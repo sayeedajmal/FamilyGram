@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: FamilyAuth
+  data:
+    mongodb:
+      uri: ${BlogDBUrl}
+      database: ${BlogDBName}
+  servlet:
+    multipart:
+      enabled: ${MULTIPART_ENABLED}
+      max-file-size: ${MAX_FILE_SIZE}
+      max-request-size: ${MAX_REQUEST_SIZE}
+  main:
+    allow-circular-references: true
+  devtools:
+    add-properties: false
+
+server:
+  port: 8081
+
+
+jwt:
+  secret: ${JWT_SECRET}
+  tokenValidityInMilliSeconds: ${JWT_TOKEN_VALIDITY_IN_MILLISECONDS}
+  tokenRefreshInMilliSeconds: ${JWT_TOKEN_REFRESH_IN_MILLISECONDS}
+
+# Auth:
+#   Cors:
+#     Url: ${CORS_URL}
+#     Methods: ${CORS_METHODS}
+
+# logging:
+#   level:
+#     web: OFF
+#     org.springframework.web: ERROR
+#     feign: ERROR
+    
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
