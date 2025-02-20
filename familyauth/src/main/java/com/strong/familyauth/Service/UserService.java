@@ -38,6 +38,9 @@ public class UserService implements UserDetailsService {
     AuthenticationManager authenticationManager;
 
     @Autowired
+    EmailService emailService;
+
+    @Autowired
     private JwtUtil jwtUtil;
 
     @Autowired
@@ -57,13 +60,21 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
 
-    public String signUp(User user) throws UserException {
-        Optional<User> existingUser = userRepo.findByEmail(user.getEmail().toLowerCase());
+    public String sendEmailOtp(String email) throws UserException {
+        Optional<User> existingUser = userRepo.findByEmail(email.toLowerCase());
         if (existingUser.isPresent()) {
-            throw new UserException("Email already in use: " + user.getEmail());
+            throw new UserException("Email already in use: " + email);
         }
+        emailService.sendOtpEmail(email);
+        return "Email sent successfully! Validity is 3 Minutes.";
+    }
 
+    public String signUp(User user) throws UserException {
+        if (!emailService.validateOtp(user.getEmail(), user.getBio())) {
+            throw new UserException("Incorrect OTP/Expired OTP. Please try again.");
+        }
         user.setUsername(user.getName());
+        user.setBio("");
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setAccountNonExpired(true);
         user.setAccountNonLocked(true);

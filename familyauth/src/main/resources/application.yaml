@@ -14,6 +14,14 @@ spring:
     allow-circular-references: true
   devtools:
     add-properties: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${Email}
+    password: ${EmailPassword}
+    properties.mail.smtp.auth: true
+    properties.mail.smtp.starttls.enable: true
+
 
 server:
   port: 8081
@@ -44,3 +52,4 @@ management:
     export:
       prometheus:
         enabled: true
+
