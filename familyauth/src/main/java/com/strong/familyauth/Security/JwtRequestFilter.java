@@ -5,7 +5,6 @@ import java.io.IOException;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -56,6 +55,11 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
 
+        String requestURI = request.getRequestURI();
+        if (requestURI.contains("/auth/")) {
+            chain.doFilter(request, response);
+            return;
+        }
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -71,6 +75,8 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                                 userDetails, null, userDetails.getAuthorities());
                         authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                        chain.doFilter(request, response);
+                        return;
                     }
                 }
             } catch (UserException e) {
@@ -80,6 +86,8 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             }
 
         }
+        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.getWriter().write("Unauthorized");
         chain.doFilter(request, response);
     }
 }

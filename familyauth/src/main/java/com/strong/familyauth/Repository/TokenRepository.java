@@ -9,7 +9,7 @@ import com.strong.familyauth.Model.Token;
 
 public interface TokenRepository extends MongoRepository<Token, String> {
 
-    List<Token> findByUser(String username);
+    List<Token> findByUser(String id);
 
     Optional<Token> findByAccessToken(String accessToken);
 

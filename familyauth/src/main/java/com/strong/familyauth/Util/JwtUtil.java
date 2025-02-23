@@ -101,6 +101,7 @@ public class JwtUtil {
         } catch (JwtException e) {
             throw new JwtException("Error checking token expiration: " + e.getMessage());
         } catch (UserException e) {
+            
         }
         return false;
     }
@@ -145,7 +146,7 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (ExpiredJwtException e) {
-            throw new UserException("Token has expired");
+            throw new UserException(e.getLocalizedMessage());
         } catch (JwtException e) {
             throw new UserException("Invalid JWT: " + e.getMessage());
         }

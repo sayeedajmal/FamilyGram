@@ -15,7 +15,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.strong.familyauth.Model.Profile;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.UserService;
 import com.strong.familyauth.Util.UserException;
@@ -68,9 +67,4 @@ public class AuthController {
         }
     }
 
-    @PostMapping("/profile")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profile> getProfile(@RequestParam("username") String username) throws UserException {
-        return new ResponseEntity<>(userService.getUserByUsername(username), HttpStatus.OK);
-    }
 }

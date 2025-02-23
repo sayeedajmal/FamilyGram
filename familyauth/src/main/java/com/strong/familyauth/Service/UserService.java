@@ -1,6 +1,7 @@
 package com.strong.familyauth.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -95,7 +96,6 @@ public class UserService implements UserDetailsService {
         String accessToken = jwtUtil.generateAccessToken(user);
         String refreshToken = jwtUtil.generateRefreshToken(user);
 
-        revokeAllTokens(refreshToken);
         saveToken(accessToken, refreshToken, user);
         Map<String, String> tokens = new HashMap<>();
         tokens.put("accessToken", accessToken);
@@ -171,7 +171,7 @@ public class UserService implements UserDetailsService {
         String newRefreshToken = jwtUtil.generateRefreshToken(user);
 
         // Revoke old tokens and save new ones
-        revokeAllTokens(refreshToken);
+        revokeRefreshToken(refreshToken);
         saveToken(newAccessToken, newRefreshToken, user);
 
         // Return tokens as JSON response
@@ -182,10 +182,16 @@ public class UserService implements UserDetailsService {
         return tokens;
     }
 
-    private void revokeAllTokens(String refreshToken) {
-        Optional<Token> validToken = tokenRepository.findByRefreshToken(refreshToken);
-        if (validToken.isPresent()) {
-            tokenRepository.delete(validToken.get());
+    public void revokeRefreshToken(String refreshToken) throws UserException {
+        Token token = tokenRepository.findByRefreshToken(refreshToken)
+            .orElseThrow(() -> new UserException("Token not found"));
+        tokenRepository.delete(token);
+    }
+    @SuppressWarnings("unused")
+    private void revokeAllTokens(User user) {
+        List<Token> validTokens = tokenRepository.findByUser(user.getId());
+        if (!validTokens.isEmpty()) {
+            tokenRepository.deleteAll(validTokens);
         }
     }
 
