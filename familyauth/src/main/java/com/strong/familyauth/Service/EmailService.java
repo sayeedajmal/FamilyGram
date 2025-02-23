@@ -27,12 +27,7 @@ public class EmailService {
                 Instant expiryTime = Instant.now().plusSeconds(180); // 3 minutes expiry
 
                 // Check if an OTP already exists for the email
-                OtpEntity otpEntity = otpRepository.findByEmail(to)
-                                .orElse(new OtpEntity(to, otp, expiryTime)); // If not found, create a new entity
-
-                // Update the OTP and expiry time
-                otpEntity.setOtp(otp);
-                otpEntity.setExpiryTime(expiryTime);
+                OtpEntity otpEntity =new OtpEntity(to,otp,expiryTime);
 
                 otpRepository.save(otpEntity); // Save the updated OTP
 

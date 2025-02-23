@@ -10,8 +10,10 @@ import org.springframework.security.web.authentication.WebAuthenticationDetailsS
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.UserService;
 import com.strong.familyauth.Util.JwtUtil;
+import com.strong.familyauth.Util.UserException;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,14 +21,8 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 /**
- * JwtRequestFilter is a Spring Security filter that intercepts HTTP requests to
- * handle JWT-based authentication. It extends OncePerRequestFilter to ensure
- * that it
- * processes each request only once per request cycle.
- * <p>
- * This filter extracts the JWT from the "Authorization" header, validates it,
- * and sets the
- * authentication information in the SecurityContext if the token is valid.
+ * JwtRequestFilter is a Spring Security filter that intercepts HTTP requests
+ * to handle JWT-based authentication.
  */
 @Component
 public class JwtRequestFilter extends OncePerRequestFilter {
@@ -48,11 +44,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     /**
      * Filters requests to handle JWT-based authentication.
      * 
-     * <p>
-     * This method extracts the JWT from the "Authorization" header, validates it,
-     * and sets the authentication information in the SecurityContext if the token
-     * is valid.
-     * 
      * @param request  the HTTP request containing the JWT in the "Authorization"
      *                 header.
      * @param response the HTTP response.
@@ -71,21 +62,23 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             String jwt = authHeader.substring(7);
 
             try {
-                String username = jwtUtil.extractUserEmail(jwt);
-                UserDetails userDetails = userService.loadUserByUsername(username);
+                String email = jwtUtil.extractUserEmail(jwt);
+                if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    User userDetails = (User) userService.loadUserByUsername(email);
 
-                if (userDetails != null && jwtUtil.isTokenValid(jwt, userDetails)) {
-                    UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
-                            userDetails, null, userDetails.getAuthorities());
-                    authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-                    SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    if (userDetails != null && jwtUtil.isTokenValid(jwt, userDetails)) {
+                        UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
+                                userDetails, null, userDetails.getAuthorities());
+                        authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+                    }
                 }
-            } catch (Exception e) {
-                // Handle the exception and send an unauthorized response
+            } catch (UserException e) {
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.getWriter().write(e.getLocalizedMessage());
+                response.getWriter().write(e.getMessage());
                 return;
             }
+
         }
         chain.doFilter(request, response);
     }

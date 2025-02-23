@@ -7,13 +7,13 @@ import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Repository.TokenRepository;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -46,8 +46,9 @@ public class JwtUtil {
      * 
      * @param token the JWT from which the user email is to be extracted.
      * @return the extracted user email.
+     * @throws UserException if the token is invalid or has expired.
      */
-    public String extractUserEmail(String token) {
+    public String extractUserEmail(String token) throws UserException {
         return extractClaim(token, Claims::getSubject);
     }
 
@@ -57,16 +58,16 @@ public class JwtUtil {
      * @param token the JWT to validate.
      * @param user  the user details to validate against.
      * @return true if the JWT is valid, false otherwise.
+     * @throws UserException
      */
-    public boolean isTokenValid(String token, UserDetails user) {
+    public boolean isTokenValid(String token, User user) throws UserException {
         String email = extractUserEmail(token);
 
         boolean validToken = tokenRepo
                 .findByAccessToken(token)
                 .map(t -> !t.isLoggedOut())
                 .orElse(false);
-
-        return (email.equals(user.getUsername())) && !isTokenExpired(token) && validToken;
+        return (email.equals(user.getEmail())) && !isTokenExpired(token) && validToken;
     }
 
     /**
@@ -75,8 +76,9 @@ public class JwtUtil {
      * @param token the refresh token to validate.
      * @param user  the user details to validate against.
      * @return true if the refresh token is valid, false otherwise.
+     * @throws UserException
      */
-    public boolean isRefreshValid(String token, User user) {
+    public boolean isRefreshValid(String token, User user) throws UserException {
         String email = extractUserEmail(token);
 
         boolean validRefreshToken = tokenRepo
@@ -94,7 +96,13 @@ public class JwtUtil {
      * @return true if the token has expired, false otherwise.
      */
     private boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
+        try {
+            return extractExpiration(token).before(new Date());
+        } catch (JwtException e) {
+            throw new JwtException("Error checking token expiration: " + e.getMessage());
+        } catch (UserException e) {
+        }
+        return false;
     }
 
     /**
@@ -102,8 +110,9 @@ public class JwtUtil {
      * 
      * @param token the JWT from which the expiration date is to be extracted.
      * @return the extracted expiration date.
+     * @throws UserException if the token is invalid or has expired.
      */
-    private Date extractExpiration(String token) {
+    private Date extractExpiration(String token) throws UserException {
         return extractClaim(token, Claims::getExpiration);
     }
 
@@ -114,8 +123,9 @@ public class JwtUtil {
      * @param resolver the function to extract the specific claim.
      * @param <T>      the type of the claim.
      * @return the extracted claim.
+     * @throws UserException if the token is invalid or has expired.
      */
-    public <T> T extractClaim(String token, Function<Claims, T> resolver) {
+    public <T> T extractClaim(String token, Function<Claims, T> resolver) throws UserException {
         Claims claims = extractAllClaims(token);
         return resolver.apply(claims);
     }
@@ -125,17 +135,19 @@ public class JwtUtil {
      * 
      * @param token the JWT from which the claims are to be extracted.
      * @return the extracted claims.
+     * @throws UserException if the token is invalid or has expired.
      */
-    private Claims extractAllClaims(String token) {
+    private Claims extractAllClaims(String token) throws UserException {
         try {
-            return Jwts
-                    .parser()
+            return Jwts.parser()
                     .verifyWith(getSigninKey())
                     .build()
                     .parseSignedClaims(token)
                     .getPayload();
+        } catch (ExpiredJwtException e) {
+            throw new UserException("Token has expired");
         } catch (JwtException e) {
-            throw new JwtException(e.getLocalizedMessage());
+            throw new UserException("Invalid JWT: " + e.getMessage());
         }
     }
 

@@ -1,6 +1,7 @@
 package com.strong.familyauth.Model;
 
 import java.util.Collection;
+import java.util.Set;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
@@ -12,8 +13,10 @@ import lombok.Data;
 
 @Data
 @Document(collection = "users")
-public class User implements UserDetails{
+public class User implements UserDetails {
     @Id
+    @Indexed(unique = true)
+    private String id;
     @Indexed(unique = true)
     private String username;
     private String name;
@@ -27,8 +30,11 @@ public class User implements UserDetails{
     private boolean accountNonExpired;
     private boolean accountNonLocked;
     private boolean enabled;
-    @Override
-    public Collection<? extends GrantedAuthority> getAuthorities() {
-            return null;
-    }
+    private boolean isPrivate;
+    private Set<String> followers;
+    private Set<String> following;
+    private int followerCount;
+    private int followingCount;
+    private Collection<? extends GrantedAuthority> authorities;
+
 }
