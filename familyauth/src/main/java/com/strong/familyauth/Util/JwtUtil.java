@@ -7,6 +7,7 @@ import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 import com.strong.familyauth.Model.User;
@@ -146,7 +147,7 @@ public class JwtUtil {
                     .parseSignedClaims(token)
                     .getPayload();
         } catch (ExpiredJwtException e) {
-            throw new UserException(e.getLocalizedMessage());
+            throw new UserException(e.getLocalizedMessage(), HttpStatus.I_AM_A_TEAPOT);
         } catch (JwtException e) {
             throw new UserException("Invalid JWT: " + e.getMessage());
         }

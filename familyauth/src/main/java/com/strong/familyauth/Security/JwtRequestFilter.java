@@ -80,7 +80,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                     }
                 }
             } catch (UserException e) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setStatus(HttpServletResponse.SC_NOT_ACCEPTABLE);
                 response.getWriter().write(e.getMessage());
                 return;
             }
