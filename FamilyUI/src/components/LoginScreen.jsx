@@ -43,11 +43,15 @@ export default function LoginScreen({ navigation }) {
         type: "success",
       });
 
-      setTimeout(() => navigation.replace("Home"), 1000);
+      setTimeout(() => {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: "ProfileSection" }],
+        });
+      }, 1000);
     } else {
       // Read the response once
       const responseText = await response.text();
-      console.log("Response:", responseText); // Debugging
       let responseBody = {};
       try {
         responseBody = JSON.parse(responseText);

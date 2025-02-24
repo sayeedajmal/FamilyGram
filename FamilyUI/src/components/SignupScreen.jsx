@@ -115,11 +115,16 @@ export default function SignupScreen({ navigation }) {
       const response = await loginSignup.registerUser(userData);
       const responseText = await response.text();
       if (response.status === 201) {
-        setSnackbarMessage("Registration Successful! Redirecting to Login...");
+        setSnackbarMessage(
+          "Registration Successful! Redirecting to Profile..."
+        );
         setSnackbarType("success");
         setTimeout(() => {
-          navigation.navigate("Login");
-        }, 2000);
+          navigation.reset({
+            index: 0,
+            routes: [{ name: "ProfileSection" }],
+          });
+        }, 1000);
       } else {
         let responseBody = {};
         try {
