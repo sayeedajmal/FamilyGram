@@ -19,7 +19,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   const [website, setWebsite] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
-  const [isUpdating, setIsUpdating] = useState(false); // <-- Added loading state
+  const [isUpdating, setIsUpdating] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -31,7 +31,6 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         setBio(userProfile.bio || "");
         setWebsite(userProfile.website || "");
 
-        // Fetch Image URL
         if (userProfile.photoId) {
           const imageUrl = await loginSignup.getProfileImage(
             userProfile.photoId
@@ -59,9 +58,15 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
     }
   };
 
+  // Handle Username Input (Restrict spaces & special characters except "-")
+  const handleUsernameChange = (text) => {
+    const sanitizedText = text.replace(/[^a-zA-Z0-9-_]/g, ""); // Remove invalid characters
+    setUsername(sanitizedText);
+  };
+
   // Handle Profile Update
   const handleSave = async () => {
-    setIsUpdating(true); // Start loading
+    setIsUpdating(true);
     const updatedUser = {
       id: id,
       username,
@@ -77,8 +82,8 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       );
       if (response) {
         Alert.alert("Success", "Profile updated successfully");
-        onUpdate(); // Refresh profile
-        onEdit(); // Close the edit screen
+        onUpdate();
+        onEdit();
       } else {
         Alert.alert("Error", "Failed to update profile");
       }
@@ -86,13 +91,12 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       console.error("Profile update error:", error);
       Alert.alert("Error", "Something went wrong");
     } finally {
-      setIsUpdating(false); // Stop loading
+      setIsUpdating(false);
     }
   };
 
   return (
     <View className="content-center h-full w-full max-w-md bg-white rounded-xl shadow-lg p-6">
-      {/* Header */}
       <View className="flex-row justify-between items-center mb-6">
         <Text className="text-2xl font-semibold">Edit Profile</Text>
         <TouchableOpacity onPress={onEdit}>
@@ -100,13 +104,10 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Profile Picture */}
       <View className="items-center mb-6">
         <View className="relative">
           <Image
-            source={{
-              uri: profileImage || "https://via.placeholder.com/150",
-            }}
+            source={{ uri: profileImage || "https://via.placeholder.com/150" }}
             className="w-24 h-24 rounded-full border-4 border-gray-100"
           />
           <TouchableOpacity
@@ -118,13 +119,12 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </View>
       </View>
 
-      {/* Form */}
       <View className="space-y-4">
         <View>
           <Text className="text-sm font-medium mb-2">Username</Text>
           <TextInput
             value={username}
-            onChangeText={setUsername}
+            onChangeText={handleUsernameChange}
             textContentType="username"
             placeholder="@username"
             className="w-full px-4 py-2 rounded-3xl border border-gray-300"
@@ -165,7 +165,6 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </View>
       </View>
 
-      {/* Buttons */}
       <View className="flex-row justify-end space-x-3 pt-4">
         <TouchableOpacity
           onPress={onEdit}

@@ -25,7 +25,6 @@ const Storage = {
     },
 };
 
-
 class ApiService {
     constructor() {
         this.refreshingPromise = null;
@@ -41,7 +40,6 @@ class ApiService {
         }
     }
 
-    /** Save access & refresh tokens securely */
     async saveTokens(accessToken, refreshToken) {
         try {
             await Storage.setItem("accessToken", accessToken);
@@ -51,17 +49,14 @@ class ApiService {
         }
     }
 
-    /** Get stored access token */
     async getAccessToken() {
         return await Storage.getItem("accessToken");
     }
 
-    /** Get stored refresh token */
     async getRefreshToken() {
         return await Storage.getItem("refreshToken");
     }
 
-    /** Clear tokens (logout or refresh failure) */
     async clearTokens() {
         await Storage.deleteItem("accessToken");
         await Storage.deleteItem("refreshToken");
@@ -71,35 +66,39 @@ class ApiService {
         if (!fieldId) return null;
         try {
             const response = await this.request(`/auth/image/${fieldId}`, {
-                method: 'GET'
+                method: "GET",
             });
 
             if (!response.ok) {
-                console.error('Failed to fetch image:', response.status);
+                console.error("Failed to fetch image:", response.status);
                 return null;
             }
 
-            const blob = await response.blob();
-            const imageUrl = URL.createObjectURL(blob);
+            if (Platform.OS === "web") {
+                const blob = await response.blob();
+                return URL.createObjectURL(blob);
+            }
 
-            return imageUrl;
+            return response.url || response.uri || `/auth/image/${fieldId}`;
         } catch (error) {
-            console.error('Error fetching profile image:', error);
+            console.error("Error fetching profile image:", error);
             return null;
         }
     }
 
-
-    /* Update Profile */
     async updateUserProfile(userData, file) {
         const formData = new FormData();
-
-        // Append user data as a JSON string
         formData.append("user", JSON.stringify(userData));
-        // Append file if it exists
-        const response = await fetch(file.uri);
-        const blob = await response.blob();
-        formData.append("file", blob, "image.jpg");
+
+        if (file) {
+            if (Platform.OS === "web") {
+                formData.append("file", file);
+            } else {
+                const response = await fetch(file.uri);
+                const blob = await response.blob();
+                formData.append("file", blob, "image.jpg");
+            }
+        }
 
         try {
             const response = await this.request("/user/update", {
@@ -121,14 +120,11 @@ class ApiService {
         }
     }
 
-
-    /** Refresh the access token */
     async refreshAccessToken() {
         if (this.refreshingPromise) return this.refreshingPromise;
 
         this.refreshingPromise = (async () => {
             const refreshToken = await this.getRefreshToken();
-
             if (!refreshToken) return null;
 
             try {
@@ -157,7 +153,6 @@ class ApiService {
         return this.refreshingPromise;
     }
 
-    /** Central API request method */
     async request(endpoint, options = {}) {
         let accessToken = await this.getAccessToken();
 
@@ -177,13 +172,13 @@ class ApiService {
         return response;
     }
 
-    /** User Authentication Methods */
     async registerUser(userData) {
         const response = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
         });
+
         if (response.status === 200) {
             const data = await response.json();
             await this.saveTokens(data.accessToken, data.refreshToken);

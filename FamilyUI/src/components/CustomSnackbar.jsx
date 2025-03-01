@@ -1,10 +1,10 @@
-import React from "react";
-import { View, Text, Animated } from "react-native";
+import React, { useEffect, useRef } from "react";
+import { View, Text, Animated, Platform } from "react-native";
 
 const CustomSnackbar = ({ message, visible, type = "success" }) => {
-  const position = new Animated.Value(-100); // Starts off-screen
+  const position = useRef(new Animated.Value(-100)).current; // Using useRef to persist animation value
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (visible) {
       Animated.timing(position, {
         toValue: 50, // Slide in from top
@@ -23,9 +23,8 @@ const CustomSnackbar = ({ message, visible, type = "success" }) => {
     }
   }, [visible]);
 
-  if (!visible) return null;
+  if (!visible || Platform.OS === "web") return null; // Prevent rendering on web
 
-  // Set background color based on type
   const backgroundColor = type === "success" ? "#22c55e" : "#ef4444"; // Green for success, Red for error
 
   return (
@@ -34,7 +33,7 @@ const CustomSnackbar = ({ message, visible, type = "success" }) => {
         position: "absolute",
         top: position,
         right: 20,
-        backgroundColor: backgroundColor,
+        backgroundColor,
         padding: 12,
         borderRadius: 10,
         shadowColor: "#000",

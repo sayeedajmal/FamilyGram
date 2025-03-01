@@ -46,7 +46,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
       setAuthenticated(true);
 
       // ✅ Navigate to Profile
-      navigation.replace("ProfileSection");
+      navigation.replace("HomePage");
     } else {
       // Read the response once
       const responseText = await response.text();
@@ -68,7 +68,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
 
   return (
     <View className="flex-1 bg-white items-center justify-center px-6">
-      <View className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-lg">
+      <View className="w-full h-[60%] justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
         <Image
           source={{
             uri: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png",
@@ -97,7 +97,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
         />
 
         <TouchableOpacity
-          className="w-full bg-blue-500 py-3 rounded-3xl mt-3"
+          className="w-full bg-blue-500 py-3 rounded-3xl mt-3 justify-center items-center"
           onPress={handleLogin}
           disabled={loading}
         >
@@ -112,7 +112,9 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
 
         <View className="flex-row items-center my-4">
           <View className="flex-1 h-[1px] bg-gray-300"></View>
-          <Text className="px-2 text-gray-500 text-sm font-semibold">OR</Text>
+          <Text className="px-20128 text-gray-500 text-sm font-semibold">
+            OR
+          </Text>
           <View className="flex-1 h-[1px] bg-gray-300"></View>
         </View>
 
@@ -122,17 +124,17 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity>
-          <Text className="block text-center text-xs text-blue-900 mt-2">
-            Forgot password?
-          </Text>
+        <TouchableOpacity className="items-center">
+          <Text className="text-xs text-blue-900 mt-2">Forgot password?</Text>
         </TouchableOpacity>
 
         <View className="mt-8 pt-4 border-t border-gray-300 w-full max-w-sm">
           <Text className="text-center text-sm">
             Don't have an account?
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-              <Text className="text-blue-500 font-semibold ml-1">Sign up</Text>
+              <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3">
+                Sign up
+              </Text>
             </TouchableOpacity>
           </Text>
         </View>

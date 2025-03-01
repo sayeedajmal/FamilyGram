@@ -150,7 +150,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   };
 
   return (
-    <View className="flex-1 bg-white items-center justify-center px-6">
+    <View className="flex-1  bg-white items-center justify-center px-6">
       {/* Custom Snackbar */}
       <CustomSnackbar
         message={snackbarMessage}
@@ -159,7 +159,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
       />
 
       {/* Signup Box */}
-      <View className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-lg">
+      <View className="w-full h-[60%] justify-center max-w-sm bg-white p-6 rounded-3xl shadow-lg">
         <Image
           source={{
             uri: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png",
@@ -276,7 +276,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
             <Text className="text-center text-sm">
               Already have an account?
               <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                <Text className="text-blue-500 font-semibold ml-1">
+                <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3">
                   {" "}
                   Log in
                 </Text>
