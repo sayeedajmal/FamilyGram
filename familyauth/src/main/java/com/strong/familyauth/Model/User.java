@@ -26,7 +26,7 @@ public class User implements UserDetails {
     private String email;
     @Indexed(unique = true)
     private String phone;
-    private String photoUrl;
+    private String photoId;
     private boolean accountNonExpired;
     private boolean accountNonLocked;
     private boolean enabled;
@@ -34,6 +34,7 @@ public class User implements UserDetails {
     private Set<String> followers;
     private Set<String> following;
     private int followerCount;
+    private String website;
     private int followingCount;
     private Collection<? extends GrantedAuthority> authorities;
 

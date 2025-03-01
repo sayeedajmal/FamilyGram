@@ -4,16 +4,15 @@ import lombok.Data;
 
 @Data
 public class Profile {
+    private String id;
     private String username;
     private String name;
     private String bio;
     private String email;
     private String phone;
-    private String photoUrl;
-    private boolean accountNonExpired;
-    private boolean accountNonLocked;
-    private boolean enabled;
+    private String photoId;
     private boolean isPrivate;
+    private String website;
     private int followerCount;
     private int followingCount;
 }

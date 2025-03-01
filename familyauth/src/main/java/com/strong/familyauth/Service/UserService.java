@@ -6,6 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
@@ -14,6 +15,7 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.strong.familyauth.Model.Profile;
 import com.strong.familyauth.Model.Token;
@@ -42,6 +44,12 @@ public class UserService implements UserDetailsService {
     private JwtUtil jwtUtil;
 
     @Autowired
+    ImageStorageService imageStorageService;
+
+    @Autowired
+    User savedUser;
+
+    @Autowired
     private TokenRepository tokenRepository;
 
     public String sendEmailOtp(String email) throws UserException {
@@ -64,6 +72,7 @@ public class UserService implements UserDetailsService {
         user.setAccountNonExpired(true);
         user.setAccountNonLocked(true);
         user.setEnabled(true);
+        user.setPhotoId("");
         user.setPrivate(false);
         user.setFollowerCount(0);
         user.setFollowingCount(0);
@@ -84,6 +93,16 @@ public class UserService implements UserDetailsService {
     public Map<String, String> authenticate(String email, String password) throws UserException {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
+
+        if (!user.isAccountNonExpired()) {
+            throw new UserException("Your account has expired", HttpStatus.UNAUTHORIZED);
+        }
+        if (!user.isAccountNonLocked()) {
+            throw new UserException("Your account is locked", HttpStatus.UNAUTHORIZED);
+        }
+        if (!user.isEnabled()) {
+            throw new UserException("Your account is disabled", HttpStatus.UNAUTHORIZED);
+        }
 
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(
@@ -107,34 +126,95 @@ public class UserService implements UserDetailsService {
         User user = userRepo.findByusername(username)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
+        profile.setId(user.getId());
         profile.setEmail(user.getEmail());
         profile.setUsername(user.getUsername());
         profile.setName(user.getName());
         profile.setPhone(user.getPhone());
-        profile.setPhotoUrl(user.getPhotoUrl());
+        profile.setPhotoId(user.getPhotoId());
         profile.setBio(user.getBio());
-        profile.setEnabled(user.isEnabled());
+        profile.setWebsite(user.getWebsite());
         profile.setPrivate(user.isPrivate());
-        profile.setAccountNonExpired(user.isAccountNonExpired());
-        profile.setAccountNonLocked(user.isAccountNonLocked());
         profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
         profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
         return profile;
     }
 
-    public User getUserByEmail(String email) throws UserException {
+    public Profile getUserByEmail(String email) throws UserException {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
-        return user;
+        Profile profile = new Profile();
+        profile.setId(user.getId());
+        profile.setEmail(user.getEmail());
+        profile.setUsername(user.getUsername());
+        profile.setName(user.getName());
+        profile.setPhone(user.getPhone());
+        profile.setPhotoId(user.getPhotoId());
+        profile.setBio(user.getBio());
+        profile.setWebsite(user.getWebsite());
+        profile.setPrivate(user.isPrivate());
+        profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        return profile;
     }
 
-    public User updateUser(String id, User userDetails) throws UserException {
-        User user = userRepo.findById(id)
-                .orElseThrow(() -> new UserException("Can't Find User by Id: " + id));
-        user.setName(userDetails.getName());
-        user.setPhotoUrl(userDetails.getPhotoUrl());
-        user.setBio(userDetails.getBio());
-        return userRepo.save(user);
+    public String updateUserEmail(String id, String email) throws UserException {
+        User existingUser = userRepo.findById(id)
+                .orElseThrow(() -> new UserException("User not found"));
+        existingUser.setEmail(email);
+        User savedUser = userRepo.save(existingUser);
+        return savedUser.getEmail();
+    }
+
+    public String updateUserPhone(String id, String phone) throws UserException {
+        User existingUser = userRepo.findById(id)
+                .orElseThrow(() -> new UserException("User not found"));
+        existingUser.setPhone(phone);
+        User savedUser = userRepo.save(existingUser);
+        return savedUser.getPhone();
+    }
+
+    public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
+        // Fetch the existing user from the database
+        User existingUser = userRepo.findById(updatedUser.getId())
+                .orElseThrow(() -> new UserException("User not found"));
+
+        // Handle profile picture update
+        if (file != null && !file.isEmpty()) {
+            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
+            System.out.println("uploadImage: " + uploadImage);
+            existingUser.setPhotoId(uploadImage);
+        }
+
+        // Update only non-null fields
+        if (updatedUser.getWebsite() != null) {
+            existingUser.setWebsite(updatedUser.getWebsite());
+        }
+        if (updatedUser.getUsername() != null) {
+            existingUser.setUsername(updatedUser.getUsername());
+        }
+        if (updatedUser.getName() != null) {
+            existingUser.setName(updatedUser.getName());
+        }
+
+        if (updatedUser.getBio() != null) {
+            existingUser.setBio(updatedUser.getBio());
+        }
+
+        User savedUser = userRepo.save(existingUser);
+        Profile profile = new Profile();
+        profile.setId(savedUser.getId());
+        profile.setEmail(savedUser.getEmail());
+        profile.setUsername(savedUser.getUsername());
+        profile.setName(savedUser.getName());
+        profile.setPhone(savedUser.getPhone());
+        profile.setPhotoId(savedUser.getPhotoId());
+        profile.setBio(savedUser.getBio());
+        profile.setWebsite(savedUser.getWebsite());
+        profile.setPrivate(savedUser.isPrivate());
+        profile.setFollowerCount(savedUser.getFollowers() != null ? savedUser.getFollowers().size() : 0);
+        profile.setFollowingCount(savedUser.getFollowing() != null ? savedUser.getFollowing().size() : 0);
+        return profile;
     }
 
     public void deleteUser(String id) throws UserException {
@@ -184,15 +264,22 @@ public class UserService implements UserDetailsService {
 
     public void revokeRefreshToken(String refreshToken) throws UserException {
         Token token = tokenRepository.findByRefreshToken(refreshToken)
-            .orElseThrow(() -> new UserException("Token not found"));
+                .orElseThrow(() -> new UserException("Token not found"));
         tokenRepository.delete(token);
     }
+
     @SuppressWarnings("unused")
     private void revokeAllTokens(User user) {
         List<Token> validTokens = tokenRepository.findByUser(user.getId());
         if (!validTokens.isEmpty()) {
             tokenRepository.deleteAll(validTokens);
         }
+    }
+
+    public void revokeAccessToken(String accessToken) throws UserException {
+        Token token = tokenRepository.findByAccessToken(accessToken)
+                .orElseThrow(() -> new UserException("Token not found"));
+        tokenRepository.delete(token);
     }
 
     @Override
