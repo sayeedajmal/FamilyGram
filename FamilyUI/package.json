@@ -29,7 +29,8 @@
     "react-native-web": "~0.19.13",
     "tailwindcss": "^3.4.17",
     "expo-secure-store": "~14.0.1",
-    "expo-router": "~4.0.17"
+    "expo-router": "~4.0.17",
+    "expo-image-picker": "~16.0.6"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0"

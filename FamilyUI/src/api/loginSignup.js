@@ -67,13 +67,67 @@ class ApiService {
         await Storage.deleteItem("refreshToken");
     }
 
+    async getProfileImage(fieldId) {
+        if (!fieldId) return null;
+        try {
+            const response = await this.request(`/auth/image/${fieldId}`, {
+                method: 'GET'
+            });
+
+            if (!response.ok) {
+                console.error('Failed to fetch image:', response.status);
+                return null;
+            }
+
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            return imageUrl;
+        } catch (error) {
+            console.error('Error fetching profile image:', error);
+            return null;
+        }
+    }
+
+
+    /* Update Profile */
+    async updateUserProfile(userData, file) {
+        const formData = new FormData();
+
+        // Append user data as a JSON string
+        formData.append("user", JSON.stringify(userData));
+        // Append file if it exists
+        const response = await fetch(file.uri);
+        const blob = await response.blob();
+        formData.append("file", blob, "image.jpg");
+
+        try {
+            const response = await this.request("/user/update", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (response.ok) {
+                const updatedProfile = await response.json();
+                await Storage.setItem("userProfile", JSON.stringify(updatedProfile));
+                return true;
+            } else {
+                console.error("Failed to update profile:", response.status, await response.text());
+                return response;
+            }
+        } catch (error) {
+            console.error("Profile update error:", error);
+            return null;
+        }
+    }
+
+
     /** Refresh the access token */
     async refreshAccessToken() {
         if (this.refreshingPromise) return this.refreshingPromise;
 
         this.refreshingPromise = (async () => {
             const refreshToken = await this.getRefreshToken();
-            console.log("refreshToken", refreshToken);
 
             if (!refreshToken) return null;
 
@@ -125,12 +179,11 @@ class ApiService {
 
     /** User Authentication Methods */
     async registerUser(userData) {
-        const response = await this.request("/auth/signup", {
+        const response = await fetch(`${API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
         });
-
         if (response.status === 200) {
             const data = await response.json();
             await this.saveTokens(data.accessToken, data.refreshToken);
@@ -162,6 +215,12 @@ class ApiService {
         }
 
         return response;
+    }
+
+    async sendSignupOtp(email) {
+        return fetch(`${API_URL}/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, {
+            method: "POST",
+        });
     }
 
     async fetchUserProfileByEmail(email) {

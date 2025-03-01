@@ -29,7 +29,6 @@ export default function App() {
   useEffect(() => {
     const checkAuth = async () => {
       const token = await Storage.getItem("accessToken");
-      console.log("Token found:", token);
 
       if (!token) {
         setIsAuthenticated(false);
@@ -42,7 +41,6 @@ export default function App() {
         const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
 
         if (!userProfile || !userProfile.email) {
-          console.log("No user email found, logging out...");
           await Storage.deleteItem("accessToken");
           await Storage.deleteItem("refreshToken");
           setIsAuthenticated(false);
@@ -55,8 +53,8 @@ export default function App() {
         if (profile) {
           setIsAuthenticated(true);
         } else {
-          await Storage.deleteItem("accessToken");
-          await Storage.deleteItem("refreshToken");
+          // await Storage.deleteItem("accessToken");
+          // await Storage.deleteItem("refreshToken");
           setIsAuthenticated(false);
         }
       } catch (error) {
@@ -69,7 +67,6 @@ export default function App() {
 
     checkAuth();
   }, []);
-
 
   if (isAuthenticated === null) {
     return (
@@ -86,8 +83,13 @@ export default function App() {
           <Stack.Screen name="ProfileSection" component={ProfileSection} />
         ) : (
           <>
-            <Stack.Screen name="Login" component={LoginScreen} />
-            <Stack.Screen name="Signup" component={SignupScreen} />
+            <Stack.Screen name="Login">
+              {props => <LoginScreen {...props} setAuthenticated={setIsAuthenticated} />}
+            </Stack.Screen>
+            <Stack.Screen name="Signup">
+              {props => <SignupScreen {...props} setAuthenticated={setIsAuthenticated} />}
+            </Stack.Screen>
+
           </>
         )}
       </Stack.Navigator>

@@ -10,7 +10,7 @@ import {
 import loginSignup from "../api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
 
-export default function LoginScreen({ navigation }) {
+export default function LoginScreen({ navigation, setAuthenticated }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -43,12 +43,10 @@ export default function LoginScreen({ navigation }) {
         type: "success",
       });
 
-      setTimeout(() => {
-        navigation.reset({
-          index: 0,
-          routes: [{ name: "ProfileSection" }],
-        });
-      }, 1000);
+      setAuthenticated(true);
+
+      // ✅ Navigate to Profile
+      navigation.replace("ProfileSection");
     } else {
       // Read the response once
       const responseText = await response.text();

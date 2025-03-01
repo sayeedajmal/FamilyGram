@@ -1,23 +1,49 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, Image, TouchableOpacity, FlatList } from "react-native";
-import { Link } from "expo-router";
 import { MaterialIcons } from "@expo/vector-icons";
+import * as Linking from "expo-linking";
+import React, { useEffect, useState } from "react";
+import {
+  FlatList,
+  Image,
+  Modal,
+  Platform,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import loginSignup from "../api/loginSignup";
+import ProfileEdit from "./ProfileEdit";
 
 export const ProfileSection = () => {
   const [userProfile, setUserProfile] = useState(null);
+  const [activeEdit, setActiveEdit] = useState(false);
 
   const posts = [...Array(20)].map((_, i) => ({
     id: i,
     uri: `https://placehold.co/400x400?text=Post${i + 1}`,
   }));
 
-  useEffect(() => {
-    async function fetchData() {
-      const profile = await loginSignup.getStoredUserProfile();
-      if (profile) setUserProfile(profile);
+  const fetchUserProfile = async () => {
+    const profile = await loginSignup.getStoredUserProfile();
+    if (profile) {
+      let imageUrl = "https://placehold.co/150x150"; // Default profile image
+
+      if (profile.photoId) {
+        try {
+          const response = await loginSignup.getProfileImage(profile.photoId);
+
+          // Ensure the response is a Blob
+          imageUrl = response;
+        } catch (error) {
+          console.error("Error fetching profile image:", error);
+        }
+      }
+
+      setUserProfile({ ...profile, imageUrl });
     }
-    fetchData();
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
   }, []);
 
   if (!userProfile) {
@@ -32,27 +58,41 @@ export const ProfileSection = () => {
     <View className="bg-white flex-1">
       {/* Profile Header */}
       <View className="p-4 w-full border-b flex-col justify-center items-center">
-        {/* Center container for larger screens */}
-        <View className="w-full md:w-[60vw] lg:w-[40vw] flex-col md:items-center">
+        <View className="w-full flex-col items-center">
           {/* Username and More Icon */}
           <View className="w-full flex-row justify-between items-center px-4">
-            <Text className="text-lg font-bold w-[80%] text-nowrap overflow-hidden">
+            <Text className="text-lg font-bold w-[80%] overflow-hidden">
               {userProfile.username || "Username"}
             </Text>
             <MaterialIcons name="more-horiz" size={24} />
           </View>
 
           {/* Profile Picture and Stats */}
-          <View className="p-4 w-full flex-row justify-around md:justify-center md:gap-16 items-center">
-            <Image
-              source={{
-                uri: userProfile.photoUrl || "https://placehold.co/150x150",
-              }}
-              className="w-[15vw] h-[15vw] md:w-[8vw] md:h-[8vw] lg:w-[6vw] lg:h-[6vw] rounded-full shadow-lg"
-            />
-            <View className="flex-row gap-3 md:gap-6 lg:gap-12">
+          <View className="p-2 w-full flex-row justify-around items-center">
+            {Platform.OS === "web" ? (
+              <img
+                src={userProfile.imageUrl || "https://placehold.co/150x150"}
+                alt="Profile"
+                style={{
+                  width: 96,
+                  height: 96,
+                  borderRadius: "50%",
+                  boxShadow: "0 4px 6px rgba(0,0,0,0.1)",
+                  objectFit: "cover",
+                }}
+              />
+            ) : (
+              <Image
+                source={{
+                  uri: userProfile.imageUrl || "https://placehold.co/150x150",
+                }}
+                style={{ width: 96, height: 96, borderRadius: 48 }}
+              />
+            )}
+
+            <View className="flex-row gap-6">
               <Text className="text-center">
-                <Text className="font-bold">1,234</Text> posts
+                <Text className="font-bold">0</Text> posts
               </Text>
               <Text className="text-center">
                 <Text className="font-bold">{userProfile.followerCount}</Text>{" "}
@@ -66,20 +106,38 @@ export const ProfileSection = () => {
           </View>
 
           {/* Name, Bio, and Link */}
-          <View className="px-4 w-full md:w-[60vw] lg:w-[40vw] flex-col items-start md:items-center">
+          <View className="px-4 w-full flex-col items-start">
             <Text className="font-semibold">{userProfile.name || "Name"}</Text>
-            <Text className="text-center md:text-left">
-              {userProfile.bio || "Bio"}
-            </Text>
-            <Link href="#" className="text-blue-900">
-              www.website.com
-            </Link>
+            <Text className="text-center">{userProfile.bio || "Bio"}</Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(userProfile.website || "#")}
+            >
+              <Text className="text-blue-900">
+                {userProfile.website || "No website"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
 
+      {/* Profile Actions */}
+      <View className="flex-row justify-center gap-4 w-full p-4">
+        <TouchableOpacity
+          onPress={() => setActiveEdit(true)}
+          className="flex-1 bg-gray-200 p-2 rounded-md"
+        >
+          <Text className="text-center font-semibold">Edit Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md">
+          <Text className="text-center font-semibold">Share Profile</Text>
+        </TouchableOpacity>
+        <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md">
+          <Text className="text-center font-semibold">Call</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Tabs */}
-      <View className="max-w-[80vw] border-b flex-row justify-center gap-8 p-4 self-center text-center">
+      <View className="border-b flex-row justify-center gap-8 p-4 self-center text-center">
         <TouchableOpacity className="items-center">
           <MaterialIcons name="grid-on" size={24} />
           <Text>POSTS</Text>
@@ -113,6 +171,18 @@ export const ProfileSection = () => {
           </TouchableOpacity>
         )}
       />
+
+      {/* Modal for Profile Editing */}
+      <Modal
+        style={{ alignSelf: "center" }}
+        visible={activeEdit}
+        animationType="slide"
+      >
+        <ProfileEdit
+          onEdit={() => setActiveEdit(false)}
+          onUpdate={fetchUserProfile}
+        />
+      </Modal>
     </View>
   );
 };

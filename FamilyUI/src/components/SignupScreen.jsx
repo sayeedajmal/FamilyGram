@@ -10,7 +10,7 @@ import {
 import loginSignup from "../api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
 
-export default function SignupScreen({ navigation }) {
+export default function SignupScreen({ navigation, setAuthenticated }) {
   const [email, setEmail] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
@@ -90,8 +90,9 @@ export default function SignupScreen({ navigation }) {
         setLoading(false);
       }
     } catch (error) {
-      setSnackbarMessage("Error processing request. Please try again.");
+      setSnackbarMessage("Error processing request. Please try again.", error);
       setSnackbarType("error");
+      setVerifying(false);
     }
 
     setShowSnackbar(true);
@@ -99,7 +100,7 @@ export default function SignupScreen({ navigation }) {
   };
 
   const handleVerifyOtp = async () => {
-    setShowSnackbar(false); // Reset snackbar visibility before making a call
+    setShowSnackbar(false);
 
     if (!otp) {
       setSnackbarMessage("Please enter the OTP!");
@@ -114,17 +115,18 @@ export default function SignupScreen({ navigation }) {
       const userData = { email, name: fullName, password, bio: otp };
       const response = await loginSignup.registerUser(userData);
       const responseText = await response.text();
+
       if (response.status === 201) {
         setSnackbarMessage(
           "Registration Successful! Redirecting to Profile..."
         );
         setSnackbarType("success");
-        setTimeout(() => {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: "ProfileSection" }],
-          });
-        }, 1000);
+
+        // ✅ Update Authentication State
+        setAuthenticated(true);
+
+        // ✅ Navigate to Profile
+        navigation.replace("ProfileSection");
       } else {
         let responseBody = {};
         try {
