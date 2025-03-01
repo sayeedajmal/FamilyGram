@@ -65,7 +65,7 @@ const HomePage = () => {
         </View>
       </View>
 
-      <ScrollView>
+      <ScrollView showsVerticalScrollIndicator={false}>
         {/* Stories */}
         <ScrollView
           horizontal

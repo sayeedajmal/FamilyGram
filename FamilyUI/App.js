@@ -171,7 +171,7 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "white", top: 0 }}>
       <NavigationContainer>
         <Stack.Navigator
           screenOptions={{
