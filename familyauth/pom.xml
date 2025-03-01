@@ -110,6 +110,13 @@
 	                </excludes>
 	            </configuration>
 	        </plugin>
+			<plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+            <configuration>
+                <mainClass>com.strong.familyauth.FamilyauthApplication</mainClass> <!-- Ensure this is your main class -->
+            </configuration>
+        </plugin>
 	    </plugins>
 	</build>
 </project>
