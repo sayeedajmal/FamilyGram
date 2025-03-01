@@ -1,22 +1,22 @@
-# Use an official OpenJDK runtime as a parent image
-FROM maven:3.8.8-openjdk-17 AS build
+# Use Maven to build the application
+FROM maven:3.8.8-eclipse-temurin-17 AS build
 
-# Set the working directory
+# Set working directory
 WORKDIR /app
 
 # Copy the project files
 COPY . .
 
-# Build the project (this generates the JAR file inside target/)
+# Build the JAR file
 RUN mvn clean package -DskipTests
 
 # Use a minimal JDK runtime for the final image
-FROM openjdk:17-jdk-slim
+FROM eclipse-temurin:17-jdk
 
 # Set working directory
 WORKDIR /app
 
-# Copy the built JAR file from the previous step
+# Copy the built JAR file from the previous stage
 COPY --from=build /app/target/*.jar app.jar
 
 # Expose the application port
