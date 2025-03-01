@@ -5,7 +5,6 @@ import {
   FlatList,
   Image,
   Modal,
-  Platform,
   Text,
   TouchableOpacity,
   View,
@@ -103,11 +102,29 @@ export const ProfileSection = () => {
               </Text>
             </TouchableOpacity>
           </View>
+
+          {/* Edit Profile Button */}
+          <View className="w-full flex-row justify-between items-center">
+            <TouchableOpacity
+              className="flex-1 bg-blue-500 p-2 rounded-md mx-[1%]"
+              onPress={() => setActiveEdit(true)}
+            >
+              <Text className="text-center font-semibold text-white">
+                Edit Profile
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+              <Text className="text-center font-semibold">Share Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+              <Text className="text-center font-semibold">Call</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
       {/* Tabs Navigation */}
-      <View className="p-2 w-[full] flex-row justify-between gap-8 px-4 text-center">
+      <View className="p-4 w-[full] flex-row justify-between gap-8 px-4 text-center">
         {["Posts", "Reels", "Saved", "Tagged"].map((tab) => (
           <TouchableOpacity
             key={tab}
@@ -137,6 +154,7 @@ export const ProfileSection = () => {
       {/* Tab Content */}
       {activeTab === "Posts" && (
         <FlatList
+          showsVerticalScrollIndicator={false}
           data={posts}
           keyExtractor={(item) => item.id.toString()}
           numColumns={3}
@@ -145,7 +163,7 @@ export const ProfileSection = () => {
             <TouchableOpacity className="w-1/3 p-1 rounded-lg">
               <Image
                 source={{ uri: item.uri }}
-                className="w-[30vw] h-[30vw] rounded-md"
+                className="w-[30vw] h-[30vw] rounded-md mx-[1%]"
               />
             </TouchableOpacity>
           )}
