@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -122,6 +123,11 @@ public class UserService implements UserDetailsService {
         return tokens;
     }
 
+    public boolean isUsernameAvailable(String username) {
+        Optional<User> existingUser = userRepo.findByusername(username);
+        return !existingUser.isPresent();
+    }
+
     public Profile getUserByUsername(String username) throws UserException {
         User user = userRepo.findByusername(username)
                 .orElseThrow(() -> new UserException("User not found"));
@@ -141,6 +147,12 @@ public class UserService implements UserDetailsService {
     }
 
     public Profile getUserByEmail(String email) throws UserException {
+
+        String loggedInEmail = getAuthenticatedUserEmail();
+
+        if (!email.equals(loggedInEmail)) {
+            throw new UserException("You are not authorized to access this profile");
+        }
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
@@ -156,6 +168,16 @@ public class UserService implements UserDetailsService {
         profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
         profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
         return profile;
+    }
+
+    private String getAuthenticatedUserEmail() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (principal instanceof User) {
+            return ((User) principal).getEmail();
+        }
+
+        return null;
     }
 
     public String updateUserEmail(String id, String email) throws UserException {

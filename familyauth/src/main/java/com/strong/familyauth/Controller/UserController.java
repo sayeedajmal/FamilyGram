@@ -15,6 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.strong.familyauth.Model.Profile;
+import com.strong.familyauth.Model.ResponseWrapper;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.UserService;
 import com.strong.familyauth.Util.UserException;
@@ -28,54 +29,73 @@ public class UserController {
     @Autowired
     private UserService userService;
 
+    @PostMapping("/checkUsername")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<ResponseWrapper<Boolean>> checkUsernameAvailability(
+            @RequestParam("username") String username) {
+        boolean isAvailable = userService.isUsernameAvailable(username);
+        String message = isAvailable ? "Username is available" : "Username is already taken";
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), message, isAvailable));
+    }
+
     @PostMapping("/update")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profile> updateProfile(
+    public ResponseEntity<ResponseWrapper<Profile>> updateProfile(
             @RequestPart(value = "file", required = false) MultipartFile file,
             @RequestParam("user") String userJson) throws UserException, JsonProcessingException {
 
         ObjectMapper objectMapper = new ObjectMapper();
         User updatedUser = objectMapper.readValue(userJson, User.class);
+        Profile updatedProfile = userService.updateUser(file, updatedUser);
 
-        return new ResponseEntity<>(userService.updateUser(file, updatedUser), HttpStatus.ACCEPTED);
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(new ResponseWrapper<>(HttpStatus.ACCEPTED.value(), "Profile updated successfully",
+                        updatedProfile));
     }
-
 
     @PostMapping("/profile")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profile> getProfile(@RequestParam("username") String username) throws UserException {
-        return new ResponseEntity<>(userService.getUserByUsername(username), HttpStatus.OK);
+    public ResponseEntity<ResponseWrapper<Profile>> getProfile(@RequestParam("username") String username)
+            throws UserException {
+        Profile profile = userService.getUserByUsername(username);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 
     @PostMapping("/updateEmail")
-    @PreAuthorize("isAuthenticated() and #updatedUser.username == authentication.name")
-    public ResponseEntity<String> updateEmail(@RequestParam("id") String id, @RequestParam("email") String email)
-            throws UserException {
-        return new ResponseEntity<>(userService.updateUserEmail(id, email), HttpStatus.OK);
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<String>> updateEmail(@RequestParam("id") String id,
+            @RequestParam("email") String email) throws UserException {
+        String result = userService.updateUserEmail(id, email);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Email updated successfully", result));
     }
 
     @PostMapping("/updatePhone")
-    @PreAuthorize("isAuthenticated() and #updatedUser.username == authentication.name")
-    public ResponseEntity<String> updatePhone(@RequestParam("id") String id, @RequestParam("phone") String phone)
-            throws UserException {
-        return new ResponseEntity<>(userService.updateUserPhone(id, phone), HttpStatus.OK);
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<String>> updatePhone(@RequestParam("id") String id,
+            @RequestParam("phone") String phone) throws UserException {
+        String result = userService.updateUserPhone(id, phone);
+        return ResponseEntity
+                .ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Phone number updated successfully", result));
     }
 
     @PostMapping("/email")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profile> getProfileByEmail(@RequestParam("email") String email) throws UserException {
-        return new ResponseEntity<>(userService.getUserByEmail(email), HttpStatus.OK);
+    public ResponseEntity<ResponseWrapper<Profile>> getProfileByEmail(@RequestParam("email") String email)
+            throws UserException {
+        Profile profile = userService.getUserByEmail(email);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 
     @PostMapping("/logout")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<String> logout(HttpServletRequest request) throws UserException {
+    public ResponseEntity<ResponseWrapper<Void>> logout(HttpServletRequest request) throws UserException {
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
             userService.revokeAccessToken(token);
-            return ResponseEntity.ok("Logged out successfully");
+            return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Logged out successfully", null));
         }
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid token");
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(new ResponseWrapper<>(HttpStatus.UNAUTHORIZED.value(), "Invalid token", null));
     }
 }

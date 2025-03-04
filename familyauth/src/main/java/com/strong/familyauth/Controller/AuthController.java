@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.strong.familyauth.Model.ResponseWrapper;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.ImageStorageService;
 import com.strong.familyauth.Service.UserService;
@@ -38,40 +39,42 @@ public class AuthController {
     @Transactional
     @PostMapping("/register")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<Map<String, String>> registerUser(@RequestBody User user) throws UserException {
-        return new ResponseEntity<>(userService.signUp(user), HttpStatus.CREATED);
+    public ResponseEntity<ResponseWrapper<Map<String, String>>> registerUser(@RequestBody User user)
+            throws UserException {
+        Map<String, String> result = userService.signUp(user);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new ResponseWrapper<>(HttpStatus.CREATED.value(), "User registered successfully", result));
     }
 
     @PostMapping("/sendSignupOtp")
     @PreAuthorize("permitAll()")
-    public String sendOtp(@RequestParam("email") String email) throws UserException {
+    public ResponseEntity<ResponseWrapper<Void>> sendOtp(@RequestParam("email") String email) throws UserException {
         userService.sendEmailOtp(email);
-        return "OTP sent successfully to " + email + ". Please check your email.";
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "OTP sent successfully", null));
     }
 
     @PostMapping("/login")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<Map<String, String>> login(@RequestBody User user) throws UserException {
-        return ResponseEntity.ok(userService.authenticate(user.getEmail(), user.getPassword()));
+    public ResponseEntity<ResponseWrapper<Map<String, String>>> login(@RequestBody User user) throws UserException {
+        Map<String, String> result = userService.authenticate(user.getEmail(), user.getPassword());
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Login successful", result));
     }
 
-    @GetMapping("/refresh")
+    @PostMapping("/refresh")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<?> refreshToken(HttpServletRequest request) {
+    public ResponseEntity<ResponseWrapper<Map<String, String>>> refreshToken(HttpServletRequest request)
+            throws UserException {
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
-
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Refresh token is missing or malformed");
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(new ResponseWrapper<>(HttpStatus.UNAUTHORIZED.value(),
+                            "Refresh token is missing or malformed",
+                            null));
         }
 
         String refreshToken = authHeader.substring(7);
-
-        try {
-            Map<String, String> tokens = userService.refreshToken(refreshToken);
-            return ResponseEntity.ok(tokens);
-        } catch (UserException e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
-        }
+        Map<String, String> tokens = userService.refreshToken(refreshToken);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Token refreshed successfully", tokens));
     }
 
     @GetMapping("/image/{fileId}")
@@ -81,6 +84,5 @@ public class AuthController {
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(imageStream);
-
     }
 }
