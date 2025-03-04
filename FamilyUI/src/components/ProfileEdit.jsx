@@ -35,7 +35,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
           const imageUrl = await loginSignup.getProfileImage(
             userProfile.photoId
           );
-          setProfileImage(imageUrl);
+          setProfileImage(imageUrl.data);
         }
       }
     };
@@ -86,11 +86,9 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         onEdit();
       } else {
         Alert.alert("Error", "Failed to update profile");
+        setIsUpdating(false);
       }
-    } catch (error) {
-      console.error("Profile update error:", error);
-      Alert.alert("Error", "Something went wrong");
-    } finally {
+    } catch (error) {      
       setIsUpdating(false);
     }
   };
@@ -169,7 +167,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         <TouchableOpacity
           onPress={onEdit}
           disabled={isUpdating}
-          className="px-6 py-2 rounded-3xl border border-gray-300"
+          className="px-6 py-2 mx-2 rounded-3xl border border-gray-300"
         >
           <Text className="text-gray-700">Cancel</Text>
         </TouchableOpacity>

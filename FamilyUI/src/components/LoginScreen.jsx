@@ -21,7 +21,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
   });
 
   const handleLogin = async () => {
-    setSnackbar({ visible: false });
+    setSnackbar((prev) => ({ ...prev, visible: false }));
 
     if (!email || !password) {
       setSnackbar({
@@ -35,40 +35,29 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
     setLoading(true);
 
     const response = await loginSignup.loginUser({ email, password });
-
-    if (response.status === 200) {
+    
+    if (response.status) {
       setSnackbar({
         visible: true,
         message: "Login successful",
         type: "success",
       });
-
       setAuthenticated(true);
-
-      // ✅ Navigate to Profile
-      navigation.replace("HomePage");
     } else {
-      // Read the response once
-      const responseText = await response.text();
-      let responseBody = {};
-      try {
-        responseBody = JSON.parse(responseText);
-      } catch (error) {
-        console.error("Error parsing JSON:", error);
-      }
-
       setSnackbar({
         visible: true,
-        message: responseBody.message || "Invalid credentials",
+        message: response.message || "Login failed",
         type: "error",
       });
       setLoading(false);
     }
+
+    setLoading(false);
   };
 
   return (
     <View className="flex-1 bg-white items-center justify-center px-6">
-      <View className="w-full h-[60%] justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
+      <View className="w-full justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
         <Image
           source={{
             uri: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png",
@@ -104,46 +93,31 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text className="text-white text-center text-lg font-semibold">
-              Log in
-            </Text>
+            <Text className="text-white text-lg font-semibold">Log in</Text>
           )}
         </TouchableOpacity>
 
-        <View className="flex-row items-center my-4">
-          <View className="flex-1 h-[1px] bg-gray-300"></View>
-          <Text className="px-20128 text-gray-500 text-sm font-semibold">
-            OR
-          </Text>
-          <View className="flex-1 h-[1px] bg-gray-300"></View>
-        </View>
-
-        <TouchableOpacity className="w-full flex-row items-center justify-center gap-2">
-          <Text className="text-blue-900 font-semibold">
-            Log in with Facebook
-          </Text>
+        <TouchableOpacity className="items-center mt-3">
+          <Text className="text-blue-900 text-xs">Forgot password?</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity className="items-center">
-          <Text className="text-xs text-blue-900 mt-2">Forgot password?</Text>
-        </TouchableOpacity>
-
-        <View className="mt-8 pt-4 border-t border-gray-300 w-full max-w-sm">
+        <View className="mt-8 h-10 pt-4 border-t border-gray-300 w-full">
           <Text className="text-center text-sm">
             Don't have an account?
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-              <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3">
+              <Text className="text-blue-500 font-semibold h-10 m-1 mt-3">
                 Sign up
               </Text>
             </TouchableOpacity>
           </Text>
         </View>
       </View>
+
       <CustomSnackbar
         visible={snackbar.visible}
         message={snackbar.message}
         type={snackbar.type}
-        onDismiss={() => setSnackbar({ ...snackbar, visible: false })}
+        onDismiss={() => setSnackbar((prev) => ({ ...prev, visible: false }))}
       />
     </View>
   );

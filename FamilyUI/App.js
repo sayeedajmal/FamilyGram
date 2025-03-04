@@ -10,26 +10,38 @@ import {
   Animated,
   Easing,
   Image,
-  Platform
+  Platform,
+  View
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import "./global.css";
 import loginSignup from "./src/api/loginSignup";
 import LoginScreen from "./src/components/LoginScreen";
 import ProfileSection from "./src/components/ProfileSection";
 import SignupScreen from "./src/components/SignupScreen";
 import HomePage from "./src/containers/HomePage";
-import "./global.css"
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
 // Unified Storage Handling
 const Storage = {
+  setItem: async (key, value) => {
+    if (Platform.OS === "web") {
+      return AsyncStorage.setItem(key, value);
+    }
+    return SecureStore.setItemAsync(key, value);
+  },
   getItem: async (key) => {
-    return Platform.OS === "web" ? await AsyncStorage.getItem(key) : await SecureStore.getItemAsync(key);
+    if (Platform.OS === "web") {
+      return AsyncStorage.getItem(key);
+    }
+    return SecureStore.getItemAsync(key);
   },
   deleteItem: async (key) => {
-    return Platform.OS === "web" ? await AsyncStorage.removeItem(key) : await SecureStore.deleteItemAsync(key);
+    if (Platform.OS === "web") {
+      return AsyncStorage.removeItem(key);
+    }
+    return SecureStore.deleteItemAsync(key);
   },
 };
 
@@ -40,17 +52,12 @@ const BottomTabNavigator = () => {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
-      try {
-        const profile = await loginSignup.getStoredUserProfile();
-        if (profile?.photoId) {
-          const imageUrl = await loginSignup.getProfileImage(profile.photoId);
-          setProfileImage(imageUrl);
-        }
-      } catch (error) {
-        console.error("Error fetching profile image:", error);
+      const profile = await loginSignup.getStoredUserProfile();
+      if (profile?.photoId) {
+        const imageUrl = await loginSignup.getProfileImage(profile.photoId);
+        setProfileImage(imageUrl.data);
       }
     };
-
     fetchUserProfile();
   }, []);
 
@@ -126,33 +133,30 @@ export default function App() {
     const checkAuth = async () => {
       try {
         const token = await Storage.getItem("accessToken");
+
         if (!token) {
           setIsAuthenticated(false);
+          loginSignup.clearTokens();
           return;
         }
 
-        const storedProfile = await Storage.getItem("userProfile");
-        const userProfile = storedProfile ? JSON.parse(storedProfile) : null;
-
+        const userProfile = await loginSignup.getStoredUserProfile();
         if (!userProfile?.email) {
-          await Storage.deleteItem("accessToken");
-          await Storage.deleteItem("refreshToken");
           setIsAuthenticated(false);
+          loginSignup.clearTokens();
           return;
         }
 
         const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        if (profile) {
+        if (profile.status === true) {
           setIsAuthenticated(true);
         } else {
-          await Storage.deleteItem("accessToken");
-          await Storage.deleteItem("refreshToken");
           setIsAuthenticated(false);
+          loginSignup.clearTokens();
         }
       } catch (error) {
-        console.error("Auth check failed:", error);
-        await Storage.deleteItem("accessToken");
-        await Storage.deleteItem("refreshToken");
+        console.error("Authentication check failed:", error);
+        loginSignup.clearTokens();
         setIsAuthenticated(false);
       }
     };
@@ -162,16 +166,16 @@ export default function App() {
 
   if (isAuthenticated === null) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: "white" }}>
-        <Animated.View style={{ flex: 1, justifyContent: "center", alignItems: "center", opacity: fadeAnim }}>
+      <View style={{ flex: 1, backgroundColor: "white", justifyContent: "center", alignItems: "center" }}>
+        <Animated.View style={{ opacity: fadeAnim }}>
           <ActivityIndicator size="large" color="#3498db" />
         </Animated.View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "white", top: 0 }}>
+    <View style={{ flex: 1, backgroundColor: "white" }}>
       <NavigationContainer>
         <Stack.Navigator
           screenOptions={{
@@ -198,6 +202,6 @@ export default function App() {
           )}
         </Stack.Navigator>
       </NavigationContainer>
-    </SafeAreaView>
+    </View>
   );
 }

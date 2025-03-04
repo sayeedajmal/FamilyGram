@@ -2,7 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const API_URL = `https://familygram.onrender.com`; //http://localhost:8082
+//const API_URL = "http://localhost:8082"; // Local backend
+const API_URL = `https://familygram.onrender.com`; // Production
 
 const Storage = {
     setItem: async (key, value) => {
@@ -30,14 +31,12 @@ class ApiService {
         this.refreshingPromise = null;
     }
 
-    async getStoredUserProfile() {
-        try {
-            const storedProfile = await Storage.getItem("userProfile");
-            return storedProfile ? JSON.parse(storedProfile) : null;
-        } catch (error) {
-            console.error("Error retrieving user profile:", error);
-            return null;
-        }
+    async getAccessToken() {
+        return await Storage.getItem("accessToken");
+    }
+
+    async getRefreshToken() {
+        return await Storage.getItem("refreshToken");
     }
 
     async saveTokens(accessToken, refreshToken) {
@@ -49,75 +48,10 @@ class ApiService {
         }
     }
 
-    async getAccessToken() {
-        return await Storage.getItem("accessToken");
-    }
-
-    async getRefreshToken() {
-        return await Storage.getItem("refreshToken");
-    }
-
     async clearTokens() {
         await Storage.deleteItem("accessToken");
         await Storage.deleteItem("refreshToken");
-    }
-
-    async getProfileImage(fieldId) {
-        if (!fieldId) return null;
-        try {
-            const response = await this.request(`/auth/image/${fieldId}`, {
-                method: "GET",
-            });
-
-            if (!response.ok) {
-                console.error("Failed to fetch image:", response.status);
-                return null;
-            }
-
-            if (Platform.OS === "web") {
-                const blob = await response.blob();
-                return URL.createObjectURL(blob);
-            }
-
-            return response.url || response.uri || `/auth/image/${fieldId}`;
-        } catch (error) {
-            console.error("Error fetching profile image:", error);
-            return null;
-        }
-    }
-
-    async updateUserProfile(userData, file) {
-        const formData = new FormData();
-        formData.append("user", JSON.stringify(userData));
-
-        if (file) {
-            if (Platform.OS === "web") {
-                formData.append("file", file);
-            } else {
-                const response = await fetch(file.uri);
-                const blob = await response.blob();
-                formData.append("file", blob, "image.jpg");
-            }
-        }
-
-        try {
-            const response = await this.request("/user/update", {
-                method: "POST",
-                body: formData,
-            });
-
-            if (response.ok) {
-                const updatedProfile = await response.json();
-                await Storage.setItem("userProfile", JSON.stringify(updatedProfile));
-                return true;
-            } else {
-                console.error("Failed to update profile:", response.status, await response.text());
-                return response;
-            }
-        } catch (error) {
-            console.error("Profile update error:", error);
-            return null;
-        }
+        await Storage.deleteItem("userProfile");
     }
 
     async refreshAccessToken() {
@@ -129,20 +63,19 @@ class ApiService {
 
             try {
                 const response = await fetch(`${API_URL}/auth/refresh`, {
-                    method: "GET",
+                    method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        Authorization: `Bearer ${refreshToken}`,
+                        Authorization: `Bearer ${refreshToken}`
                     },
                 });
 
-                if (!response.ok) throw new Error("Failed to refresh token");
+                const responseBody = await response.json();
+                if (!response.ok) throw new Error(responseBody.message || "Failed to refresh token");
 
-                const { accessToken } = await response.json();
-                await this.saveTokens(accessToken, refreshToken);
-                return accessToken;
+                await this.saveTokens(responseBody.data.accessToken, responseBody.data.refreshToken);
+                return responseBody.data.accessToken;
             } catch (error) {
-                console.error("Token refresh failed:", error);
                 await this.clearTokens();
                 return null;
             } finally {
@@ -159,37 +92,24 @@ class ApiService {
         if (!options.headers) options.headers = {};
         if (accessToken) options.headers.Authorization = `Bearer ${accessToken}`;
 
-        let response = await fetch(`${API_URL}${endpoint}`, options);
+        try {
+            let response = await fetch(`${API_URL}${endpoint}`, options);
 
-        if (response.status === 406) {
-            accessToken = await this.refreshAccessToken();
-            if (!accessToken) return null;
+            if (response.status === 406) {
+                console.warn("Access token expired. Refreshing token...");
+                accessToken = await this.refreshAccessToken();
+                if (!accessToken) {
+                    return { status: false, message: "Session expired. Please log in again.", data: null };
+                }
 
-            options.headers.Authorization = `Bearer ${accessToken}`;
-            response = await fetch(`${API_URL}${endpoint}`, options);
-        }
-
-        return response;
-    }
-
-    async registerUser(userData) {
-        const response = await fetch(`${API_URL}/auth/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(userData),
-        });
-
-        if (response.status === 200) {
-            const data = await response.json();
-            await this.saveTokens(data.accessToken, data.refreshToken);
-
-            const profile = await this.fetchUserProfileByEmail(userData.email);
-            if (profile) {
-                await Storage.setItem("userProfile", JSON.stringify(profile));
+                options.headers.Authorization = `Bearer ${accessToken}`;
+                response = await fetch(`${API_URL}${endpoint}`, options);
             }
+            const responseData = await response.json();
+            return { status: response.ok, message: responseData.message || "Success", data: responseData };
+        } catch (error) {
+            return { status: false, message: "Network error. Please try again.", data: null };
         }
-
-        return response;
     }
 
     async loginUser(userData) {
@@ -199,45 +119,121 @@ class ApiService {
             body: JSON.stringify(userData),
         });
 
-        if (response.status === 200) {
-            const data = await response.json();
-            await this.saveTokens(data.accessToken, data.refreshToken);
-
-            const profile = await this.fetchUserProfileByEmail(userData.email);
-            if (profile) {
-                await Storage.setItem("userProfile", JSON.stringify(profile));
+        if (response.status) {
+            const { accessToken, refreshToken } = response.data.data;
+            if (accessToken && refreshToken) {
+                await this.saveTokens(accessToken, refreshToken);
             }
-        }
 
-        return response;
+            const profileResponse = await this.fetchUserProfileByEmail(userData.email);
+
+            if (profileResponse.status) {
+                return { status: true, message: "Login successful", data: profileResponse.data };
+            }
+        } else {
+            return { status: false, message: response.message || "Login failed", data: null };
+        }
+    }
+
+    async registerUser(userData) {
+        const response = await this.request("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(userData),
+        });
+
+        if (response.status) {
+            const { accessToken, refreshToken } = response.data.data;
+            if (accessToken && refreshToken) {
+                await this.saveTokens(accessToken, refreshToken);
+            }
+
+            const profileResponse = await this.fetchUserProfileByEmail(userData.email);
+            if (profileResponse.status) {
+                return { status: true, message: "Registration successful", data: profileResponse.data };
+            }
+            return { status: false, message: "Registration successful but failed to fetch profile", data: null };
+        } else {
+            return { status: false, message: response.message || "Registration failed", data: null };
+        }
     }
 
     async sendSignupOtp(email) {
-        return fetch(`${API_URL}/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, {
-            method: "POST",
-        });
+        return await this.request(`/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, { method: "POST" });
     }
 
     async fetchUserProfileByEmail(email) {
-        const response = await this.request(
-            `/user/email?email=${encodeURIComponent(email)}`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-            }
-        );
 
-        if (response.ok) {
-            return response.json();
+        const response = await this.request(`/user/email?email=${encodeURIComponent(email)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+
+        if (response.status) {
+            const userProfile = response.data.data;
+
+            // Store the user profile in storage as a JSON string
+            await Storage.setItem("userProfile", JSON.stringify(userProfile));
+
+            // Retrieve and parse the stored profile to confirm
+            return { status: true, message: "User profile fetched and stored", data: userProfile };
+        } else {
+            return { status: false, message: response.message || "Failed to fetch user profile", data: null };
+        }
+
+    }
+
+    async updateUserProfile(userData, file) {
+        const formData = new FormData();
+        formData.append("user", JSON.stringify(userData));
+
+        if (file) {
+            if (Platform.OS === "web") {
+                formData.append("file", file);
+            } else {
+                formData.append("file", { uri: file.uri, name: file.name || "image.jpg", type: file.type || "image/jpeg" });
+            }
+        }
+
+        const response = await this.request("/user/update", {
+            method: "POST",
+            body: formData,
+        });
+
+        if (response.status) {
+            const updatedProfile = await response.json();
+            await Storage.setItem("userProfile", JSON.stringify(updatedProfile));
+            return { status: true, message: "Profile Updated Sucessfully", data: response.data };
+        } else {
+            return { status: false, message: response.message, data: null };
+        }
+    }
+
+    async getProfileImage(fieldId) {
+        if (!fieldId) return { status: false, message: "No image available", data: null };
+
+        const response = await fetch(`${API_URL}/auth/image/${fieldId}`);
+        if (!response.ok) return { status: false, message: "Failed to fetch image", data: null };
+
+        if (Platform.OS === "web") {
+            const blob = await response.blob();
+            return { status: true, message: "Image fetched", data: URL.createObjectURL(blob) };
+        }
+
+        return { status: true, message: "Image fetched", data: response.url };
+    }
+
+
+    async getStoredUserProfile() {
+        const storedProfile = await Storage.getItem("userProfile");
+        if (storedProfile) {
+            return JSON.parse(storedProfile);
         }
     }
 
     async logoutUser() {
         await this.clearTokens();
-    }
-
-    async fetchUserProfile() {
-        return this.request("/user/profile");
+        return { status: true, message: "Logged out successfully", data: null };
     }
 }
 

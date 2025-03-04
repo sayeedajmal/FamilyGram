@@ -30,9 +30,9 @@ export const ProfileSection = () => {
       if (profile.photoId) {
         try {
           const response = await loginSignup.getProfileImage(profile.photoId);
-          imageUrl = response;
+          imageUrl = response.data;
         } catch (error) {
-          console.error("Error fetching profile image:", error);
+          Alert("Error fetching profile image:", error);
         }
       }
 
@@ -55,13 +55,15 @@ export const ProfileSection = () => {
   return (
     <View className="bg-white flex-1">
       {/* Profile Header */}
-      <View className="w-[90%] flex-row justify-center gap-8 self-center text-center">
+      <View className="w-full flex-row justify-center self-center text-center">
         <View className="w-full flex-col items-center">
           <View className="w-full flex-row justify-between items-center px-4">
             <Text className="text-lg font-bold w-[80%] overflow-hidden">
               {userProfile.username || "Username"}
             </Text>
-            <MaterialIcons name="more-horiz" size={24} />
+            <TouchableOpacity>
+              <MaterialIcons name="menu-open" size={28} />
+            </TouchableOpacity>
           </View>
 
           {/* Profile Picture and Stats */}
@@ -91,9 +93,13 @@ export const ProfileSection = () => {
           </View>
 
           {/* Name, Bio, and Link */}
-          <View className="p-2 w-full flex-col items-start">
-            <Text className="font-semibold">{userProfile.name || "Name"}</Text>
-            <Text className="text-center">{userProfile.bio || "Bio"}</Text>
+          <View className="px-4 pb-2 w-full flex-col items-start">
+            <Text className="text-lg font-bold">
+              {userProfile.name || "Name"}
+            </Text>
+            <Text className="text-start w-[90%]">
+              {userProfile.bio || "Bio"}
+            </Text>
             <TouchableOpacity
               onPress={() => Linking.openURL(userProfile.website || "#")}
             >
@@ -187,14 +193,19 @@ export const ProfileSection = () => {
 
       {/* Modal for Profile Editing */}
       <Modal
-        style={{ alignSelf: "center" }}
         visible={activeEdit}
         animationType="slide"
+        transparent
+        statusBarTranslucent
       >
-        <ProfileEdit
-          onEdit={() => setActiveEdit(false)}
-          onUpdate={fetchUserProfile}
-        />
+        <View className="flex-1 justify-end bg-black/40">
+          <View className="h-[80%] rounded-t-2xl shadow-lg">
+            <ProfileEdit
+              onEdit={() => setActiveEdit(false)}
+              onUpdate={fetchUserProfile}
+            />
+          </View>
+        </View>
       </Modal>
     </View>
   );
