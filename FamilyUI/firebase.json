@@ -1,7 +1,7 @@
 {
   "hosting": {
     "public": "dist",
-    "site":"familygram",
+    "site": "familygram",
     "ignore": [
       "firebase.json",
       "**/.*",
