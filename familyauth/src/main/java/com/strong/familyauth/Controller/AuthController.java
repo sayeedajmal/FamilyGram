@@ -36,6 +36,15 @@ public class AuthController {
     @Autowired
     private ImageStorageService imageStorageService;
 
+    @PostMapping("/checkUsername")
+    @PreAuthorize("permitAll()")
+    public ResponseEntity<ResponseWrapper<Boolean>> checkUsernameAvailability(
+            @RequestParam("username") String username) {
+        boolean isAvailable = userService.isUsernameAvailable(username);
+        String message = isAvailable ? "Username is available" : "Username is already taken";
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), message, isAvailable));
+    }
+    
     @Transactional
     @PostMapping("/register")
     @PreAuthorize("permitAll()")
