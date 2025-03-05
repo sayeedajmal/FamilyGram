@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "FamilyUI",
+    "name": "FamilyGram",
     "slug": "FamilyUI",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
+    "icon": "./assets/iconLauncher.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/iconLauncher.png",
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
@@ -27,8 +27,17 @@
       "package": "com.strong.familygram"
     },
     "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "pwa": {
+        "display": "fullscreen",
+        "backgroundColor": "#000000"
+      },
+      "favicon": "./assets/iconLauncher.png",
+      "bundler": "metro",
+      "viewport": "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
+      "meta": {
+        "themeColor": "#000000",
+        "statusBarStyle": "black-translucent"
+      }
     },
     "extra": {
       "EXPO_DEV_SERVER_HOST": "localhost",

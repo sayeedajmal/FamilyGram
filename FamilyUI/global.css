@@ -1,3 +1,23 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+html,
+body,
+#root {
+    margin: 0;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    background-color: #000;
+    /* Adjust background color */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+canvas {
+    width: 100% !important;
+    height: 100% !important;
+}

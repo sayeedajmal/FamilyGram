@@ -5,50 +5,57 @@ import { NavigationContainer } from "@react-navigation/native";
 import { CardStyleInterpolators, createStackNavigator, TransitionSpecs } from "@react-navigation/stack";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Animated,
-  Easing,
-  Image,
-  Platform,
-  View
-} from "react-native";
-import "./global.css";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
+import { Animated, Easing, Image, Platform, SafeAreaView, StatusBar, View } from "react-native";
+
 import loginSignup from "./src/api/loginSignup";
 import LoginScreen from "./src/components/LoginScreen";
 import ProfileSection from "./src/components/ProfileSection";
 import SignupScreen from "./src/components/SignupScreen";
 import HomePage from "./src/containers/HomePage";
-
+import "./global.css"
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
-// Unified Storage Handling
+
+const SkeletonLoader = () => (
+  <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "white" }}>
+    <ContentLoader
+      speed={2}
+      width={400}
+      height={500}
+      viewBox="0 0 400 500"
+      backgroundColor="#f3f3f3"
+      foregroundColor="#ecebeb"
+    >
+      <Circle cx="50" cy="40" r="30" />
+      <Rect x="90" y="20" rx="5" ry="5" width="200" height="10" />
+      <Rect x="90" y="40" rx="5" ry="5" width="150" height="10" />
+      <Rect x="0" y="80" rx="5" ry="5" width="400" height="200" />
+      <Rect x="0" y="300" rx="5" ry="5" width="300" height="10" />
+      <Rect x="0" y="320" rx="5" ry="5" width="250" height="10" />
+      <Rect x="0" y="340" rx="5" ry="5" width="280" height="10" />
+    </ContentLoader>
+  </View>
+);
+
+
 const Storage = {
   setItem: async (key, value) => {
-    if (Platform.OS === "web") {
-      return AsyncStorage.setItem(key, value);
-    }
-    return SecureStore.setItemAsync(key, value);
+    return Platform.OS === "web" ? AsyncStorage.setItem(key, value) : SecureStore.setItemAsync(key, value);
   },
   getItem: async (key) => {
-    if (Platform.OS === "web") {
-      return AsyncStorage.getItem(key);
-    }
-    return SecureStore.getItemAsync(key);
+    return Platform.OS === "web" ? AsyncStorage.getItem(key) : SecureStore.getItemAsync(key);
   },
   deleteItem: async (key) => {
-    if (Platform.OS === "web") {
-      return AsyncStorage.removeItem(key);
-    }
-    return SecureStore.deleteItemAsync(key);
+    return Platform.OS === "web" ? AsyncStorage.removeItem(key) : SecureStore.deleteItemAsync(key);
   },
 };
 
-// Bottom Tab Navigator
+
 const BottomTabNavigator = () => {
-  const [profileImage, setProfileImage] = useState("https://placehold.co/150x150");
-  const scaleAnim = new Animated.Value(1); // Animation state
+  const [profileImage, setProfileImage] = useState("");
+  const scaleAnim = new Animated.Value(1);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -77,13 +84,13 @@ const BottomTabNavigator = () => {
             return (
               <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                 <Image
-                  source={{ uri: profileImage }}
+                  source={profileImage ? { uri: profileImage } : require("./assets/iconLauncher.png")}
                   style={{
                     width: size,
                     height: size,
                     borderRadius: size / 2,
                     borderWidth: focused ? 2 : 0,
-                    borderColor: focused ? "black" : "transparent",
+                    borderColor: focused ? "#0278ae" : "transparent",
                   }}
                 />
               </Animated.View>
@@ -104,7 +111,7 @@ const BottomTabNavigator = () => {
             />
           );
         },
-        tabBarActiveTintColor: "black",
+        tabBarActiveTintColor: "#0278ae",
         tabBarInactiveTintColor: "gray",
       })}
     >
@@ -117,10 +124,10 @@ const BottomTabNavigator = () => {
   );
 };
 
-// Main App Component
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(null);
-  const fadeAnim = new Animated.Value(0); // Animation state
+  const fadeAnim = new Animated.Value(0);
 
   useEffect(() => {
     Animated.timing(fadeAnim, {
@@ -148,12 +155,7 @@ export default function App() {
         }
 
         const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        if (profile.status === true) {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-          loginSignup.clearTokens();
-        }
+        setIsAuthenticated(profile.status === true);
       } catch (error) {
         console.error("Authentication check failed:", error);
         loginSignup.clearTokens();
@@ -168,14 +170,14 @@ export default function App() {
     return (
       <View style={{ flex: 1, backgroundColor: "white", justifyContent: "center", alignItems: "center" }}>
         <Animated.View style={{ opacity: fadeAnim }}>
-          <ActivityIndicator size="large" color="#3498db" />
+          <SkeletonLoader />
         </Animated.View>
       </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "white" }}>
+    <SafeAreaView style={safeContainerStyle}>
       <NavigationContainer>
         <Stack.Navigator
           screenOptions={{
@@ -202,6 +204,12 @@ export default function App() {
           )}
         </Stack.Navigator>
       </NavigationContainer>
-    </View>
+    </SafeAreaView>
   );
 }
+
+const safeContainerStyle = {
+  flex: 1,
+  backgroundColor: "white",
+  paddingTop: Platform.OS === "android" ? StatusBar.currentHeight : 0,
+};

@@ -59,10 +59,9 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
     <View className="flex-1 bg-white items-center justify-center px-6">
       <View className="w-full justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
         <Image
-          source={{
-            uri: "https://www.instagram.com/static/images/web/logged_out_wordmark.png/7a252de00b20.png",
-          }}
-          className="h-12 w-40 self-center mb-6"
+          source={require('../../assets/logo.png')}
+          className="self-center mb-6"
+          style={{height:40}}
           resizeMode="contain"
         />
 

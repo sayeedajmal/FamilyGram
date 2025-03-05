@@ -1,5 +1,6 @@
 import { MaterialIcons } from "@expo/vector-icons";
 import * as Linking from "expo-linking";
+import ContentLoader, { Rect, Circle } from "react-content-loader/native";
 import React, { useEffect, useState } from "react";
 import {
   FlatList,
@@ -46,8 +47,33 @@ export const ProfileSection = () => {
 
   if (!userProfile) {
     return (
-      <View className="flex-1 items-center justify-center">
-        <Text>Loading profile...</Text>
+      <View className="flex-1 items-center justify-center bg-white">
+        <ContentLoader
+          speed={2}
+          width={300}
+          height={300}
+          viewBox="0 0 300 300"
+          backgroundColor="#f3f3f3"
+          foregroundColor="#ecebeb"
+        >
+          {/* Profile Image */}
+          <Circle cx="150" cy="50" r="40" />
+
+          {/* Username */}
+          <Rect x="75" y="100" rx="5" ry="5" width="150" height="15" />
+
+          {/* Stats (Posts, Followers, Following) */}
+          <Rect x="40" y="130" rx="5" ry="5" width="50" height="15" />
+          <Rect x="125" y="130" rx="5" ry="5" width="50" height="15" />
+          <Rect x="210" y="130" rx="5" ry="5" width="50" height="15" />
+
+          {/* Bio */}
+          <Rect x="40" y="160" rx="5" ry="5" width="220" height="10" />
+          <Rect x="40" y="175" rx="5" ry="5" width="180" height="10" />
+
+          {/* Buttons */}
+          <Rect x="40" y="200" rx="10" ry="10" width="220" height="40" />
+        </ContentLoader>
       </View>
     );
   }
@@ -69,9 +95,11 @@ export const ProfileSection = () => {
           {/* Profile Picture and Stats */}
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={{
-                uri: userProfile.imageUrl || "https://placehold.co/150x150",
-              }}
+              source={
+                userProfile.imageUrl
+                  ? { uri: userProfile.imageUrl }
+                  : require("../../assets/iconLauncher.png")
+              }
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
@@ -148,9 +176,9 @@ export const ProfileSection = () => {
                   : "account-box"
               }
               size={24}
-              color={activeTab === tab ? "black" : "gray"}
+              color={activeTab === tab ? "#0278ae" : "gray"}
             />
-            <Text style={{ color: activeTab === tab ? "black" : "gray" }}>
+            <Text style={{ color: activeTab === tab ? "#0278ae" : "gray" }}>
               {tab}
             </Text>
           </TouchableOpacity>
@@ -198,7 +226,7 @@ export const ProfileSection = () => {
         transparent
         statusBarTranslucent
       >
-        <View className="flex-1 justify-end bg-black/40">
+        <View className="flex-1 justify-end bg-#0278ae/40">
           <View className="h-[80%] rounded-t-2xl shadow-lg">
             <ProfileEdit
               onEdit={() => setActiveEdit(false)}
