@@ -99,7 +99,12 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
     setVerifying(true);
 
     try {
-      const userData = { email, name: fullName, password, bio: otp };
+      const userData = {
+        email,
+        name: fullName.toLocaleLowerCase(),
+        password,
+        bio: otp,
+      };
       const response = await loginSignup.registerUser(userData);
 
       if (response.status) {

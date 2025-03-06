@@ -67,7 +67,7 @@ public class UserService implements UserDetailsService {
             throw new UserException("Incorrect OTP/Expired OTP. Please try again.");
         }
 
-        user.setUsername(user.getName() + (int) (Math.random() * 90000000) + 10000000);
+        user.setUsername((user.getName() + (int) (Math.random() * 90000000) + 10000000).toLowerCase());
         user.setBio("");
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setAccountNonExpired(true);
@@ -204,7 +204,6 @@ public class UserService implements UserDetailsService {
         // Handle profile picture update
         if (file != null && !file.isEmpty()) {
             String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
-            System.out.println("uploadImage: " + uploadImage);
             existingUser.setPhotoId(uploadImage);
         }
 

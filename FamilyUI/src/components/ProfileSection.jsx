@@ -227,7 +227,7 @@ export const ProfileSection = () => {
         statusBarTranslucent
       >
         <View className="flex-1 justify-end bg-#0278ae/40">
-          <View className="h-[80%] rounded-t-2xl shadow-lg">
+          <View className="h-[90%] rounded-t-2xl shadow-lg">
             <ProfileEdit
               onEdit={() => setActiveEdit(false)}
               onUpdate={fetchUserProfile}

@@ -2,7 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-//const API_URL = "http://localhost:8082"; // Local backend
+//const API_URL = "http://192.168.31.218:8082"; // Local backend
 const API_URL = `https://familygram.onrender.com`; // Production
 
 const Storage = {
@@ -200,13 +200,25 @@ class ApiService {
             body: formData,
         });
 
+
         if (response.status) {
-            const updatedProfile = await response.json();
-            await Storage.setItem("userProfile", JSON.stringify(updatedProfile));
-            return { status: true, message: "Profile Updated Sucessfully", data: response.data };
-        } else {
-            return { status: false, message: response.message, data: null };
+            await Storage.setItem("userProfile", JSON.stringify(response.data.data));
         }
+
+        return response;
+    }
+
+    async checkUsernameAvailability(username) {
+        if (!username) return null;
+
+        const response = await fetch(`${API_URL}/auth/checkUsername?username=${username}`, {
+            method: "POST", // Ensure backend supports POST for this
+            headers: { "Content-Type": "application/json" },
+        });
+
+        const data = await response.json();
+
+        return data;
     }
 
     async getProfileImage(fieldId) {

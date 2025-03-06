@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
@@ -20,6 +21,8 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   const [profileImage, setProfileImage] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
   const [isUpdating, setIsUpdating] = useState(false);
+  const [oldUsername, setOldUsername] = useState("");
+  const [usernameStatus, setUsernameStatus] = useState(null);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -30,6 +33,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         setFullName(userProfile.name || "");
         setBio(userProfile.bio || "");
         setWebsite(userProfile.website || "");
+        setOldUsername(userProfile.username);
 
         if (userProfile.photoId) {
           const imageUrl = await loginSignup.getProfileImage(
@@ -39,11 +43,35 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         }
       }
     };
-
     fetchProfile();
   }, []);
 
-  // Handle Image Selection
+  useEffect(() => {
+    if (username === oldUsername) {
+      return;
+    }
+    if (username.length === 0) {
+      setUsernameStatus({
+        message: "Please enter username",
+        isAvailable: false,
+      });
+      return;
+    }
+    const delay = setTimeout(async () => {
+      console.log("BITCH: ", username.length);
+
+      const response = await loginSignup.checkUsernameAvailability(username.toLowerCase());
+      if (response) {
+        setUsernameStatus({
+          message: response.message,
+          isAvailable: response.data,
+        });
+      }
+    }, 500);
+
+    return () => clearTimeout(delay);
+  }, [username, oldUsername]);
+
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -58,43 +86,37 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
     }
   };
 
-  // Handle Username Input (Restrict spaces & special characters except "-")
   const handleUsernameChange = (text) => {
     const sanitizedText = text.replace(/[^a-zA-Z0-9-_]/g, ""); // Remove invalid characters
     setUsername(sanitizedText);
   };
 
-  // Handle Profile Update
   const handleSave = async () => {
     setIsUpdating(true);
     const updatedUser = {
-      id: id,
-      username,
+      id,
+      username: username.toLowerCase(),
       name: fullName,
       bio,
       website,
     };
 
-    try {
-      const response = await loginSignup.updateUserProfile(
-        updatedUser,
-        selectedImage
-      );
-      if (response) {
-        Alert.alert("Success", "Profile updated successfully");
-        onUpdate();
-        onEdit();
-      } else {
-        Alert.alert("Error", "Failed to update profile");
-        setIsUpdating(false);
-      }
-    } catch (error) {      
+    const response = await loginSignup.updateUserProfile(
+      updatedUser,
+      selectedImage
+    );
+    if (response) {
+      Alert.alert("Success", "Profile updated successfully");
+      onUpdate();
+      onEdit();
+    } else {
+      Alert.alert("Error", "Failed to update profile");
       setIsUpdating(false);
     }
   };
 
   return (
-    <View className="content-center h-full w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+    <ScrollView className="content-center h-full w-full max-w-md bg-white rounded-xl shadow-lg p-6">
       <View className="flex-row justify-between items-center mb-6">
         <Text className="text-2xl font-semibold">Edit Profile</Text>
         <TouchableOpacity onPress={onEdit}>
@@ -119,7 +141,17 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
 
       <View className="space-y-4">
         <View>
-          <Text className="text-sm font-medium mb-2">Username</Text>
+          <Text
+            className={`text-sm font-medium mb-2 ${
+              usernameStatus
+                ? usernameStatus.isAvailable
+                  ? "text-green-500"
+                  : "text-red-500"
+                : "text-black"
+            }`}
+          >
+            {usernameStatus ? usernameStatus.message : "Username"}
+          </Text>
           <TextInput
             value={username}
             onChangeText={handleUsernameChange}
@@ -174,7 +206,9 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
 
         <TouchableOpacity
           onPress={handleSave}
-          disabled={isUpdating}
+          disabled={
+            isUpdating || (usernameStatus && !usernameStatus.isAvailable)
+          }
           className="px-6 py-2 rounded-3xl bg-blue-500 flex-row items-center"
         >
           {isUpdating ? (
@@ -185,7 +219,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
           </Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 };
 
