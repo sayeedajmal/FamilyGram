@@ -25,6 +25,29 @@ import com.strong.familypost.Service.PostService;
 import com.strong.familypost.Util.PostException;
 import com.strong.familypost.Util.ResponseWrapper;
 
+/**
+ * REST Controller for handling post-related operations in the FamilyGram
+ * application.
+ * This controller manages the creation, retrieval, deletion, and interaction
+ * with posts,
+ * including likes and comments.
+ *
+ * All endpoints require authentication (@PreAuthorize("isAuthenticated()")).
+ *
+ * @RestController Indicates that this class is a REST controller
+ *                 @RequestMapping("/posts") Base URL mapping for all
+ *                 post-related endpoints
+ * 
+ * @author [Your Name]
+ * @version 1.0
+ * @since [Date]
+ *
+ * @see PostService
+ * @see CommentService
+ * @see Post
+ * @see Comment
+ * @see ResponseWrapper
+ */
 @RestController
 @RequestMapping("/posts")
 public class PostController {
@@ -36,7 +59,12 @@ public class PostController {
     private CommentService commentService;
 
     /**
-     * Creates a new post
+     * Creates a new post with optional file attachment.
+     * 
+     * @param file     Optional multipart file to be attached to the post
+     * @param postJson JSON string containing post data
+     * @return ResponseEntity containing the created post
+     * @throws PostException if there's an error processing the request
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
@@ -54,17 +82,37 @@ public class PostController {
     }
 
     /**
-     * Retrieves all posts
+     * Retrieves all public posts.
+     * 
+     * @return ResponseEntity containing list of public posts
+     * @throws PostException if there's an error retrieving posts
      */
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts() {
-        List<Post> posts = postService.getAllPosts();
+    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts() throws PostException {
+        List<Post> posts = postService.getAllPublicPosts();
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }
 
     /**
-     * Retrieves a specific post by ID
+     * Retrieves all private posts for a specific user.
+     * 
+     * @param userId ID of the user whose private posts are to be retrieved
+     * @return ResponseEntity containing list of private posts
+     * @throws PostException if there's an error retrieving posts
+     */
+    @GetMapping
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<List<Post>>> getPrivateAllPosts(String userId) throws PostException {
+        List<Post> posts = postService.getAllPrivatePosts(userId);
+        return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
+    }
+
+    /**
+     * Retrieves a specific post by its ID.
+     * 
+     * @param postId ID of the post to retrieve
+     * @return ResponseEntity containing the requested post
      */
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
@@ -78,7 +126,11 @@ public class PostController {
     }
 
     /**
-     * Deletes a post by ID (Only the owner can delete)
+     * Deletes a specific post by its ID.
+     * Only the owner of the post can delete it.
+     * 
+     * @param postId ID of the post to delete
+     * @return ResponseEntity with deletion status
      */
     @DeleteMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
@@ -92,7 +144,11 @@ public class PostController {
     }
 
     /**
-     * Toggles like status for a post
+     * Toggles the like status of a post for a specific user.
+     * 
+     * @param postId ID of the post to toggle like
+     * @param userId ID of the user toggling the like
+     * @return ResponseEntity containing updated like count
      */
     @PostMapping("/{postId}/toggle-like")
     @PreAuthorize("isAuthenticated()")
@@ -107,7 +163,10 @@ public class PostController {
     }
 
     /**
-     * Retrieves all comments for a specific post
+     * Retrieves all comments for a specific post.
+     * 
+     * @param postId ID of the post to retrieve comments for
+     * @return ResponseEntity containing list of comments
      */
     @GetMapping("/{postId}/comments")
     @PreAuthorize("isAuthenticated()")

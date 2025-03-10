@@ -181,6 +181,11 @@ public class UserService implements UserDetailsService {
     }
 
     public String updateUserEmail(String id, String email) throws UserException {
+        String loggedInEmail = getAuthenticatedUserEmail();
+
+        if (!email.equals(loggedInEmail)) {
+            throw new UserException("You are not authorized to access this profile");
+        }
         User existingUser = userRepo.findById(id)
                 .orElseThrow(() -> new UserException("User not found"));
         existingUser.setEmail(email);
@@ -197,6 +202,11 @@ public class UserService implements UserDetailsService {
     }
 
     public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
+        String loggedInEmail = getAuthenticatedUserEmail();
+
+        if (!updatedUser.getEmail().equals(loggedInEmail)) {
+            throw new UserException("You are not authorized to access this profile");
+        }
         // Fetch the existing user from the database
         User existingUser = userRepo.findById(updatedUser.getUserId())
                 .orElseThrow(() -> new UserException("User not found"));
@@ -239,9 +249,18 @@ public class UserService implements UserDetailsService {
     }
 
     public void deleteUser(String id) throws UserException {
-        if (!userRepo.existsById(id)) {
+
+        String loggedInEmail = getAuthenticatedUserEmail();
+        Optional<User> userOptional = userRepo.findById(id);
+        if (userOptional.isEmpty()) {
             throw new UserException("Can't Find User by Id: " + id);
         }
+
+        User user = userOptional.get();
+        if (!user.getEmail().equals(loggedInEmail)) {
+            throw new UserException("You are not authorized to access this profile");
+        }
+
         userRepo.deleteById(id);
     }
 

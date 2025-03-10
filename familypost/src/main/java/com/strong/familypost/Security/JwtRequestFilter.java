@@ -1,18 +1,19 @@
 package com.strong.familypost.Security;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.Collection;
 
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
+import com.strong.familypost.Model.User;
 import com.strong.familypost.Util.JwtUtil;
 
+import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -41,7 +42,22 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     if (jwtUtil.validateToken(token)) {
-                        UserDetails userDetails = new User(email, "", Collections.emptyList());
+                        Claims claims = jwtUtil.extractClaims(token);
+                        String userId = claims.get("userId", String.class);
+                        String username = claims.get("username", String.class);
+                        String name = claims.get("name", String.class);
+                        String phone = claims.get("phone", String.class);
+                        boolean isPrivate = claims.get("isPrivate", Boolean.class);
+                        boolean isEnabled = claims.get("enabled", Boolean.class);
+                        boolean isAccountNonLocked = claims.get("accountNonLocked", Boolean.class);
+                        boolean isAccountNonExpired = claims.get("accountNonExpired", Boolean.class);
+                        @SuppressWarnings("unchecked")
+                        Collection<SimpleGrantedAuthority> authorities = (Collection<SimpleGrantedAuthority>) claims
+                                .get("authorities", Collection.class);
+
+                        User userDetails = new User(
+                                email, userId, username, name, phone, isPrivate, isEnabled, isAccountNonLocked,
+                                isAccountNonExpired, authorities);
                         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                                 userDetails, null, userDetails.getAuthorities());
                         authenticationToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -52,7 +52,7 @@ public class JwtUtil {
      * @param token JWT token
      * @return Claims
      */
-    private Claims extractClaims(String token) {
+    public Claims extractClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigninKey())
                 .build()

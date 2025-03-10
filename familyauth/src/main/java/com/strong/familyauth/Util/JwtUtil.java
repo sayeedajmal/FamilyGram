@@ -102,7 +102,7 @@ public class JwtUtil {
         } catch (JwtException e) {
             throw new JwtException("Error checking token expiration: " + e.getMessage());
         } catch (UserException e) {
-            
+
         }
         return false;
     }
@@ -184,6 +184,15 @@ public class JwtUtil {
         return Jwts
                 .builder()
                 .subject(user.getEmail())
+                .claim("userId", user.getUserId())
+                .claim("username", user.getUsername())
+                .claim("name", user.getName())
+                .claim("phone", user.getPhone())
+                .claim("isPrivate", user.isPrivate())
+                .claim("enabled", user.isEnabled())
+                .claim("accountNonLocked", user.isAccountNonLocked())
+                .claim("accountNonExpired", user.isAccountNonExpired())
+                .claim("authorities", user.getAuthorities())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expireTime))
                 .signWith(getSigninKey())

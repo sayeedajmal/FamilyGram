@@ -5,12 +5,15 @@ import java.util.List;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.strong.familypost.Model.Post;
+import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Repository.PostRepo;
 import com.strong.familypost.Util.PostException;
@@ -36,6 +39,29 @@ public class PostService {
     @Autowired
     private StorageService storageService;
 
+    private String getAuthenticatedUserId() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (principal instanceof User) {
+            User userDetails = (User) principal;
+            // Return the username
+            return userDetails.getUserId();
+        }
+
+        return null;
+    }
+
+    private boolean isPrivate() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (principal instanceof User) {
+            User userDetails = (User) principal;
+            // Return the username
+            return userDetails.isPrivate();
+        }
+        return false;
+    }
+
     /**
      * Saves a new post to the repository.
      *
@@ -44,12 +70,13 @@ public class PostService {
      * @throws PostException If the post object is null
      */
     public Post savePost(MultipartFile file, Post post) throws PostException {
+        String loggedUserId = getAuthenticatedUserId();
+
+        if (!post.getUserId().equals(loggedUserId)) {
+            throw new PostException("You are not authorized to access this Resource");
+        }
+
         try {
-
-            if (post == null) {
-                throw new PostException("Post cannot be null");
-            }
-
             // Step 1: Save post first to generate an ID
             Post savedPost = postRepo.save(post);
 
@@ -79,6 +106,11 @@ public class PostService {
      */
     @Transactional
     public void deletePost(String postId) throws PostException {
+        String loggedUserId = getAuthenticatedUserId();
+
+        if (!postId.equals(loggedUserId)) {
+            throw new PostException("You are not authorized to access this Resource");
+        }
         if (postId == null || postId.trim().isEmpty()) {
             throw new PostException("PostId cannot be null or empty");
         }
@@ -112,8 +144,28 @@ public class PostService {
      * 
      * @return A List containing all Post objects
      */
-    public List<Post> getAllPosts() {
+    public List<Post> getAllPublicPosts() throws PostException {
+        // Check if the current user is private
+        if (isPrivate()) {
+            // Throw exception if private users shouldn't access public posts
+            throw new PostException("You are not authorized to access this Resource", HttpStatus.FORBIDDEN);
+        }
+        // Return all posts if user is not private
         return postRepo.findAll();
+    }
+
+    public List<Post> getAllPrivatePosts(String userId) throws PostException {
+        // Get the currently authenticated user's ID
+        String authenticatedUserId = getAuthenticatedUserId();
+
+        // Check if the user is trying to access their own posts
+        if (!userId.equals(authenticatedUserId)) {
+            // Throw an exception if the user is trying to access someone else's posts
+            throw new PostException("You are not authorized to access this Resource", HttpStatus.FORBIDDEN);
+        }
+
+        // Return posts for the authenticated user if authorized
+        return postRepo.findByUserId(userId); // Assuming you have a method like this in the repository
     }
 
     /**
