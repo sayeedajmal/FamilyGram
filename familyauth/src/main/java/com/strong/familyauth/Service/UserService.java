@@ -132,7 +132,7 @@ public class UserService implements UserDetailsService {
         User user = userRepo.findByusername(username)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
-        profile.setId(user.getId());
+        profile.setId(user.getUserId());
         profile.setEmail(user.getEmail());
         profile.setUsername(user.getUsername());
         profile.setName(user.getName());
@@ -156,7 +156,7 @@ public class UserService implements UserDetailsService {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
-        profile.setId(user.getId());
+        profile.setId(user.getUserId());
         profile.setEmail(user.getEmail());
         profile.setUsername(user.getUsername());
         profile.setName(user.getName());
@@ -198,12 +198,12 @@ public class UserService implements UserDetailsService {
 
     public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
         // Fetch the existing user from the database
-        User existingUser = userRepo.findById(updatedUser.getId())
+        User existingUser = userRepo.findById(updatedUser.getUserId())
                 .orElseThrow(() -> new UserException("User not found"));
 
         // Handle profile picture update
         if (file != null && !file.isEmpty()) {
-            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
+            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getUserId());
             existingUser.setPhotoId(uploadImage);
         }
 
@@ -224,7 +224,7 @@ public class UserService implements UserDetailsService {
 
         User savedUser = userRepo.save(existingUser);
         Profile profile = new Profile();
-        profile.setId(savedUser.getId());
+        profile.setId(savedUser.getUserId());
         profile.setEmail(savedUser.getEmail());
         profile.setUsername(savedUser.getUsername());
         profile.setName(savedUser.getName());
@@ -291,7 +291,7 @@ public class UserService implements UserDetailsService {
 
     @SuppressWarnings("unused")
     private void revokeAllTokens(User user) {
-        List<Token> validTokens = tokenRepository.findByUser(user.getId());
+        List<Token> validTokens = tokenRepository.findByUser(user.getUserId());
         if (!validTokens.isEmpty()) {
             tokenRepository.deleteAll(validTokens);
         }

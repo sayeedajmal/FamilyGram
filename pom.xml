@@ -14,6 +14,7 @@
 
     <modules>
         <module>familyauth</module>
+        <module>familypost</module>
         <!-- Add other microservices here -->
     </modules>
 

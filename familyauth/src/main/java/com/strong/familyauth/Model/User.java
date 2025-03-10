@@ -16,7 +16,7 @@ import lombok.Data;
 public class User implements UserDetails {
     @Id
     @Indexed(unique = true)
-    private String id;
+    private String userId;
     @Indexed(unique = true)
     private String username;
     private String name;
