@@ -3,6 +3,7 @@ package com.strong.familypost.Controller;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import com.strong.familypost.Model.Comment;
@@ -31,6 +32,7 @@ public class CommentController {
      * Creates a new comment.
      */
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Comment>> createComment(@RequestBody Comment comment) throws PostException {
         Comment createdComment = commentService.createComment(comment);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment created successfully", createdComment));
@@ -40,6 +42,7 @@ public class CommentController {
      * Retrieves all comments in the system.
      */
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<List<Comment>>> getAllComments() throws PostException {
         List<Comment> comments = commentService.getAllComments();
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
@@ -49,6 +52,7 @@ public class CommentController {
      * Retrieves all comments for a specific post.
      */
     @GetMapping("/post/{postId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<List<Comment>>> getCommentsByPostId(@PathVariable String postId)
             throws PostException {
         List<Comment> comments = commentService.getCommentsByPostId(postId);
@@ -59,6 +63,7 @@ public class CommentController {
      * Retrieves a specific comment by its ID.
      */
     @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Comment>> getCommentById(@PathVariable String id) throws PostException {
         Comment comment = commentService.getCommentById(id);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment retrieved successfully", comment));
@@ -68,6 +73,7 @@ public class CommentController {
      * Updates an existing comment.
      */
     @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Comment>> updateComment(@PathVariable String id,
             @RequestBody Comment commentDetails)
             throws PostException {
@@ -79,6 +85,7 @@ public class CommentController {
      * Deletes a comment by its ID.
      */
     @DeleteMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Void>> deleteComment(@PathVariable String id) throws PostException {
         commentService.deleteComment(id);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment deleted successfully", null));
@@ -88,6 +95,7 @@ public class CommentController {
      * Counts the total number of comments in the system.
      */
     @GetMapping("/count")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Long>> countAllComments() throws PostException {
         long count = commentService.getAllComments().size();
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Total comments count retrieved successfully", count));

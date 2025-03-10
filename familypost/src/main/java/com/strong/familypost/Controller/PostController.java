@@ -4,7 +4,16 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -30,6 +39,7 @@ public class PostController {
      * Creates a new post
      */
     @PostMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Post>> createPost(
             @RequestPart(value = "file", required = false) MultipartFile file,
             @RequestParam("post") String postJson) throws PostException {
@@ -47,6 +57,7 @@ public class PostController {
      * Retrieves all posts
      */
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts() {
         List<Post> posts = postService.getAllPosts();
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
@@ -56,6 +67,7 @@ public class PostController {
      * Retrieves a specific post by ID
      */
     @GetMapping("/{postId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Post>> getPost(@PathVariable String postId) {
         try {
             Post post = postService.getPost(postId);
@@ -66,9 +78,10 @@ public class PostController {
     }
 
     /**
-     * Deletes a post by ID
+     * Deletes a post by ID (Only the owner can delete)
      */
     @DeleteMapping("/{postId}")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Void>> deletePost(@PathVariable String postId) {
         try {
             postService.deletePost(postId);
@@ -82,6 +95,7 @@ public class PostController {
      * Toggles like status for a post
      */
     @PostMapping("/{postId}/toggle-like")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Integer>> toggleLike(@PathVariable String postId,
             @RequestHeader("userId") String userId) {
         try {
@@ -96,9 +110,13 @@ public class PostController {
      * Retrieves all comments for a specific post
      */
     @GetMapping("/{postId}/comments")
-    public ResponseEntity<ResponseWrapper<List<Comment>>> getComments(@PathVariable String postId)
-            throws PostException {
-        List<Comment> comments = commentService.getCommentsByPostId(postId);
-        return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<List<Comment>>> getComments(@PathVariable String postId) {
+        try {
+            List<Comment> comments = commentService.getCommentsByPostId(postId);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
+        } catch (PostException e) {
+            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Comments not found", null));
+        }
     }
 }
