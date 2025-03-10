@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: FamilyPost
+  data:
+    mongodb:
+      uri: ${BlogDBUrl}
+      database: ${BlogDBName}
+  servlet:
+    multipart:
+      enabled: ${MULTIPART_ENABLED}
+      max-file-size: ${MAX_FILE_SIZE}
+      max-request-size: ${MAX_REQUEST_SIZE}
+  main:
+    allow-circular-references: true
+  devtools:
+    add-properties: false
+
+server:
+  port: 8083
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true
