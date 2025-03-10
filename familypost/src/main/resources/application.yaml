@@ -15,6 +15,11 @@ spring:
   devtools:
     add-properties: false
 
+jwt:
+  secret: ${JWT_SECRET}
+  tokenValidityInMilliSeconds: ${JWT_TOKEN_VALIDITY_IN_MILLISECONDS}
+  tokenRefreshInMilliSeconds: ${JWT_TOKEN_REFRESH_IN_MILLISECONDS}
+
 server:
   port: 8083
 

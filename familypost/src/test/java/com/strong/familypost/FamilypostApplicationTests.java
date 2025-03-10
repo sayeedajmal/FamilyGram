@@ -1,4 +1,4 @@
-package com.storng.familypost;
+package com.strong.familypost;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

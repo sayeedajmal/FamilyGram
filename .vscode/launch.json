@@ -6,6 +6,14 @@
   "configurations": [
     {
       "type": "java",
+      "name": "FamilyPostApplication",
+      "request": "launch",
+      "mainClass": "com.strong.familypost.FamilypostApplication",
+      "projectName": "familypost",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
       "name": "FamilyauthApplication",
       "request": "launch",
       "mainClass": "com.strong.familyauth.FamilyauthApplication",
