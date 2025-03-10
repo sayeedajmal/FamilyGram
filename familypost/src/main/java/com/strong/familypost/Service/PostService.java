@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Repository.CommentRepo;
@@ -32,6 +33,9 @@ public class PostService {
     @Autowired
     private CommentRepo commentRepo;
 
+    @Autowired
+    private StorageService storageService;
+
     /**
      * Saves a new post to the repository.
      *
@@ -39,11 +43,29 @@ public class PostService {
      * @return The saved post object
      * @throws PostException If the post object is null
      */
-    public Post savePost(Post post) throws PostException {
-        if (post == null) {
-            throw new PostException("Post cannot be null");
+    public Post savePost(MultipartFile file, Post post) throws PostException {
+        try {
+
+            if (post == null) {
+                throw new PostException("Post cannot be null");
+            }
+
+            // Step 1: Save post first to generate an ID
+            Post savedPost = postRepo.save(post);
+
+            if (file != null && !file.isEmpty()) {
+                // Step 2: Upload media with the generated post ID
+                String mediaId = storageService.uploadMedia(file, savedPost.getPostId());
+
+                // Step 3: Update post with media ID
+                savedPost.getMediaIds().add(mediaId);
+                postRepo.save(savedPost);
+            }
+
+            return savedPost;
+        } catch (Exception e) {
+            throw new PostException("Error saving post: " + e.getMessage());
         }
-        return postRepo.save(post);
     }
 
     /**

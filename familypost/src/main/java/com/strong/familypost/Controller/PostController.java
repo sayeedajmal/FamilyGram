@@ -1,35 +1,21 @@
-
 package com.strong.familypost.Controller;
 
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Service.CommentService;
 import com.strong.familypost.Service.PostService;
 import com.strong.familypost.Util.PostException;
+import com.strong.familypost.Util.ResponseWrapper;
 
-/**
- * REST Controller for handling post-related operations in the FamilyGram
- * application.
- * This controller manages CRUD operations for posts, including creating,
- * retrieving,
- * deleting posts, and handling post-related actions such as likes and comments.
- * 
- * @author FamilyGram
- * @version 1.0
- */
 @RestController
 @RequestMapping("/posts")
 public class PostController {
@@ -42,89 +28,77 @@ public class PostController {
 
     /**
      * Creates a new post
-     * 
-     * @param post   The post object to be created
-     * @param userId The ID of the user creating the post
-     * @return ResponseEntity containing the saved post or null if creation fails
      */
     @PostMapping
-    public ResponseEntity<Post> createPost(@RequestBody Post post, @RequestHeader("userId") String userId) {
+    public ResponseEntity<ResponseWrapper<Post>> createPost(
+            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestParam("post") String postJson) throws PostException {
         try {
-            Post savedPost = postService.savePost(post);
-            return ResponseEntity.ok(savedPost);
-        } catch (PostException e) {
-            return ResponseEntity.badRequest().body(null);
+            ObjectMapper objectMapper = new ObjectMapper();
+            Post post = objectMapper.readValue(postJson, Post.class);
+            Post savedPost = postService.savePost(file, post);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Post created successfully", savedPost));
+        } catch (JsonProcessingException e) {
+            throw new PostException("Error processing JSON: " + e.getMessage());
         }
     }
 
     /**
      * Retrieves all posts
-     * 
-     * @return ResponseEntity containing a list of all posts
      */
     @GetMapping
-    public ResponseEntity<List<Post>> getAllPosts() {
-        return ResponseEntity.ok(postService.getAllPosts());
+    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts() {
+        List<Post> posts = postService.getAllPosts();
+        return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }
 
     /**
      * Retrieves a specific post by ID
-     * 
-     * @param postId The ID of the post to retrieve
-     * @return ResponseEntity containing the requested post or not found status
      */
     @GetMapping("/{postId}")
-    public ResponseEntity<Post> getPost(@PathVariable String postId) {
+    public ResponseEntity<ResponseWrapper<Post>> getPost(@PathVariable String postId) {
         try {
             Post post = postService.getPost(postId);
-            return ResponseEntity.ok(post);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Post not found", null));
         }
     }
 
     /**
      * Deletes a post by ID
-     * 
-     * @param postId The ID of the post to delete
-     * @return ResponseEntity with success or not found status
      */
     @DeleteMapping("/{postId}")
-    public ResponseEntity<Void> deletePost(@PathVariable String postId) {
+    public ResponseEntity<ResponseWrapper<Void>> deletePost(@PathVariable String postId) {
         try {
             postService.deletePost(postId);
-            return ResponseEntity.ok().build();
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Post deleted successfully", null));
         } catch (PostException e) {
-            return ResponseEntity.notFound().build();
+            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Post not found", null));
         }
     }
 
     /**
      * Toggles like status for a post
-     * 
-     * @param postId The ID of the post to toggle like
-     * @param userId The ID of the user toggling the like
-     * @return ResponseEntity containing the updated total likes count
      */
     @PostMapping("/{postId}/toggle-like")
-    public ResponseEntity<Integer> toggleLike(@PathVariable String postId, @RequestHeader("userId") String userId) {
+    public ResponseEntity<ResponseWrapper<Integer>> toggleLike(@PathVariable String postId,
+            @RequestHeader("userId") String userId) {
         try {
             int totalLikes = postService.toggleLike(postId, userId);
-            return ResponseEntity.ok(totalLikes);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
         } catch (PostException e) {
-            return ResponseEntity.badRequest().body(0);
+            return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));
         }
     }
 
     /**
      * Retrieves all comments for a specific post
-     * 
-     * @param postId The ID of the post to get comments for
-     * @return ResponseEntity containing a list of comments
-     * @throws PostException if the post is not found
      */
     @GetMapping("/{postId}/comments")
-    public ResponseEntity<List<Comment>> getComments(@PathVariable String postId) throws PostException {
-        return ResponseEntity.ok(commentService.getCommentsByPostId(postId));
+    public ResponseEntity<ResponseWrapper<List<Comment>>> getComments(@PathVariable String postId)
+            throws PostException {
+        List<Comment> comments = commentService.getCommentsByPostId(postId);
+        return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
     }
 }

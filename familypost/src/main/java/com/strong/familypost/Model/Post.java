@@ -38,7 +38,7 @@ public class Post {
 
     /** List of URLs pointing to media content associated with the post */
     @NonNull
-    private List<String> mediaUrls;
+    private List<String> mediaIds;
 
     /** Set of user IDs who have liked this post */
     private Set<String> likes = new HashSet<>();
