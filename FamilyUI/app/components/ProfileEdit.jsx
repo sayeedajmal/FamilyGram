@@ -9,8 +9,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
-import loginSignup from "../api/loginSignup";
+import loginSignup from "../../api/loginSignup";
+import { Colors } from "../constants/Colors";
 
 const ProfileEdit = ({ onEdit, onUpdate }) => {
   const [id, setId] = useState("");
@@ -24,6 +26,10 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   const [oldUsername, setOldUsername] = useState("");
   const [usernameStatus, setUsernameStatus] = useState(null);
 
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
   useEffect(() => {
     const fetchProfile = async () => {
       const userProfile = await loginSignup.getStoredUserProfile();
@@ -60,7 +66,9 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
     const delay = setTimeout(async () => {
       console.log("BITCH: ", username.length);
 
-      const response = await loginSignup.checkUsernameAvailability(username.toLowerCase());
+      const response = await loginSignup.checkUsernameAvailability(
+        username.toLowerCase()
+      );
       if (response) {
         setUsernameStatus({
           message: response.message,
@@ -105,7 +113,8 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       updatedUser,
       selectedImage
     );
-    if (response) {
+    console.log("LOG: ", response);
+    if (response.status) {
       Alert.alert("Success", "Profile updated successfully");
       onUpdate();
       onEdit();
@@ -116,12 +125,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   };
 
   return (
-    <ScrollView className="content-center h-full w-full max-w-md bg-white rounded-xl shadow-lg p-6">
+    <ScrollView
+      style={{ backgroundColor: bg }}
+      className="content-center h-full w-full max-w-md rounded-xl shadow-lg p-6"
+    >
       <View className="flex-row justify-between items-center mb-6">
-        <Text className="text-2xl font-semibold">Edit Profile</Text>
-        <TouchableOpacity onPress={onEdit}>
-          <Text className="text-gray-600 text-lg">✖</Text>
-        </TouchableOpacity>
+        <Text className="text-2xl font-semibold" style={{ color: textColor }}>
+          Edit Profile
+        </Text>
       </View>
 
       <View className="items-center mb-6">
@@ -142,6 +153,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       <View className="space-y-4">
         <View>
           <Text
+            style={{ color: textColor }}
             className={`text-sm font-medium mb-2 ${
               usernameStatus
                 ? usernameStatus.isAvailable
@@ -153,6 +165,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
             {usernameStatus ? usernameStatus.message : "Username"}
           </Text>
           <TextInput
+            style={{ color: textColor }}
             value={username}
             onChangeText={handleUsernameChange}
             textContentType="username"
@@ -162,8 +175,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </View>
 
         <View>
-          <Text className="text-sm font-medium mb-2">Full Name</Text>
+          <Text
+            className="text-sm font-medium mb-2"
+            style={{ color: textColor }}
+          >
+            Full Name
+          </Text>
           <TextInput
+            style={{ color: textColor }}
             value={fullName}
             onChangeText={setFullName}
             textContentType="name"
@@ -173,8 +192,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </View>
 
         <View>
-          <Text className="text-sm font-medium mb-2">Bio</Text>
+          <Text
+            style={{ color: textColor }}
+            className="text-sm font-medium mb-2"
+          >
+            Bio
+          </Text>
           <TextInput
+            style={{ color: textColor }}
             value={bio}
             onChangeText={setBio}
             placeholder="Tell us about yourself..."
@@ -184,8 +209,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         </View>
 
         <View>
-          <Text className="text-sm font-medium mb-2">Website</Text>
+          <Text
+            style={{ color: textColor }}
+            className="text-sm font-medium mb-2"
+          >
+            Website
+          </Text>
           <TextInput
+            style={{ color: textColor }}
             value={website}
             onChangeText={setWebsite}
             textContentType="URL"
@@ -201,7 +232,9 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
           disabled={isUpdating}
           className="px-6 py-2 mx-2 rounded-3xl border border-gray-300"
         >
-          <Text className="text-gray-700">Cancel</Text>
+          <Text style={{ color: textColor }} className="text-gray-700">
+            Cancel
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity

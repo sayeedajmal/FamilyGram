@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import loginSignup from "../api/loginSignup";
+import loginSignup from "../../../FamilyUI/api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
 
 export default function SignupScreen({ navigation, setAuthenticated }) {
@@ -139,7 +139,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
       <View className="flex-1 items-center justify-center px-6">
         <View className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-lg">
           <Image
-            source={require("../../assets/logo.png")}
+            source={require("../../assets/images/logo.png")}
             className="self-center mb-6"
             style={{ height: 40 }}
             resizeMode="contain"

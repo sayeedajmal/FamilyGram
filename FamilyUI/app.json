@@ -1,63 +1,42 @@
 {
   "expo": {
-    "name": "FamilyGram",
+    "name": "FamilyUI",
     "slug": "FamilyUI",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/iconLauncher.png",
-    "userInterfaceStyle": "light",
+    "icon": "./assets/images/icon.png",
+    "scheme": "myapp",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/iconLauncher.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.strong.familygram",
-      "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
-      }
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      },
-      "package": "com.strong.familygram"
+      }
     },
     "web": {
-      "pwa": {
-        "display": "fullscreen",
-        "backgroundColor": "#000000"
-      },
-      "favicon": "./assets/iconLauncher.png",
       "bundler": "metro",
-      "viewport": "width=device-width, initial-scale=1, user-scalable=no, viewport-fit=cover",
-      "meta": {
-        "themeColor": "#000000",
-        "statusBarStyle": "black-translucent"
-      }
-    },
-    "extra": {
-      "EXPO_DEV_SERVER_HOST": "localhost",
-      "EXPO_DEV_SERVER_PORT": "8080",
-      "router": {
-        "origin": false
-      },
-      "eas": {
-        "projectId": "870fa8e7-707d-4045-8d8c-edb0b9dc5dc0"
-      }
+      "output": "static",
+      "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-secure-store",
-      "expo-router"
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/splash-icon.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "backgroundColor": "#ffffff"
+        }
+      ],
+      "expo-secure-store"
     ],
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
-    "updates": {
-      "url": "https://u.expo.dev/870fa8e7-707d-4045-8d8c-edb0b9dc5dc0"
+    "experiments": {
+      "typedRoutes": true
     }
   }
 }

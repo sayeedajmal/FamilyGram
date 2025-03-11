@@ -9,14 +9,22 @@ import {
   Text,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
-import loginSignup from "../api/loginSignup";
+import loginSignup from "../../api/loginSignup";
 import ProfileEdit from "./ProfileEdit";
+import { Colors } from "../constants/Colors";
 
 export const ProfileSection = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [activeEdit, setActiveEdit] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
+
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const iconColor = themeColors.icon;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
 
   const posts = [...Array(20)].map((_, i) => ({
     id: i,
@@ -79,16 +87,23 @@ export const ProfileSection = () => {
   }
 
   return (
-    <View className="bg-white flex-1">
+    <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Profile Header */}
       <View className="w-full flex-row justify-center self-center text-center">
         <View className="w-full flex-col items-center">
           <View className="w-full flex-row justify-between items-center px-4">
-            <Text className="text-lg font-bold w-[80%] overflow-hidden">
+            <Text
+              className="text-lg font-bold w-[80%] overflow-hidden"
+              style={{ color: textColor }}
+            >
               {userProfile.username || "Username"}
             </Text>
             <TouchableOpacity>
-              <MaterialIcons name="menu-open" size={28} />
+              <MaterialIcons
+                name="menu-open"
+                size={28}
+                style={{ color: iconColor }}
+              />
             </TouchableOpacity>
           </View>
 
@@ -98,21 +113,21 @@ export const ProfileSection = () => {
               source={
                 userProfile.imageUrl
                   ? { uri: userProfile.imageUrl }
-                  : require("../../assets/iconLauncher.png")
+                  : require("../../assets/images/iconLauncher.png")
               }
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
-              <Text className="text-center">
+              <Text className="text-center" style={{ color: textColor }}>
                 <Text className="font-bold">0</Text>
                 {"\n"} posts
               </Text>
-              <Text className="text-center">
+              <Text className="text-center" style={{ color: textColor }}>
                 <Text className="font-bold">{userProfile.followerCount}</Text>
                 {"\n"}
                 followers
               </Text>
-              <Text className="text-center">
+              <Text className="text-center" style={{ color: textColor }}>
                 <Text className="font-bold">{userProfile.followingCount}</Text>
                 {"\n"}
                 following
@@ -122,16 +137,16 @@ export const ProfileSection = () => {
 
           {/* Name, Bio, and Link */}
           <View className="px-4 pb-2 w-full flex-col items-start">
-            <Text className="text-lg font-bold">
+            <Text className="text-lg font-bold" style={{ color: textColor }}>
               {userProfile.name || "Name"}
             </Text>
-            <Text className="text-start w-[90%]">
+            <Text className="text-start w-[90%]" style={{ color: textColor }}>
               {userProfile.bio || "Bio"}
             </Text>
             <TouchableOpacity
               onPress={() => Linking.openURL(userProfile.website || "#")}
             >
-              <Text className="text-blue-900">
+              <Text className="text-blue-900" style={{ color: textColor }}>
                 {userProfile.website || "No website"}
               </Text>
             </TouchableOpacity>
@@ -178,7 +193,7 @@ export const ProfileSection = () => {
               size={24}
               color={activeTab === tab ? "#0278ae" : "gray"}
             />
-            <Text style={{ color: activeTab === tab ? "#0278ae" : "gray" }}>
+            <Text style={{ color: activeTab === tab ? textColor : "gray" }}>
               {tab}
             </Text>
           </TouchableOpacity>

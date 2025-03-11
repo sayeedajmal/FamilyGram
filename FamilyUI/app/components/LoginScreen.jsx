@@ -5,9 +5,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  KeyboardAvoidingView,
   ActivityIndicator,
+  Platform,
 } from "react-native";
-import loginSignup from "../api/loginSignup";
+import loginSignup from "../../../FamilyUI/api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
 
 export default function LoginScreen({ navigation, setAuthenticated }) {
@@ -35,7 +37,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
     setLoading(true);
 
     const response = await loginSignup.loginUser({ email, password });
-    
+
     if (response.status) {
       setSnackbar({
         visible: true,
@@ -56,12 +58,15 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
   };
 
   return (
-    <View className="flex-1 bg-white items-center justify-center px-6">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      className="flex-1 bg-white items-center justify-center px-6"
+    >
       <View className="w-full justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
         <Image
-          source={require('../../assets/logo.png')}
+          source={require("../../assets/images/logo.png")}
           className="self-center mb-6"
-          style={{height:40}}
+          style={{ height: 40 }}
           resizeMode="contain"
         />
 
@@ -118,6 +123,6 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
         type={snackbar.type}
         onDismiss={() => setSnackbar((prev) => ({ ...prev, visible: false }))}
       />
-    </View>
+    </KeyboardAvoidingView>
   );
 }

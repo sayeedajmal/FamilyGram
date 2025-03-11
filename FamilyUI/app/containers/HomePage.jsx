@@ -1,7 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
-import { Image, ScrollView, Text, TouchableOpacity, View } from "react-native";
+import {
+  Image,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
 import Posts from "../components/Posts";
+import { Colors } from "../constants/Colors";
 
 const stories = [
   { id: 1, username: "Your Story", image: "https://placekitten.com/100/100" },
@@ -10,12 +18,17 @@ const stories = [
 ];
 
 const HomePage = () => {
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const iconColor = themeColors.icon;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
   return (
-    <View className="flex-1 bg-white">
+    <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
       <View className="flex-row justify-between items-center px-4 py-1">
         <Image
-          source={require("../../assets/logo.png")}
+          source={require("../../assets/images/icon.png")}
           resizeMode="contain"
           style={{ height: 30, width: 180, marginLeft: -15 }}
         />
@@ -24,12 +37,12 @@ const HomePage = () => {
             <Ionicons
               name="heart-sharp"
               size={30}
-              color="#0278ae"
+              color={iconColor}
               className="mx-4"
             />
           </TouchableOpacity>
           <TouchableOpacity>
-            <Ionicons name="chatbubble-outline" size={30} color="#0278ae" />
+            <Ionicons name="chatbubble-outline" size={30} color={iconColor} />
           </TouchableOpacity>
         </View>
       </View>
@@ -43,13 +56,18 @@ const HomePage = () => {
         >
           {stories.map((story) => (
             <View key={story.id} className="mr-4 items-center">
-              <View className="border-2 border-pink-500 rounded-full p-1">
+              <View
+                className="border-2 rounded-full p-1"
+                style={{ borderColor: iconColor }}
+              >
                 <Image
                   source={{ uri: story.image }}
                   className="w-16 h-16 rounded-full"
                 />
               </View>
-              <Text className="text-xs mt-1">{story.username}</Text>
+              <Text className="text-xs mt-1" style={{ color: textColor }}>
+                {story.username}
+              </Text>
             </View>
           ))}
         </ScrollView>
