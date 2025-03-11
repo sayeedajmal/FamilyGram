@@ -11,7 +11,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import loginSignup from "../../api/loginSignup";
+import loginSignup from "../api/loginSignup";
 import ProfileEdit from "./ProfileEdit";
 import { Colors } from "../constants/Colors";
 
@@ -62,7 +62,7 @@ export const ProfileSection = () => {
           height={300}
           viewBox="0 0 300 300"
           backgroundColor="#f3f3f3"
-          foregroundColor="#ecebeb"
+          foregroundColor={themeColors.skeletonFg}
         >
           {/* Profile Image */}
           <Circle cx="150" cy="50" r="40" />

@@ -11,7 +11,7 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import loginSignup from "../../api/loginSignup";
+import loginSignup from "../api/loginSignup";
 import { Colors } from "../constants/Colors";
 
 const ProfileEdit = ({ onEdit, onUpdate }) => {

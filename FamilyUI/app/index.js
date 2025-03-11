@@ -6,7 +6,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import { Animated, Appearance, Easing, Image, Platform, StatusBar, View } from "react-native";
-import loginSignup from "../api/loginSignup";
+import loginSignup from "./api/loginSignup";
 import LoginScreen from "./components/LoginScreen";
 import ProfileSection from "./components/ProfileSection";
 import SignupScreen from "./components/SignupScreen";
@@ -101,7 +101,7 @@ export default function App() {
             height={500}
             viewBox="0 0 400 500"
             backgroundColor="#f3f3f3"
-            foregroundColor="#ecebeb"
+            foregroundColor={themeColors.skeletonFg}
           >
             <Circle cx="50" cy="40" r="30" />
             <Rect x="90" y="20" rx="5" ry="5" width="200" height="10" />

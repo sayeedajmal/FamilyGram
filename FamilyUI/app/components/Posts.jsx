@@ -64,7 +64,7 @@ const Posts = () => {
                 width={"100%"}
                 height={320}
                 backgroundColor="#f3f3f3"
-                foregroundColor="#ecebeb"
+                foregroundColor={themeColors.skeletonFg}
               >
                 <Circle cx="30" cy="30" r="15" />
                 <Rect x="50" y="20" rx="4" ry="4" width="120" height="10" />

@@ -6,9 +6,11 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  useColorScheme,
 } from "react-native";
-import loginSignup from "../../../FamilyUI/api/loginSignup";
+import loginSignup from "../api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
+import { Colors } from "../constants/Colors";
 
 export default function SignupScreen({ navigation, setAuthenticated }) {
   const [email, setEmail] = useState("");
@@ -26,6 +28,11 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   const [fullNameError, setFullNameError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
 
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const iconColor = themeColors.icon;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
   const showSnackbarMessage = (message, type = "error") => {
     setSnackbarMessage(message);
     setSnackbarType(type);
@@ -128,7 +135,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   };
 
   return (
-    <View className="flex-1 bg-white">
+    <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Custom Snackbar - Always on top */}
       <CustomSnackbar
         message={snackbarMessage}
@@ -137,7 +144,10 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
       />
 
       <View className="flex-1 items-center justify-center px-6">
-        <View className="w-full max-w-sm bg-white p-6 rounded-3xl shadow-lg">
+        <View
+          className="w-full max-w-sm p-6 rounded-3xl shadow-lg"
+          style={{ backgroundColor: themeColors.tint }}
+        >
           <Image
             source={require("../../assets/images/logo.png")}
             className="self-center mb-6"
@@ -148,6 +158,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
           {!otpSent && (
             <>
               <TextInput
+                style={{ color: !textColor }}
                 placeholder="Full Name"
                 textContentType="username"
                 placeholderTextColor="#aaa"
@@ -162,6 +173,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
               />
 
               <TextInput
+                style={{ color: !textColor }}
                 placeholder="Your Email"
                 textContentType="emailAddress"
                 placeholderTextColor="#aaa"
@@ -176,6 +188,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
               />
 
               <TextInput
+                style={{ color: !textColor }}
                 placeholder="Password"
                 placeholderTextColor="#aaa"
                 secureTextEntry
@@ -208,10 +221,14 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
 
           {otpSent && (
             <View className="mt-4">
-              <Text className="text-gray-600 text-center mb-2">
+              <Text
+                className="text-gray-600 text-center mb-2"
+                style={{ color: textColor }}
+              >
                 Enter OTP sent to your email
               </Text>
               <TextInput
+                style={{ color: !textColor }}
                 placeholder="Enter OTP"
                 placeholderTextColor="#aaa"
                 keyboardType="numeric"
@@ -225,9 +242,12 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                 disabled={verifying}
               >
                 {verifying ? (
-                  <ActivityIndicator color="#fff" />
+                  <ActivityIndicator color={bg} />
                 ) : (
-                  <Text className="text-white text-lg font-semibold">
+                  <Text
+                    className="text-lg font-semibold"
+                    style={{ color: textColor }}
+                  >
                     Verify OTP & Register
                   </Text>
                 )}
@@ -237,7 +257,10 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
 
           {!otpSent && (
             <View className="mt-8 pt-4 border-t border-gray-300 w-full">
-              <Text className="text-center text-sm">
+              <Text
+                className="text-center text-sm"
+                style={{ color: textColor }}
+              >
                 Already have an account?
                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
                   <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3">

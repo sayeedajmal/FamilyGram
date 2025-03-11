@@ -28,7 +28,7 @@ const HomePage = () => {
       {/* Header */}
       <View className="flex-row justify-between items-center px-4 py-1">
         <Image
-          source={require("../../assets/images/icon.png")}
+          source={require("../../assets/images/logo.png")}
           resizeMode="contain"
           style={{ height: 30, width: 180, marginLeft: -15 }}
         />

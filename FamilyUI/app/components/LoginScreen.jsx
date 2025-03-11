@@ -1,16 +1,18 @@
 import { useState } from "react";
 import {
+  ActivityIndicator,
   Image,
+  KeyboardAvoidingView,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  useColorScheme,
   View,
-  KeyboardAvoidingView,
-  ActivityIndicator,
-  Platform,
 } from "react-native";
-import loginSignup from "../../../FamilyUI/api/loginSignup";
+import loginSignup from "../api/loginSignup";
 import CustomSnackbar from "../components/CustomSnackbar";
+import { Colors } from "../constants/Colors";
 
 export default function LoginScreen({ navigation, setAuthenticated }) {
   const [email, setEmail] = useState("");
@@ -21,6 +23,12 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
     message: "",
     type: "success",
   });
+
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const iconColor = themeColors.icon;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
 
   const handleLogin = async () => {
     setSnackbar((prev) => ({ ...prev, visible: false }));
@@ -60,9 +68,13 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 bg-white items-center justify-center px-6"
+      className="flex-1 items-center justify-center px-6"
+      style={{ backgroundColor: bg }}
     >
-      <View className="w-full justify-center max-w-sm bg-white p-6 rounded-3xl shadow-md">
+      <View
+        className="w-full justify-center max-w-sm p-6 rounded-3xl shadow-md"
+        style={{ backgroundColor: themeColors.tint }}
+      >
         <Image
           source={require("../../assets/images/logo.png")}
           className="self-center mb-6"
@@ -71,6 +83,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
         />
 
         <TextInput
+          style={{ color: !textColor }}
           placeholder="Email"
           textContentType="emailAddress"
           placeholderTextColor="#aaa"
@@ -80,6 +93,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
         />
 
         <TextInput
+          style={{ color: !textColor }}
           placeholder="Password"
           textContentType="password"
           placeholderTextColor="#aaa"
@@ -95,21 +109,26 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator color="white" />
+            <ActivityIndicator color={bg} />
           ) : (
             <Text className="text-white text-lg font-semibold">Log in</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity className="items-center mt-3">
-          <Text className="text-blue-900 text-xs">Forgot password?</Text>
+          <Text className="text-blue-900 text-xs" style={{ color: textColor }}>
+            Forgot password?
+          </Text>
         </TouchableOpacity>
 
         <View className="mt-8 h-10 pt-4 border-t border-gray-300 w-full">
-          <Text className="text-center text-sm">
+          <Text className="text-center text-sm" style={{ color: textColor }}>
             Don't have an account?
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
-              <Text className="text-blue-500 font-semibold h-10 m-1 mt-3">
+              <Text
+                className="font-semibold h-10 m-1 mt-3"
+                style={{ color: iconColor }}
+              >
                 Sign up
               </Text>
             </TouchableOpacity>

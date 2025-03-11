@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { View, Text, Animated, Platform, StyleSheet } from "react-native";
+import { Animated, Platform, StyleSheet, Text } from "react-native";
 
 const CustomSnackbar = ({ message, visible, type = "success", onDismiss }) => {
   const position = useRef(new Animated.Value(-100)).current;
