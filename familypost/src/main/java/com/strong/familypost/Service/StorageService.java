@@ -17,6 +17,7 @@ import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSDownloadStream;
 import com.mongodb.client.gridfs.model.GridFSFile;
 import com.mongodb.client.gridfs.model.GridFSUploadOptions;
+import com.mongodb.client.model.Filters;
 import com.strong.familypost.Util.PostException;
 
 @Service
@@ -39,14 +40,6 @@ public class StorageService {
 
             if (!SUPPORTED_IMAGE_TYPES.contains(contentType) && !SUPPORTED_VIDEO_TYPES.contains(contentType)) {
                 throw new PostException("Unsupported file type: " + contentType);
-            }
-
-            // Delete existing file for the user (if any)
-            GridFSFile existingFile = gridFSBucket
-                    .find(new org.bson.Document("filename", new org.bson.Document("$regex", "^" + postId + "_")))
-                    .first();
-            if (existingFile != null) {
-                gridFSBucket.delete(existingFile.getObjectId());
             }
 
             InputStream inputStream;
@@ -73,13 +66,17 @@ public class StorageService {
             // Upload media file
             String fileName = postId + "_" + System.currentTimeMillis() + "." + fileExtension;
             GridFSUploadOptions options = new GridFSUploadOptions()
-                    .chunkSizeBytes(1024 * 1024) // 1MB chunks
+                    .chunkSizeBytes(256 * 1024) // 256KB chunks, better for general purpose
                     .metadata(new org.bson.Document("type", contentType));
             ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
             return fileId.toHexString();
         } catch (Exception e) {
             throw new PostException("Failed to upload media: " + e.getLocalizedMessage());
         }
+    }
+
+    public GridFSFile getFileMetadata(String fileId) {
+        return gridFSBucket.find(Filters.eq("_id", new ObjectId(fileId))).first();
     }
 
     public InputStreamResource getMediaStream(String fileId) throws PostException {

@@ -10,7 +10,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 import com.mongodb.lang.NonNull;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Represents a social media post entity in the application.
@@ -22,6 +24,8 @@ import lombok.Data;
  */
 @Document(collection = "posts")
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class Post {
 
     /** Unique identifier for the post */

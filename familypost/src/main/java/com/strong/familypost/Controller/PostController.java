@@ -3,6 +3,8 @@ package com.strong.familypost.Controller;
 import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -18,10 +20,12 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mongodb.client.gridfs.model.GridFSFile;
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Service.CommentService;
 import com.strong.familypost.Service.PostService;
+import com.strong.familypost.Service.StorageService;
 import com.strong.familypost.Util.PostException;
 import com.strong.familypost.Util.ResponseWrapper;
 
@@ -58,6 +62,9 @@ public class PostController {
     @Autowired
     private CommentService commentService;
 
+    @Autowired
+    private StorageService storageService;
+
     /**
      * Creates a new post with optional file attachment.
      * 
@@ -81,6 +88,21 @@ public class PostController {
         }
     }
 
+    @GetMapping("/media/{fileId}")
+    public ResponseEntity<InputStreamResource> getMediaStream(@PathVariable String fileId) throws PostException {
+        GridFSFile file = storageService.getFileMetadata(fileId);
+        if (file == null || file.getMetadata() == null) {
+            throw new PostException("File not found");
+        }
+
+        String contentType = file.getMetadata().getString("type");
+        InputStreamResource mediaStream = storageService.getMediaStream(fileId);
+
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(mediaStream);
+    }
+
     /**
      * Retrieves all public posts.
      * 
@@ -101,9 +123,10 @@ public class PostController {
      * @return ResponseEntity containing list of private posts
      * @throws PostException if there's an error retrieving posts
      */
-    @GetMapping
+    @GetMapping("/{userId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getPrivateAllPosts(String userId) throws PostException {
+    public ResponseEntity<ResponseWrapper<List<Post>>> getPrivateAllPosts(@RequestParam("userId") String userId)
+            throws PostException {
         List<Post> posts = postService.getAllPrivatePosts(userId);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }

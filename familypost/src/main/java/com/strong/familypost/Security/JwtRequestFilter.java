@@ -69,6 +69,10 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 response.getWriter().write(e.getLocalizedMessage());
                 return;
             }
+        } else {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Check Your Token");
+            return;
         }
         chain.doFilter(request, response);
     }

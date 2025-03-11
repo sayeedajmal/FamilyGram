@@ -71,7 +71,7 @@ public class PostService {
      */
     public Post savePost(MultipartFile file, Post post) throws PostException {
         String loggedUserId = getAuthenticatedUserId();
-
+        System.out.println("LOGUSER: "+loggedUserId);
         if (!post.getUserId().equals(loggedUserId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
