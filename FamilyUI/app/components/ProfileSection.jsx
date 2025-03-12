@@ -55,13 +55,16 @@ export const ProfileSection = () => {
 
   if (!userProfile) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: bg }}
+      >
         <ContentLoader
           speed={2}
           width={300}
           height={300}
           viewBox="0 0 300 300"
-          backgroundColor="#f3f3f3"
+          backgroundColor={themeColors.skeletonFg}
           foregroundColor={themeColors.skeletonFg}
         >
           {/* Profile Image */}

@@ -68,7 +68,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-      className="flex-1 items-center justify-center px-6"
+      className="flex-1 items-center justify-center px-6 "
       style={{ backgroundColor: bg }}
     >
       <View
@@ -83,22 +83,22 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
         />
 
         <TextInput
-          style={{ color: !textColor }}
+          style={{ color: textColor, backgroundColor: bg }}
           placeholder="Email"
           textContentType="emailAddress"
           placeholderTextColor="#aaa"
-          className="w-full px-4 py-3 border border-gray-300 rounded-3xl bg-gray-50 mb-3"
+          className="w-full px-4 py-3 border border-gray-300 rounded-3xl font-custom mb-3"
           value={email}
           onChangeText={setEmail}
         />
 
         <TextInput
-          style={{ color: !textColor }}
+          style={{ color: textColor, backgroundColor: bg }}
           placeholder="Password"
           textContentType="password"
           placeholderTextColor="#aaa"
           secureTextEntry
-          className="w-full px-4 py-3 border border-gray-300 rounded-3xl bg-gray-50"
+          className="w-full px-4 py-3 border border-gray-300 font-custom rounded-3xl"
           value={password}
           onChangeText={setPassword}
         />
@@ -111,22 +111,30 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
           {loading ? (
             <ActivityIndicator color={bg} />
           ) : (
-            <Text className="text-white text-lg font-semibold">Log in</Text>
+            <Text className="text-white text-lg font-semibold font-custom">
+              Log in
+            </Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity className="items-center mt-3">
-          <Text className="text-blue-900 text-xs" style={{ color: textColor }}>
+          <Text
+            className="text-blue-900 text-xs font-custom"
+            style={{ color: textColor }}
+          >
             Forgot password?
           </Text>
         </TouchableOpacity>
 
         <View className="mt-8 h-10 pt-4 border-t border-gray-300 w-full">
-          <Text className="text-center text-sm" style={{ color: textColor }}>
+          <Text
+            className="text-center text-sm font-custom"
+            style={{ color: textColor }}
+          >
             Don't have an account?
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
               <Text
-                className="font-semibold h-10 m-1 mt-3"
+                className="font-semibold h-10 m-1 mt-3 font-custom"
                 style={{ color: iconColor }}
               >
                 Sign up

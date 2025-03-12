@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { CardStyleInterpolators, createStackNavigator, TransitionSpecs } from "@react-navigation/stack";
+import { useFonts } from "expo-font";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
@@ -11,7 +12,10 @@ import LoginScreen from "./components/LoginScreen";
 import ProfileSection from "./components/ProfileSection";
 import SignupScreen from "./components/SignupScreen";
 import { Colors } from "./constants/Colors";
+import AddMedia from "./containers/AddMedia";
 import HomePage from "./containers/HomePage";
+import PostCreationScreen from "./containers/PostCreationScreen";
+
 import "../global.css";
 
 const Stack = createStackNavigator();
@@ -37,6 +41,22 @@ export default function App() {
 
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
+
+
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  const [fonts] = useFonts({
+    SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
+    SpaceBold: require("../assets/fonts/SpaceMono-Bold.ttf"),
+    SpaceItalic: require("../assets/fonts/SpaceMono-Italic.ttf"),
+
+  });
+
+  useEffect(() => {
+    if (fonts) {
+      setFontsLoaded(true);
+    }
+  }, [fonts]);
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -91,7 +111,7 @@ export default function App() {
     fetchUserProfile();
   }, []);
 
-  if (isAuthenticated === null) {
+  if (!fontsLoaded || isAuthenticated === null) {
     return (
       <View style={{ flex: 1, backgroundColor: themeColors.background, justifyContent: "center", alignItems: "center" }}>
         <Animated.View style={{ opacity: fadeAnim }}>
@@ -177,8 +197,8 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Home" component={HomePage} />
-          <Tab.Screen name="Search" component={HomePage} />
-          <Tab.Screen name="Add" component={HomePage} />
+          <Tab.Screen name="Search" component={AddMedia} />
+          <Tab.Screen name="Add" component={PostCreationScreen} />
           <Tab.Screen name="Play" component={HomePage} />
           <Tab.Screen name="Profile" component={ProfileSection} />
         </Tab.Navigator>

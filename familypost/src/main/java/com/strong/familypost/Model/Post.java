@@ -40,6 +40,8 @@ public class Post {
     @NonNull
     private String type;
 
+    private String caption;
+
     /** List of URLs pointing to media content associated with the post */
     @NonNull
     private List<String> mediaIds;

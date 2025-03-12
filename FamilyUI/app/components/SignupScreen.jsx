@@ -158,13 +158,13 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
           {!otpSent && (
             <>
               <TextInput
-                style={{ color: !textColor }}
+                style={{ color: textColor, backgroundColor: bg }}
                 placeholder="Full Name"
                 textContentType="username"
                 placeholderTextColor="#aaa"
-                className={`w-full px-4 py-3 border ${
+                className={`w-full px-4 font-custom py-3 border ${
                   fullNameError ? "border-red-500" : "border-gray-300"
-                } rounded-3xl bg-gray-50 mb-3`}
+                } rounded-3xl mb-3`}
                 value={fullName}
                 onChangeText={(text) => {
                   setFullName(text);
@@ -173,13 +173,13 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
               />
 
               <TextInput
-                style={{ color: !textColor }}
+                style={{ color: textColor, backgroundColor: bg }}
                 placeholder="Your Email"
                 textContentType="emailAddress"
                 placeholderTextColor="#aaa"
-                className={`w-full px-4 py-3 border ${
+                className={`w-full px-4 font-custom py-3 border ${
                   emailError ? "border-red-500" : "border-gray-300"
-                } rounded-3xl bg-gray-50 mb-3`}
+                } rounded-3xl mb-3`}
                 value={email}
                 onChangeText={(text) => {
                   setEmail(text);
@@ -188,14 +188,14 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
               />
 
               <TextInput
-                style={{ color: !textColor }}
+                style={{ color: textColor, backgroundColor: bg }}
                 placeholder="Password"
                 placeholderTextColor="#aaa"
                 secureTextEntry
                 textContentType="newPassword"
-                className={`w-full px-4 py-3 border ${
+                className={`w-full px-4 font-custom py-3 border ${
                   passwordError ? "border-red-500" : "border-gray-300"
-                } rounded-3xl bg-gray-50`}
+                } rounded-3xl`}
                 value={password}
                 onChangeText={(text) => {
                   setPassword(text);
@@ -211,7 +211,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                 {loading ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text className="text-white text-lg font-semibold">
+                  <Text className="text-white text-lg font-semibold font-custom">
                     Sign Up
                   </Text>
                 )}
@@ -222,17 +222,17 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
           {otpSent && (
             <View className="mt-4">
               <Text
-                className="text-gray-600 text-center mb-2"
+                className="text-gray-600 text-center mb-2 font-custom"
                 style={{ color: textColor }}
               >
                 Enter OTP sent to your email
               </Text>
               <TextInput
-                style={{ color: !textColor }}
+                style={{ color: textColor }}
                 placeholder="Enter OTP"
                 placeholderTextColor="#aaa"
                 keyboardType="numeric"
-                className="w-full px-4 py-3 border border-gray-300 rounded-3xl bg-gray-50 mb-3 text-center"
+                className="w-full px-4 font-custom text-2xl py-3 border border-gray-300 rounded-3xl mb-3 text-center"
                 value={otp}
                 onChangeText={setOtp}
               />
@@ -245,7 +245,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                   <ActivityIndicator color={bg} />
                 ) : (
                   <Text
-                    className="text-lg font-semibold"
+                    className="text-lg font-semibold font-custom"
                     style={{ color: textColor }}
                   >
                     Verify OTP & Register
@@ -255,15 +255,15 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
             </View>
           )}
 
-          {!otpSent && (
+          {otpSent && (
             <View className="mt-8 pt-4 border-t border-gray-300 w-full">
               <Text
-                className="text-center text-sm"
+                className="text-center text-sm font-custom"
                 style={{ color: textColor }}
               >
                 Already have an account?
                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
-                  <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3">
+                  <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3 font-custom">
                     {" "}
                     Log in
                   </Text>

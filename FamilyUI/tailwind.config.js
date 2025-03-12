@@ -1,11 +1,15 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: [
-    "./app/**/*.{js,jsx,ts,tsx}", // ✅ Scan all JS/TS files in app/
-  ],
+  content: ["./app/**/*.{js,jsx}"], // ✅ Ensure all components are scanned
   presets: [require("nativewind/preset")],
   theme: {
-    extend: {},
+    extend: {
+      fontFamily: {
+        custom: ["SpaceMono"], // Default Regular
+        "custom-bold": ["SpaceBold"], // Bold version
+        "custom-italic": ["SpaceItalic"], // Italic version
+      },
+    },
   },
   plugins: [],
 };
