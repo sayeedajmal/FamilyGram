@@ -16,16 +16,19 @@ import lombok.Data;
 public class User implements UserDetails {
     @Id
     @Indexed(unique = true)
-    private String userId;
+    private String id;
     @Indexed(unique = true)
     private String username;
     private String name;
     private String password;
     private String bio;
+
     @Indexed(unique = true)
     private String email;
+
     @Indexed(unique = true)
     private String phone;
+
     private String photoId;
     private boolean accountNonExpired;
     private boolean accountNonLocked;

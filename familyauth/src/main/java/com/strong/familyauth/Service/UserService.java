@@ -67,7 +67,10 @@ public class UserService implements UserDetailsService {
             throw new UserException("Incorrect OTP/Expired OTP. Please try again.");
         }
 
-        user.setUsername((user.getName() + (int) (Math.random() * 90000000) + 10000000).toLowerCase());
+        if (!isUsernameAvailable(user.getUsername())) {
+            throw new UserException("Check Your Username");
+        }
+
         user.setBio("");
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setAccountNonExpired(true);
@@ -132,7 +135,7 @@ public class UserService implements UserDetailsService {
         User user = userRepo.findByusername(username)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
-        profile.setId(user.getUserId());
+        profile.setId(user.getId());
         profile.setEmail(user.getEmail());
         profile.setUsername(user.getUsername());
         profile.setName(user.getName());
@@ -156,7 +159,7 @@ public class UserService implements UserDetailsService {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
         Profile profile = new Profile();
-        profile.setId(user.getUserId());
+        profile.setId(user.getId());
         profile.setEmail(user.getEmail());
         profile.setUsername(user.getUsername());
         profile.setName(user.getName());
@@ -204,16 +207,19 @@ public class UserService implements UserDetailsService {
     public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
 
+        System.out.println("EMALL:: "+updatedUser.getEmail() + file);
         if (!updatedUser.getEmail().equals(loggedInEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }
         // Fetch the existing user from the database
-        User existingUser = userRepo.findById(updatedUser.getUserId())
+        User existingUser = userRepo.findById(updatedUser.getId())
                 .orElseThrow(() -> new UserException("User not found"));
 
         // Handle profile picture update
         if (file != null && !file.isEmpty()) {
-            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getUserId());
+            System.out.println("USER BEFOR: : " + file);
+            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
+            System.out.println("USER AFTER: : " + uploadImage);
             existingUser.setPhotoId(uploadImage);
         }
 
@@ -234,7 +240,7 @@ public class UserService implements UserDetailsService {
 
         User savedUser = userRepo.save(existingUser);
         Profile profile = new Profile();
-        profile.setId(savedUser.getUserId());
+        profile.setId(savedUser.getId());
         profile.setEmail(savedUser.getEmail());
         profile.setUsername(savedUser.getUsername());
         profile.setName(savedUser.getName());
@@ -280,7 +286,7 @@ public class UserService implements UserDetailsService {
 
         String email = jwtUtil.extractUserEmail(refreshToken);
         User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+                .orElseThrow(() -> new UserException("User not found"));
 
         if (!jwtUtil.isRefreshValid(refreshToken, user)) {
             throw new UserException("Invalid refresh token");
@@ -310,7 +316,7 @@ public class UserService implements UserDetailsService {
 
     @SuppressWarnings("unused")
     private void revokeAllTokens(User user) {
-        List<Token> validTokens = tokenRepository.findByUser(user.getUserId());
+        List<Token> validTokens = tokenRepository.findByUser(user.getId());
         if (!validTokens.isEmpty()) {
             tokenRepository.deleteAll(validTokens);
         }

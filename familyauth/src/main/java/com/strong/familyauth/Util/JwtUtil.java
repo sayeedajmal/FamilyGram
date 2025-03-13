@@ -184,7 +184,7 @@ public class JwtUtil {
         return Jwts
                 .builder()
                 .subject(user.getEmail())
-                .claim("userId", user.getUserId())
+                .claim("id", user.getId())
                 .claim("username", user.getUsername())
                 .claim("name", user.getName())
                 .claim("phone", user.getPhone())

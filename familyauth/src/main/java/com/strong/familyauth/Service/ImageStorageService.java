@@ -50,6 +50,7 @@ public class ImageStorageService {
 
             // Upload converted image
             String fileName = id + "_" + System.currentTimeMillis() + ".jpg";
+            System.out.println("HELLL: "+fileName);
             GridFSUploadOptions options = new GridFSUploadOptions()
                     .chunkSizeBytes(1024)
                     .metadata(new org.bson.Document("type", "image/jpeg"));
