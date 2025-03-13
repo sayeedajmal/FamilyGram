@@ -207,7 +207,6 @@ public class UserService implements UserDetailsService {
     public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
 
-        System.out.println("EMALL:: "+updatedUser.getEmail() + file);
         if (!updatedUser.getEmail().equals(loggedInEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }

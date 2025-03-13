@@ -5,10 +5,12 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.strong.familypost.Model.Comment;
+import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Util.PostException;
 
@@ -21,6 +23,18 @@ public class CommentService {
     @Autowired
     CommentRepo commentRepo;
 
+    private String getAuthenticatedUserId() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+
+        if (principal instanceof User) {
+            User userDetails = (User) principal;
+            // Return the username
+            return userDetails.getId();
+        }
+
+        return null;
+    }
+
     /**
      * Creates a new comment
      * 
@@ -28,16 +42,12 @@ public class CommentService {
      * @return The saved comment
      */
     public Comment createComment(Comment comment) throws PostException {
-        return commentRepo.save(comment);
-    }
+        String loggedId = getAuthenticatedUserId();
 
-    /**
-     * Retrieves all comments from the database
-     * 
-     * @return List of all comments
-     */
-    public List<Comment> getAllComments() {
-        return commentRepo.findAll();
+        if (!comment.getUserId().equals(loggedId)) {
+            throw new PostException("You are not authorized to access this Resource");
+        }
+        return commentRepo.save(comment);
     }
 
     /**
@@ -71,6 +81,11 @@ public class CommentService {
      * @throws ResponseStatusException if comment is not found
      */
     public Comment updateComment(String id, Comment commentDetails) throws PostException {
+        String loggedId = getAuthenticatedUserId();
+
+        if (!commentDetails.getUserId().equals(loggedId)) {
+            throw new PostException("You are not authorized to access this Resource");
+        }
         Comment comment = commentRepo.findById(id)
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id));
@@ -85,13 +100,17 @@ public class CommentService {
      * Deletes a comment by its ID
      * 
      * @param id The ID of the comment to delete
+     * @throws PostException
      * @throws ResponseStatusException if comment is not found
      */
-    public void deleteComment(String id) {
+    public void deleteComment(String id) throws PostException {
+        String loggedId = getAuthenticatedUserId();
         Comment comment = commentRepo.findById(id)
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id));
-
+        if (!comment.getUserId().equals(loggedId)) {
+            throw new PostException("You are not authorized to access this Resource");
+        }
         commentRepo.delete(comment);
     }
 }

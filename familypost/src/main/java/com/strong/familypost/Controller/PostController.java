@@ -119,7 +119,7 @@ public class PostController {
     /**
      * Retrieves all private posts for a specific user.
      * 
-     * @param userId ID of the user whose private posts are to be retrieved
+     * @param id ID of the user whose private posts are to be retrieved
      * @return ResponseEntity containing list of private posts
      * @throws PostException if there's an error retrieving posts
      */
@@ -170,15 +170,15 @@ public class PostController {
      * Toggles the like status of a post for a specific user.
      * 
      * @param postId ID of the post to toggle like
-     * @param userId ID of the user toggling the like
+     * @param id     ID of the user toggling the like
      * @return ResponseEntity containing updated like count
      */
     @PostMapping("/{postId}/toggle-like")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Integer>> toggleLike(@PathVariable String postId,
-            @RequestHeader("userId") String userId) {
+            @RequestHeader("id") String id) {
         try {
-            int totalLikes = postService.toggleLike(postId, userId);
+            int totalLikes = postService.toggleLike(postId, id);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
         } catch (PostException e) {
             return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));

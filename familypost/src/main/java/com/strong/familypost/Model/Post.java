@@ -30,7 +30,7 @@ public class Post {
 
     /** Unique identifier for the post */
     @Id
-    private String postId;
+    private String id;
 
     /** ID of the user who created the post */
     @NonNull
@@ -45,6 +45,9 @@ public class Post {
     /** List of URLs pointing to media content associated with the post */
     @NonNull
     private List<String> mediaIds;
+
+    /** Location with the post */
+    private String location;
 
     /** Set of user IDs who have liked this post */
     private Set<String> likes = new HashSet<>();

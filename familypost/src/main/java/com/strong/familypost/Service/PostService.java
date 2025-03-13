@@ -45,7 +45,7 @@ public class PostService {
         if (principal instanceof User) {
             User userDetails = (User) principal;
             // Return the username
-            return userDetails.getUserId();
+            return userDetails.getId();
         }
 
         return null;
@@ -70,9 +70,12 @@ public class PostService {
      * @throws PostException If the post object is null
      */
     public Post savePost(MultipartFile file, Post post) throws PostException {
-        String loggedUserId = getAuthenticatedUserId();
-        System.out.println("LOGUSER: "+loggedUserId);
-        if (!post.getUserId().equals(loggedUserId)) {
+        String loggedId = getAuthenticatedUserId();
+
+        if (file.isEmpty()) {
+            throw new PostException("Choose An Video or Picture");
+        }
+        if (!post.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
 
@@ -82,8 +85,7 @@ public class PostService {
 
             if (file != null && !file.isEmpty()) {
                 // Step 2: Upload media with the generated post ID
-                String mediaId = storageService.uploadMedia(file, savedPost.getPostId());
-
+                String mediaId = storageService.uploadMedia(file, savedPost.getId());
                 // Step 3: Update post with media ID
                 savedPost.getMediaIds().add(mediaId);
                 postRepo.save(savedPost);
@@ -106,9 +108,9 @@ public class PostService {
      */
     @Transactional
     public void deletePost(String postId) throws PostException {
-        String loggedUserId = getAuthenticatedUserId();
+        String loggedId = getAuthenticatedUserId();
 
-        if (!postId.equals(loggedUserId)) {
+        if (!postId.equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
         if (postId == null || postId.trim().isEmpty()) {
@@ -174,12 +176,12 @@ public class PostService {
      * If the user hasn't liked the post, a like is added.
      * 
      * @param postId The unique identifier of the post
-     * @param userId The unique identifier of the user toggling the like
+     * @param id     The unique identifier of the user toggling the like
      * @return The updated number of likes on the post
      * @throws PostException if the post cannot be found or if there's an error
      *                       processing the like
      */
-    public int toggleLike(String postId, String userId) throws PostException {
+    public int toggleLike(String postId, String id) throws PostException {
         Post post = getPost(postId);
         Set<String> likes = post.getLikes();
 
@@ -187,10 +189,10 @@ public class PostService {
             likes = new HashSet<>();
         }
 
-        if (likes.contains(userId)) {
-            likes.remove(userId);
+        if (likes.contains(id)) {
+            likes.remove(id);
         } else {
-            likes.add(userId);
+            likes.add(id);
         }
 
         post.setLikes(likes);

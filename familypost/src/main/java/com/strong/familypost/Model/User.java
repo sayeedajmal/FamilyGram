@@ -13,7 +13,7 @@ import lombok.Data;
 @AllArgsConstructor
 public class User implements UserDetails {
 
-    private String userId;
+    private String id;
     private String username;
     private String name;
     private String password;
@@ -25,11 +25,11 @@ public class User implements UserDetails {
     private boolean isPrivate;
     private Collection<? extends GrantedAuthority> authorities;
 
-    public User(String email, String userId, String username, String name, String phone,
+    public User(String email, String id, String username, String name, String phone,
             boolean isPrivate, boolean isEnabled, boolean isAccountNonLocked,
             boolean isAccountNonExpired, Collection<SimpleGrantedAuthority> authorities) {
         this.email = email;
-        this.userId = userId;
+        this.id = id;
         this.username = username;
         this.name = name;
         this.phone = phone;

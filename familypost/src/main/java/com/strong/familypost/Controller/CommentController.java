@@ -1,10 +1,18 @@
 package com.strong.familypost.Controller;
 
 import java.util.List;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Service.CommentService;
@@ -36,16 +44,6 @@ public class CommentController {
     public ResponseEntity<ResponseWrapper<Comment>> createComment(@RequestBody Comment comment) throws PostException {
         Comment createdComment = commentService.createComment(comment);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment created successfully", createdComment));
-    }
-
-    /**
-     * Retrieves all comments in the system.
-     */
-    @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Comment>>> getAllComments() throws PostException {
-        List<Comment> comments = commentService.getAllComments();
-        return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
     }
 
     /**
@@ -91,13 +89,4 @@ public class CommentController {
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment deleted successfully", null));
     }
 
-    /**
-     * Counts the total number of comments in the system.
-     */
-    @GetMapping("/count")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Long>> countAllComments() throws PostException {
-        long count = commentService.getAllComments().size();
-        return ResponseEntity.ok(new ResponseWrapper<>(200, "Total comments count retrieved successfully", count));
-    }
 }

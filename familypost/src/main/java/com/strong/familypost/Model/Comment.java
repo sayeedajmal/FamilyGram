@@ -24,7 +24,7 @@ public class Comment {
 
     /** Unique identifier for the comment */
     @Id
-    private String cmId;
+    private String id;
 
     /** ID of the post this comment belongs to */
     @NonNull

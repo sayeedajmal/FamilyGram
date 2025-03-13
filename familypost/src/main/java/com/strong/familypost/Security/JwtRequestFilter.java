@@ -43,7 +43,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
                     if (jwtUtil.validateToken(token)) {
                         Claims claims = jwtUtil.extractClaims(token);
-                        String userId = claims.get("userId", String.class);
+                        String id = claims.get("id", String.class);
                         String username = claims.get("username", String.class);
                         String name = claims.get("name", String.class);
                         String phone = claims.get("phone", String.class);
@@ -56,7 +56,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                                 .get("authorities", Collection.class);
 
                         User userDetails = new User(
-                                email, userId, username, name, phone, isPrivate, isEnabled, isAccountNonLocked,
+                                email, id, username, name, phone, isPrivate, isEnabled, isAccountNonLocked,
                                 isAccountNonExpired, authorities);
                         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                                 userDetails, null, userDetails.getAuthorities());
