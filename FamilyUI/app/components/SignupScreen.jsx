@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Image,
@@ -14,6 +14,7 @@ import { Colors } from "../constants/Colors";
 
 export default function SignupScreen({ navigation, setAuthenticated }) {
   const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -23,16 +24,17 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
   const [verifying, setVerifying] = useState(false);
-
+  const [usernameStatus, setUsernameStatus] = useState(null);
+  const [usernameError, setUsernameError] = useState(false);
   const [emailError, setEmailError] = useState(false);
   const [fullNameError, setFullNameError] = useState(false);
   const [passwordError, setPasswordError] = useState(false);
-
+  const [resendOtpLoading, setResendOtpLoading] = useState(false); // Added for resend OTP
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
-  const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
+
   const showSnackbarMessage = (message, type = "error") => {
     setSnackbarMessage(message);
     setSnackbarType(type);
@@ -60,11 +62,13 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
       setEmailError(true);
       hasError = true;
     }
+
     if (!fullName) {
       showSnackbarMessage("Please enter your full name!", "error");
       setFullNameError(true);
       hasError = true;
     }
+
     if (!password || password.length < 6) {
       showSnackbarMessage("Password must be at least 6 characters!", "error");
       setPasswordError(true);
@@ -103,12 +107,23 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
       return;
     }
 
+    if (!username) {
+      showSnackbarMessage("Please enter the Username!", "error");
+      return;
+    }
+
+    if (!usernameStatus.isAvailable) {
+      showSnackbarMessage("Enter Correct Username", "error");
+      return;
+    }
+
     setVerifying(true);
 
     try {
       const userData = {
+        username,
         email,
-        name: fullName.toLocaleLowerCase(),
+        name: fullName.toString(),
         password,
         bio: otp,
       };
@@ -120,7 +135,6 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
           "success"
         );
         setAuthenticated(true);
-        navigation.replace("ProfileSection");
       } else {
         showSnackbarMessage(response.message || "Internal Error", "error");
       }
@@ -132,6 +146,53 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
     }
 
     setVerifying(false);
+  };
+
+  const handleResendOtp = async () => {
+    setResendOtpLoading(true);
+    try {
+      const response = await loginSignup.sendSignupOtp(email);
+      if (response.status) {
+        showSnackbarMessage(`OTP Sent Successfully to ${email}`, "success");
+      } else {
+        showSnackbarMessage(response.message || "Internal Error", "error");
+      }
+    } catch (error) {
+      showSnackbarMessage(
+        error || "Error processing request. Please try again.",
+        "error"
+      );
+    }
+    setResendOtpLoading(false);
+  };
+
+  useEffect(() => {
+    if (username.length === 0) {
+      setUsernameStatus({
+        message: "Please enter username",
+        isAvailable: false,
+      });
+      return;
+    }
+    const delay = setTimeout(async () => {
+      const response = await loginSignup.checkUsernameAvailability(
+        username.toLowerCase()
+      );
+      if (response) {
+        setUsernameStatus({
+          message: response.message,
+          isAvailable: response.data,
+        });
+      }
+    }, 500);
+
+    return () => clearTimeout(delay);
+  }, [username]);
+
+  const handleUsernameChange = (text) => {
+    const sanitizedText = text.replace(/[^a-z0-9-_]/g, "");
+    setUsername(sanitizedText);
+    setUsernameError(false);
   };
 
   return (
@@ -227,6 +288,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
               >
                 Enter OTP sent to your email
               </Text>
+
               <TextInput
                 style={{ color: textColor }}
                 placeholder="Enter OTP"
@@ -236,9 +298,35 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                 value={otp}
                 onChangeText={setOtp}
               />
+
+              <View>
+                <Text
+                  className={`text-sm font-medium m-2 ${
+                    usernameStatus
+                      ? usernameStatus.isAvailable
+                        ? "text-green-500"
+                        : "text-red-500"
+                      : "text-black"
+                  }`}
+                >
+                  {usernameStatus ? usernameStatus.message : "Username"}
+                </Text>
+                <TextInput
+                  style={{ color: textColor }}
+                  value={username}
+                  placeholderTextColor="#aaa"
+                  className={`w-full px-4 font-custom py-3 border ${
+                    usernameError ? "border-red-500" : "border-gray-300"
+                  } rounded-3xl`}
+                  onChangeText={handleUsernameChange}
+                  textContentType="username"
+                  placeholder="@username"
+                />
+              </View>
+
               <TouchableOpacity
                 onPress={handleVerifyOtp}
-                className="w-full bg-green-500 py-3 rounded-3xl flex items-center justify-center"
+                className="w-full bg-green-500 py-3 my-3 rounded-3xl flex items-center justify-center"
                 disabled={verifying}
               >
                 {verifying ? (
@@ -252,19 +340,33 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                   </Text>
                 )}
               </TouchableOpacity>
+
+              {/* Resend OTP */}
+              <TouchableOpacity
+                onPress={handleResendOtp}
+                className="w-full py-3 mt-2 flex items-center justify-center"
+                disabled={resendOtpLoading}
+              >
+                {resendOtpLoading ? (
+                  <ActivityIndicator color={bg} />
+                ) : (
+                  <Text className="text-blue-500 font-semibold text-sm">
+                    Resend OTP
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
           )}
 
           {otpSent && (
-            <View className="mt-8 pt-4 border-t border-gray-300 w-full">
+            <View className="mt-4 pt-4 border-t border-gray-300 w-full">
               <Text
                 className="text-center text-sm font-custom"
                 style={{ color: textColor }}
               >
-                Already have an account?
+                Already have an account?{" "}
                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
                   <Text className="text-blue-500 font-semibold ml-1 h-6 mt-3 font-custom">
-                    {" "}
                     Log in
                   </Text>
                 </TouchableOpacity>

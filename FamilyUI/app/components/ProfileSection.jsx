@@ -116,7 +116,7 @@ export const ProfileSection = () => {
               source={
                 userProfile.imageUrl
                   ? { uri: userProfile.imageUrl }
-                  : require("../../assets/images/iconLauncher.png")
+                  : require("../../assets/images/profile.png")
               }
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />

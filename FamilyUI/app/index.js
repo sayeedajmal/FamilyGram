@@ -6,13 +6,13 @@ import { useFonts } from "expo-font";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
-import { Animated, Appearance, Easing, Image, Platform, StatusBar, View } from "react-native";
+import { Animated, Appearance, Easing, Image, Platform, View, StatusBar } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import loginSignup from "./api/loginSignup";
 import LoginScreen from "./components/LoginScreen";
 import ProfileSection from "./components/ProfileSection";
 import SignupScreen from "./components/SignupScreen";
 import { Colors } from "./constants/Colors";
-import AddMedia from "./containers/AddMedia";
 import HomePage from "./containers/HomePage";
 import PostCreationScreen from "./containers/PostCreationScreen";
 
@@ -38,6 +38,7 @@ export default function App() {
   const [profileImage, setProfileImage] = useState("");
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(1);
+  const insets = useSafeAreaInsets();
 
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
@@ -137,13 +138,12 @@ export default function App() {
   }
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: "black" }}>
       <StatusBar
         barStyle={theme === "dark" ? "light-content" : "dark-content"}
         animated={true}
         showHideTransition="fade"
         backgroundColor={themeColors.background}
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
       />
 
       {isAuthenticated ? (
@@ -151,6 +151,7 @@ export default function App() {
           screenOptions={({ route }) => ({
             tabBarStyle: {
               backgroundColor: themeColors.background,
+              height: 20 + (insets.bottom || 0),
             },
             headerShown: false,
             tabBarIcon: ({ focused, color, size }) => {
@@ -165,7 +166,11 @@ export default function App() {
                 return (
                   <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                     <Image
-                      source={profileImage ? { uri: profileImage } : require("../assets/images/iconLauncher.png")}
+                      source={
+                        profileImage
+                          ? { uri: profileImage }
+                          : require("../assets/images/profile.png")
+                      }
                       style={{
                         width: size,
                         height: size,
@@ -197,7 +202,7 @@ export default function App() {
           })}
         >
           <Tab.Screen name="Home" component={HomePage} />
-          <Tab.Screen name="Search" component={AddMedia} />
+          <Tab.Screen name="Search" component={HomePage} />
           <Tab.Screen name="Add" component={PostCreationScreen} />
           <Tab.Screen name="Play" component={HomePage} />
           <Tab.Screen name="Profile" component={ProfileSection} />
@@ -222,6 +227,6 @@ export default function App() {
           </Stack.Screen>
         </Stack.Navigator>
       )}
-    </>
+    </View>
   );
-}
+};

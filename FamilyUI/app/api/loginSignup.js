@@ -200,7 +200,7 @@ class ApiService {
             body: formData,
         });
 
-        await response.json()
+
         if (response.status) {
             await Storage.setItem("userProfile", JSON.stringify(response.data.data));
         }

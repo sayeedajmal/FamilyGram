@@ -10,7 +10,7 @@ import {
   useColorScheme,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Video } from "expo-av"; // Use Expo's Video Component
+import { Video } from "expo-av";
 import { Colors } from "../constants/Colors";
 
 const PostCreationScreen = () => {
@@ -28,7 +28,7 @@ const PostCreationScreen = () => {
   // Open Image/Video Picker
   const pickMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All, // Allow images & videos
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsEditing: true,
       quality: 1,
     });
@@ -36,12 +36,12 @@ const PostCreationScreen = () => {
     if (!result.canceled) {
       const selectedAsset = result.assets[0];
       setMedia(selectedAsset.uri);
-      setMediaType(selectedAsset.type); // 'image' or 'video'
+      setMediaType(selectedAsset.type);
     }
   };
 
   return (
-    <ScrollView className="p-6" style={{ backgroundColor: bg }}>
+    <ScrollView className="p-6 flex-1" style={{ backgroundColor: bg }}>
       {/* Header */}
       <View className="flex-row justify-between items-center">
         <Text style={{ color: textColor }} className="text-lg font-custom-bold">
@@ -56,13 +56,12 @@ const PostCreationScreen = () => {
       <TouchableOpacity onPress={pickMedia}>
         {media ? (
           mediaType === "video" ? (
-            // Render video using expo-av
             <Video
               source={{ uri: media }}
               style={{ width: "100%", height: "100%", borderRadius: 10 }}
               useNativeControls // Enables play/pause controls
               resizeMode="contain"
-              isLooping
+              isLooping={false}
             />
           ) : (
             // Render image
@@ -85,9 +84,7 @@ const PostCreationScreen = () => {
       {/* User Info */}
       <View className="flex-row items-center space-x-3 mb-6">
         <Image
-          source={{
-            uri: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?ixlib=rb-1.2.1&auto=format&fit=crop&w=100&q=80",
-          }}
+          source={require("../../assets/images/profile.png")}
           className="w-10 h-10 rounded-full"
         />
         <Text style={{ color: textColor }} className="font-custom text-sm ml-2">
@@ -132,14 +129,6 @@ const PostCreationScreen = () => {
           Add Music
         </Text>
         <Feather name="chevron-right" size={18} color={iconColor} />
-      </TouchableOpacity>
-
-      {/* Advanced Settings */}
-      <TouchableOpacity className="flex-row justify-between items-center py-4">
-        <Text style={{ color: textColor }} className="text-sm font-medium">
-          Advanced Settings
-        </Text>
-        <Ionicons name="chevron-down" size={18} color={iconColor} />
       </TouchableOpacity>
     </ScrollView>
   );

@@ -19,6 +19,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   const [username, setUsername] = useState("");
   const [fullName, setFullName] = useState("");
   const [bio, setBio] = useState("");
+  const [email, setEmail] = useState("");
   const [website, setWebsite] = useState("");
   const [profileImage, setProfileImage] = useState(null);
   const [selectedImage, setSelectedImage] = useState(null);
@@ -33,6 +34,8 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       const userProfile = await loginSignup.getStoredUserProfile();
+      console.log("FULL :", userProfile);
+
       if (userProfile) {
         setId(userProfile.id);
         setUsername(userProfile.username || "");
@@ -40,7 +43,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         setBio(userProfile.bio || "");
         setWebsite(userProfile.website || "");
         setOldUsername(userProfile.username);
-
+        setEmail(userProfile.email);
         if (userProfile.photoId) {
           const imageUrl = await loginSignup.getProfileImage(
             userProfile.photoId
@@ -64,8 +67,6 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       return;
     }
     const delay = setTimeout(async () => {
-      console.log("BITCH: ", username.length);
-
       const response = await loginSignup.checkUsernameAvailability(
         username.toLowerCase()
       );
@@ -95,7 +96,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   };
 
   const handleUsernameChange = (text) => {
-    const sanitizedText = text.replace(/[^a-zA-Z0-9-_]/g, ""); // Remove invalid characters
+    const sanitizedText = text.replace(/[^a-z0-9-_]/g, "");
     setUsername(sanitizedText);
   };
 
@@ -106,6 +107,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       username: username.toLowerCase(),
       name: fullName,
       bio,
+      email,
       website,
     };
 
@@ -113,8 +115,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       updatedUser,
       selectedImage
     );
-    console.log("LOG: ", response);
-    if (response.status) {
+    if (response) {
       Alert.alert("Success", "Profile updated successfully");
       onUpdate();
       onEdit();
@@ -153,13 +154,12 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       <View className="space-y-4">
         <View>
           <Text
-            style={{ color: textColor }}
-            className={`text-sm font-medium mb-2 ${
+            className={`text-sm font-medium m-2 ${
               usernameStatus
                 ? usernameStatus.isAvailable
                   ? "text-green-500"
                   : "text-red-500"
-                : "text-black"
+                : textColor
             }`}
           >
             {usernameStatus ? usernameStatus.message : "Username"}
@@ -176,7 +176,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
 
         <View>
           <Text
-            className="text-sm font-medium mb-2"
+            className="text-sm font-medium m-2"
             style={{ color: textColor }}
           >
             Full Name
@@ -194,13 +194,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         <View>
           <Text
             style={{ color: textColor }}
-            className="text-sm font-medium mb-2"
+            className="text-sm font-medium m-2"
           >
             Bio
           </Text>
           <TextInput
             style={{ color: textColor }}
             value={bio}
+            placeholderTextColor="#aaa"
             onChangeText={setBio}
             placeholder="Tell us about yourself..."
             multiline
@@ -211,13 +212,14 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
         <View>
           <Text
             style={{ color: textColor }}
-            className="text-sm font-medium mb-2"
+            className="text-sm font-medium m-2"
           >
             Website
           </Text>
           <TextInput
             style={{ color: textColor }}
             value={website}
+            placeholderTextColor="#aaa"
             onChangeText={setWebsite}
             textContentType="URL"
             placeholder="https://sayeedthedev.web.app"
