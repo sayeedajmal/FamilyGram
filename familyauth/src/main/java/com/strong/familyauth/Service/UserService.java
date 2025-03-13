@@ -216,9 +216,7 @@ public class UserService implements UserDetailsService {
 
         // Handle profile picture update
         if (file != null && !file.isEmpty()) {
-            System.out.println("USER BEFOR: : " + file);
             String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
-            System.out.println("USER AFTER: : " + uploadImage);
             existingUser.setPhotoId(uploadImage);
         }
 

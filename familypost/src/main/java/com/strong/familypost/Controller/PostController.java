@@ -7,6 +7,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -75,9 +76,14 @@ public class PostController {
      */
     @PostMapping
     @PreAuthorize("isAuthenticated()")
+    @Transactional
     public ResponseEntity<ResponseWrapper<Post>> createPost(
-            @RequestPart(value = "file", required = false) MultipartFile file,
+            @RequestPart(value = "file", required = true) MultipartFile file,
             @RequestParam("post") String postJson) throws PostException {
+
+        if (file.isEmpty()) {
+            throw new PostException("Choose A Video or Picture");
+        }
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             Post post = objectMapper.readValue(postJson, Post.class);

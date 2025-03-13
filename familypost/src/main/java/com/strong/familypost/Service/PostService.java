@@ -1,5 +1,6 @@
 package com.strong.familypost.Service;
 
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -72,9 +73,6 @@ public class PostService {
     public Post savePost(MultipartFile file, Post post) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
-        if (file.isEmpty()) {
-            throw new PostException("Choose An Video or Picture");
-        }
         if (!post.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
@@ -83,10 +81,16 @@ public class PostService {
             // Step 1: Save post first to generate an ID
             Post savedPost = postRepo.save(post);
 
+            // Ensure mediaIds is initialized
+            if (savedPost.getMediaIds() == null) {
+                savedPost.setMediaIds(new ArrayList<>());
+            }
+
             if (file != null && !file.isEmpty()) {
                 // Step 2: Upload media with the generated post ID
                 String mediaId = storageService.uploadMedia(file, savedPost.getId());
-                // Step 3: Update post with media ID
+
+                // Step 3: Add media ID to list and save post again
                 savedPost.getMediaIds().add(mediaId);
                 postRepo.save(savedPost);
             }

@@ -6,12 +6,15 @@ import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
+
 import javax.imageio.ImageIO;
+
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
+
 import com.mongodb.MongoGridFSException;
 import com.mongodb.client.gridfs.GridFSBucket;
 import com.mongodb.client.gridfs.GridFSDownloadStream;
@@ -27,7 +30,8 @@ public class StorageService {
     private GridFSBucket gridFSBucket;
 
     private static final List<String> SUPPORTED_IMAGE_TYPES = Arrays.asList("image/jpeg", "image/png");
-    private static final List<String> SUPPORTED_VIDEO_TYPES = Arrays.asList("video/mp4", "video/mkv");
+    private static final List<String> SUPPORTED_VIDEO_TYPES = Arrays.asList("video/mp4", "video/mkv",
+            "video/quicktime");
 
     public String uploadMedia(MultipartFile file, String postId) throws PostException {
         try {
@@ -59,15 +63,16 @@ public class StorageService {
                 inputStream = new ByteArrayInputStream(baos.toByteArray());
                 fileExtension = "jpg"; // Convert all images to JPEG
             } else {
-                // If it's a video, just use the original stream
+                // For video, use the original file input stream
                 inputStream = file.getInputStream();
             }
 
             // Upload media file
             String fileName = postId + "_" + System.currentTimeMillis() + "." + fileExtension;
             GridFSUploadOptions options = new GridFSUploadOptions()
-                    .chunkSizeBytes(256 * 1024) // 256KB chunks, better for general purpose
+                    .chunkSizeBytes(256 * 1024)
                     .metadata(new org.bson.Document("type", contentType));
+
             ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
             return fileId.toHexString();
         } catch (Exception e) {
