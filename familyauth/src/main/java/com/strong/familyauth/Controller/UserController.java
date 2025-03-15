@@ -1,11 +1,15 @@
 package com.strong.familyauth.Controller;
 
+import java.util.Set;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -29,7 +33,6 @@ public class UserController {
     @Autowired
     private UserService userService;
 
-
     @PostMapping("/update")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Profile>> updateProfile(
@@ -43,6 +46,18 @@ public class UserController {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
                 .body(new ResponseWrapper<>(HttpStatus.ACCEPTED.value(), "Profile updated successfully",
                         updatedProfile));
+    }
+
+    @GetMapping("/privacy")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<String> privacy(@RequestParam String mineId, @RequestParam String yourId) {
+        boolean canAccessProfile = userService.canAccessProfile(mineId, yourId);
+
+        if (canAccessProfile) {
+            return ResponseEntity.ok("Access granted");
+        } else {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User Account is Private");
+        }
     }
 
     @PostMapping("/profile")
@@ -76,6 +91,36 @@ public class UserController {
             throws UserException {
         Profile profile = userService.getUserByEmail(email);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
+    }
+
+    /**
+     * Get followers of a user.
+     *
+     * @param yourId ID of the user whose followers are being retrieved
+     * @param mineId Authenticated user ID (retrieved from JWT)
+     * @return Set of user IDs who follow the given user
+     */
+    @GetMapping("/followers")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Set<String>> getFollowers(@RequestParam String yourId, @RequestParam String mineId,
+            @RequestHeader("Authorization") String token) {
+        Set<String> followers = userService.getFollowers(mineId, yourId);
+        return ResponseEntity.ok(followers);
+    }
+
+    /**
+     * Get followings of a user.
+     *
+     * @param yourId ID of the user whose followings are being retrieved
+     * @param mineId Authenticated user ID (retrieved from JWT)
+     * @return Set of user IDs whom the given user follows
+     */
+    @GetMapping("/followings")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Set<String>> getFollowings(@RequestParam String yourId, @RequestParam String mineId,
+            @RequestHeader("Authorization") String token) {
+        Set<String> followings = userService.getFollowings(mineId, yourId);
+        return ResponseEntity.ok(followings);
     }
 
     @PostMapping("/logout")

@@ -1,9 +1,11 @@
 package com.strong.familyauth.Service;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -53,6 +55,41 @@ public class UserService implements UserDetailsService {
     @Autowired
     private TokenRepository tokenRepository;
 
+    public boolean canAccessProfile(String mineId, String yourId) {
+        Optional<User> userOptional = userRepo.findById(yourId);
+
+        // If user doesn't exist, deny access
+        if (userOptional.isEmpty()) {
+            return false;
+        }
+
+        User user = userOptional.get();
+
+        // If the account is public, anyone can access
+        if (!user.isPrivate()) {
+            return true;
+        }
+
+        // If private, check if mineId is in followers
+        return user.getFollowers().contains(mineId);
+    }
+
+    public Set<String> getFollowers(String mineId, String yourId) {
+        boolean canAccessProfile = canAccessProfile(mineId, yourId);
+        if (canAccessProfile) {
+            return userRepo.getFollowersById(yourId).orElse(new HashSet<>());
+        }
+        return new HashSet<>();
+    }
+
+    public Set<String> getFollowings(String mineId, String yourId) {
+        boolean canAccessProfile = canAccessProfile(mineId, yourId);
+        if (canAccessProfile) {
+            return userRepo.getFollowingById(yourId).orElse(new HashSet<>());
+        }
+        return new HashSet<>();
+    }
+
     public String sendEmailOtp(String email) throws UserException {
         Optional<User> existingUser = userRepo.findByEmail(email);
         if (existingUser.isPresent()) {
@@ -76,10 +113,15 @@ public class UserService implements UserDetailsService {
         user.setAccountNonExpired(true);
         user.setAccountNonLocked(true);
         user.setEnabled(true);
+        user.setPhone("");
         user.setPhotoId("");
         user.setPrivate(false);
+        user.setFollowers(new HashSet<>());
+        user.setFollowing(new HashSet<>());
         user.setFollowerCount(0);
         user.setFollowingCount(0);
+        user.setWebsite("");
+
         userRepo.save(user);
 
         String accessToken = jwtUtil.generateAccessToken(user);
@@ -99,13 +141,13 @@ public class UserService implements UserDetailsService {
                 .orElseThrow(() -> new UserException("User not found"));
 
         if (!user.isAccountNonExpired()) {
-            throw new UserException("Your account has expired", HttpStatus.UNAUTHORIZED);
+            throw new UserException("Your account has expired. Visit the Offical Support", HttpStatus.UNAUTHORIZED);
         }
         if (!user.isAccountNonLocked()) {
-            throw new UserException("Your account is locked", HttpStatus.UNAUTHORIZED);
+            throw new UserException("Your account is locked. Visit the Offical Support", HttpStatus.UNAUTHORIZED);
         }
         if (!user.isEnabled()) {
-            throw new UserException("Your account is disabled", HttpStatus.UNAUTHORIZED);
+            throw new UserException("Your account is disabled. Visit the Offical Support", HttpStatus.UNAUTHORIZED);
         }
 
         try {
