@@ -1,44 +1,16 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useEffect, useRef, useState } from "react";
 import {
+  FlatList,
   Image,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import PostService from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
-
-const stories = [
-  { id: 1, username: "Your Story", image: "https://placekitten.com/100/100" },
-  { id: 2, username: "john_doe", image: "https://placekitten.com/101/101" },
-  { id: 3, username: "jane_doe", image: "https://placekitten.com/102/102" },
-];
-
-const postsData = [
-  {
-    id: 1,
-    username: "sayeed__ajmal",
-    userImage:
-      "https://images.unsplash.com/photo-1604537466158-719b1972feb8?ixlib=rb-1.2.1&auto=format&fit=crop&w=700&q=80",
-    postImage:
-      "https://images.unsplash.com/photo-1604537466158-719b1972feb8?ixlib=rb-1.2.1&auto=format&fit=crop&w=700&q=80",
-    likes: 123,
-    caption:
-      "Enjoying the amazing view today! The weather is perfect for a day out in nature. #nature #travel #adventure",
-  },
-  {
-    id: 2,
-    username: "shoaib_akhtar",
-    userImage:
-      "https://plus.unsplash.com/premium_photo-1686835759214-526932717a7e?q=80&w=1527&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    postImage:
-      "https://plus.unsplash.com/premium_photo-1686835759214-526932717a7e?q=80&w=1527&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
-    likes: 98,
-    caption: "Chilling at the beach! #sunset",
-  },
-];
 
 const HomePage = () => {
   const theme = useColorScheme();
@@ -46,6 +18,46 @@ const HomePage = () => {
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
+
+  const [posts, setPosts] = useState([]);
+  const flatListRef = useRef(null);
+  const videoRefs = useRef({});
+
+  // Fetch posts from all users (or a default user for now)
+  const fetchPosts = async () => {
+    try {
+      const response = await PostService.GetAllPosts();
+      if (response?.status) {
+        setPosts(response.data.data || []);
+      }
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+      setPosts([]);
+    }
+  };
+
+  useEffect(() => {
+    fetchPosts();
+  }, []);
+
+  const onViewableItemsChanged = ({ viewableItems }) => {
+    const visiblePostIds = new Set(viewableItems.map((item) => item.item.id));
+    Object.keys(videoRefs.current).forEach((id) => {
+      if (videoRefs.current[id]) {
+        if (visiblePostIds.has(id)) {
+          videoRefs.current[id].playAsync();
+        } else {
+          videoRefs.current[id].pauseAsync();
+        }
+      }
+    });
+  };
+
+  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
+  const viewabilityConfigCallbackPairs = useRef([
+    { onViewableItemsChanged, viewabilityConfig },
+  ]);
+
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
@@ -70,34 +82,62 @@ const HomePage = () => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {/* Stories */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          className="px-4 py-2"
-        >
-          {stories.map((story) => (
-            <View key={story.id} className="mr-4 items-center">
-              <View
-                className="border-2 rounded-full p-1"
-                style={{ borderColor: iconColor }}
-              >
-                <Image
-                  source={{ uri: story.image }}
-                  className="w-16 h-16 rounded-full"
-                />
-              </View>
-              <Text className="text-xs mt-1" style={{ color: textColor }}>
-                {story.username}
-              </Text>
+      {/* Stories */}
+      <FlatList
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        data={[
+          {
+            id: "your_story",
+            username: "Your Story",
+            image: "https://placekitten.com/100/100",
+          },
+          {
+            id: "john_doe",
+            username: "john_doe",
+            image: "https://placekitten.com/101/101",
+          },
+          {
+            id: "jane_doe",
+            username: "jane_doe",
+            image: "https://placekitten.com/102/102",
+          },
+        ]}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View className="mr-4 items-center">
+            <View
+              className="border-2 rounded-full p-1"
+              style={{ borderColor: iconColor }}
+            >
+              <Image
+                source={{ uri: item.image }}
+                className="w-16 h-16 rounded-full"
+              />
             </View>
-          ))}
-        </ScrollView>
+            <Text className="text-xs mt-1" style={{ color: textColor }}>
+              {item.username}
+            </Text>
+          </View>
+        )}
+      />
 
-        {/* Posts */}
-        <PostModel posts={postsData} loading={false} />
-      </ScrollView>
+      {/* Posts */}
+      <FlatList
+        ref={flatListRef}
+        data={posts}
+        keyExtractor={(item) => item.id.toString()}
+        renderItem={({ item }) => (
+          <PostModel post={item} loading={false} videoRefs={videoRefs} />
+        )}
+        initialNumToRender={5}
+        viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
+        ListEmptyComponent={
+          <View className="flex-1 justify-center items-center">
+            <Text className="text-gray-500 text-lg">No posts available</Text>
+          </View>
+        }
+      />
     </View>
   );
 };

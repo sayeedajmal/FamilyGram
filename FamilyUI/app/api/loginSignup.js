@@ -185,6 +185,23 @@ class ApiService {
 
     }
 
+    async getSecondProfile(userId) {
+        const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+
+        if (response.status) {
+            const userProfile = response.data.data;
+
+            // Retrieve and parse the stored profile to confirm
+            return { status: true, message: "Second Profile Fetched", data: userProfile };
+        } else {
+            return { status: false, message: response.message || "Failed to fetch user profile", data: null };
+        }
+
+    }
+
     async updateUserProfile(userData, file) {
         const formData = new FormData();
         formData.append("user", JSON.stringify(userData));

@@ -199,12 +199,16 @@ export default function App() {
   return (
     <View style={{ flex: 1 }}>
       <StatusBar
-        barStyle={Platform.OS === 'ios'
-          ? theme === "dark" ? "light-content" : "dark-content"
-          : "default"}
+        barStyle={
+          theme === "dark"
+            ? Platform.OS === "ios"
+              ? "light-content"
+              : "dark-content"
+            : "dark-content"
+        }
         animated={true}
         showHideTransition="fade"
-        backgroundColor="black"
+        backgroundColor={themeColors.background}
       />
       {isAuthenticated ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>

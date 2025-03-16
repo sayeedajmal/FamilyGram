@@ -43,46 +43,54 @@ export const ProfileSection = () => {
           console.log("Error fetching profile image:", error);
         }
       }
-      setUserProfile({ ...profile, imageUrl });
+      setUserProfile({
+        ...profile,
+        imageUrl: typeof imageUrl === "string" ? { uri: imageUrl } : imageUrl,
+      });
     }
     setRefreshing(false);
   };
 
   const fetchMyPosts = async () => {
     if (!userProfile?.id) return;
-    const response = await PostService.GetPostByUserId(userProfile?.id);
-    if (response?.status) {
-      const posts = response.data.data;
-      if (Array.isArray(posts) && posts.length > 0) {
-        const updatedPosts = await Promise.all(
-          posts.map(async (post) => {
-            let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
-            if (post.thumbnailIds && post.thumbnailIds.length > 0) {
-              try {
-                const thumbnailResponse = await PostService.getPostMedia(
-                  post.thumbnailIds[0]
-                );
-                if (thumbnailResponse?.status) {
-                  thumbnailUrl = thumbnailResponse.data;
+    try {
+      const response = await PostService.GetPostByUserId(userProfile.id);
+      if (response?.status) {
+        const posts = response.data.data;
+        if (Array.isArray(posts) && posts.length > 0) {
+          const updatedPosts = await Promise.all(
+            posts.map(async (post) => {
+              let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
+              if (post.thumbnailIds && post.thumbnailIds.length > 0) {
+                try {
+                  const thumbnailResponse = await PostService.getPostMedia(
+                    post.thumbnailIds[0]
+                  );
+                  if (thumbnailResponse?.status) {
+                    thumbnailUrl = thumbnailResponse.data;
+                  }
+                } catch (error) {
+                  console.error("Error fetching thumbnail:", error);
                 }
-              } catch (error) {
-                console.error("Error fetching thumbnail:", error);
               }
-            }
-            return { ...post, thumbnailUrl };
-          })
-        );
-        setMyPosts(updatedPosts);
-      } else {
-        setMyPosts([]);
+              return { ...post, thumbnailUrl };
+            })
+          );
+          setMyPosts(updatedPosts);
+        } else {
+          setMyPosts([]);
+        }
       }
+    } catch (error) {
+      console.error("Error fetching posts:", error);
     }
-    setRefreshing(false);
   };
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    Promise.all([fetchUserProfile(), fetchMyPosts()]);
+    await fetchUserProfile();
+    await fetchMyPosts();
+    setRefreshing(false);
   };
 
   useEffect(() => {
@@ -92,7 +100,6 @@ export const ProfileSection = () => {
   useEffect(() => {
     if (userProfile) fetchMyPosts();
   }, [userProfile]);
-
   if (!userProfile) {
     return (
       <View
@@ -270,7 +277,7 @@ export const ProfileSection = () => {
       case "Posts":
         return myPosts.length > 0 ? (
           <FlatList
-            data={myPosts}
+            data={activeTab === "Posts" ? myPosts : []}
             keyExtractor={(item) => item.id.toString()}
             numColumns={3}
             renderItem={renderPostItem}

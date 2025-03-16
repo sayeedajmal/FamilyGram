@@ -1,10 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Video } from "expo-av";
 import moment from "moment";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
-import { useInView } from "react-native-intersection-observer";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -16,27 +16,12 @@ import {
   View,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import { default as PostService } from "../api/postHandle";
+import postService, { default as PostService } from "../api/postHandle";
 import { Colors } from "../constants/Colors";
-
-const MAX_CACHE_SIZE = 50; // Limit number of items in cache
-
 const mediaContentCache = new Map();
 
-const manageCacheSize = () => {
-  if (mediaContentCache.size > MAX_CACHE_SIZE) {
-    // Remove the oldest entry (first inserted key)
-    const oldestKey = mediaContentCache.keys().next().value;
-    mediaContentCache.delete(oldestKey);
-    console.log(`Cache full, removed oldest media: ${oldestKey}`);
-  }
-};
-const PostModel = ({ post, loading = false }) => {
-  const { ref, inView } = useInView({
-    triggerOnce: false, // Re-triggers when entering/exiting
-    threshold: 0.5, // Only considered in view when 50% is visible
-  });
-
+const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile }) => {
+  const videoRef = useRef(null);
   const [likedPosts, setLikedPosts] = useState({});
   const [savedPosts, setSavedPosts] = useState({});
   const [mediaUrls, setMediaUrls] = useState([]);
@@ -47,9 +32,34 @@ const PostModel = ({ post, loading = false }) => {
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
-
   const [timeAgo, setTimeAgo] = useState("");
+  const [postLikesCount, setPostLikesCount] = useState({});
+  const [allComments, setAllComments] = useState({});
+  const [isCommenting, setIsCommenting] = useState(false);
+  const [myComment, setMyComment] = useState({
+    postId: null,
+    userId: null,
+    text: null,
+  });
 
+  const MAX_CACHE_SIZE = 50;
+  const manageCacheSize = () => {
+    while (mediaContentCache.size >= MAX_CACHE_SIZE) {
+      const oldestKey = mediaContentCache.keys().next().value;
+      mediaContentCache.delete(oldestKey);
+    }
+  };
+
+  useEffect(() => {
+    if (post) {
+      setPostLikesCount((prev) => ({
+        ...prev,
+        [post.id]: post.likes.length,
+      }));
+    }
+  }, [post]);
+
+  //Date of Post
   useEffect(() => {
     const postDate = moment(post?.createdAt);
     const now = moment();
@@ -66,53 +76,44 @@ const PostModel = ({ post, loading = false }) => {
     } else {
       formattedTime = postDate.format("MMM D, YYYY");
     }
-
     setTimeAgo(formattedTime);
   }, [post?.createdAt]);
 
+  //Get PostMedia
   useEffect(() => {
     const fetchMediaUrls = async () => {
       if (!post?.mediaIds?.length) return;
-
       setIsMediaLoading(true);
       try {
         const mediaDataArray = await Promise.all(
           post.mediaIds.map(async (mediaId) => {
             if (mediaContentCache.has(mediaId)) {
-              // Move accessed media to the end (recently used)
-              const cachedData = mediaContentCache.get(mediaId);
-              mediaContentCache.delete(mediaId);
-              mediaContentCache.set(mediaId, cachedData);
-              return cachedData.content;
+              return mediaContentCache.get(mediaId);
             }
-
             try {
               const response = await PostService.getPostMedia(mediaId);
               if (!response?.status) return null;
-
-              // ✅ FIX: Define type properly
               const type = response?.type?.startsWith("video")
                 ? "video"
                 : "image";
-              setMediaType(type);
-
               const mediaResponse = await fetch(response.data);
               if (!mediaResponse.ok) return null;
-
               const blob = await mediaResponse.blob();
-
-              // Convert Blob to Base64
               const reader = new FileReader();
               reader.readAsDataURL(blob);
               return new Promise((resolve) => {
                 reader.onloadend = () => {
-                  const base64Data = reader.result;
-
-                  // ✅ FIX: Store `type` correctly
-                  mediaContentCache.set(mediaId, { content: base64Data, type });
-                  manageCacheSize(); // Ensure cache doesn't exceed limit
-
-                  resolve(base64Data);
+                  if (reader.result) {
+                    const base64Data = reader.result;
+                    mediaContentCache.set(mediaId, {
+                      content: base64Data,
+                      type,
+                    });
+                    manageCacheSize();
+                    resolve({ content: base64Data, type });
+                  } else {
+                    resolve(null);
+                  }
                 };
               });
             } catch (error) {
@@ -123,7 +124,10 @@ const PostModel = ({ post, loading = false }) => {
         );
 
         const validMediaData = mediaDataArray.filter((data) => data !== null);
-        setMediaUrls(validMediaData);
+        if (validMediaData.length > 0) {
+          setMediaType(validMediaData[0].type);
+          setMediaUrls(validMediaData.map((data) => data.content));
+        }
       } catch (error) {
         console.log("Error in fetchMediaUrls:", error);
         Alert.alert("Error", "Failed to load media");
@@ -131,11 +135,113 @@ const PostModel = ({ post, loading = false }) => {
         setIsMediaLoading(false);
       }
     };
+
+    setMyComment((prev) => ({
+      ...prev, // Keep existing values
+      postId: post?.id, // Only update userId
+    }));
     fetchMediaUrls();
   }, [post?.mediaIds]);
 
-  const toggleLike = (postId) => {};
-  const toggleSave = (postId) => {};
+  useEffect(() => {
+    if (videoRef.current) {
+      videoRefs.current[post.id] = videoRef.current;
+    }
+  }, [videoRef.current]);
+
+  
+
+  const AddComment = async () => {
+    if (!myComment.postId || !myComment.userId || !myComment.text?.trim())
+      return;
+
+    setIsCommenting(true); // Start loader
+
+    try {
+      const response = await postService.addComment(myComment);
+
+      if (response.status) {
+        setMyComment({
+          postId: myComment.postId,
+          userId: myComment.userId,
+          text: "", // Reset text while keeping postId & userId
+        });
+      } else {
+        console.error("Failed to add comment:", response.message);
+        Alert.alert("Error", "Failed to add comment. Please try again.");
+      }
+    } catch (error) {
+      console.error("Unexpected error:", error);
+      Alert.alert("Error", "Something went wrong.");
+    } finally {
+      setIsCommenting(false); // Stop loader
+    }
+  };
+
+  useEffect(() => {
+    if (myProfile && post?.likes) {
+      setLikedPosts((prev) => ({
+        ...prev,
+        [post.id]: post.likes.includes(myProfile.id),
+      }));
+    }
+  }, [myProfile, post]);
+
+  const toggleLike = async (postId) => {
+    const isCurrentlyLiked = likedPosts[postId] || false;
+
+    setLikedPosts((prev) => ({
+      ...prev,
+      [postId]: !isCurrentlyLiked,
+    }));
+
+    setPostLikesCount((prev) => ({
+      ...prev,
+      [postId]: prev[postId] + (isCurrentlyLiked ? -1 : 1),
+    }));
+
+    try {
+      const response = await postService.toggleLike(myProfile.id, postId);
+
+      if (!response.status) {
+        setLikedPosts((prev) => ({
+          ...prev,
+          [postId]: isCurrentlyLiked,
+        }));
+
+        setPostLikesCount((prev) => ({
+          ...prev,
+          [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
+        }));
+
+        Alert.alert("Error", "Failed to toggle like. Please try again.");
+      }
+    } catch (error) {
+      console.error("Unexpected error in toggleLike:", error);
+
+      setLikedPosts((prev) => ({
+        ...prev,
+        [postId]: isCurrentlyLiked,
+      }));
+
+      setPostLikesCount((prev) => ({
+        ...prev,
+        [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
+      }));
+
+      Alert.alert(
+        "Error",
+        "Something went wrong. Please check your connection."
+      );
+    }
+  };
+
+  const toggleSave = (postId) => {
+    setSavedPosts((prev) => ({
+      ...prev,
+      [postId]: !prev[postId],
+    }));
+  };
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }}>
@@ -190,12 +296,12 @@ const PostModel = ({ post, loading = false }) => {
               }}
             >
               <Image
-                source={{ uri: post.userImage }}
+                source={secondProfile?.imageUrl}
                 style={{ width: 32, height: 32, borderRadius: 16 }}
               />
               <View style={{ marginLeft: 8 }}>
                 <Text className="font-custom-bold" style={{ color: textColor }}>
-                  {post.username}
+                  {secondProfile?.username}
                 </Text>
                 {post.location && (
                   <Text
@@ -214,7 +320,7 @@ const PostModel = ({ post, loading = false }) => {
                 <ContentLoader
                   speed={2}
                   width="100%"
-                  height={300} // Matches aspect ratio of 1:1
+                  height={300}
                   backgroundColor="#f3f3f3"
                   foregroundColor={themeColors.skeletonFg}
                 >
@@ -227,8 +333,7 @@ const PostModel = ({ post, loading = false }) => {
               ) : mediaUrls.length > 0 ? (
                 mediaType === "video" ? (
                   <Video
-                    useNativeControls
-                    shouldPlay={inView}
+                    ref={videoRef}
                     source={{ uri: mediaUrls[0] }}
                     style={{
                       width: "100%",
@@ -304,8 +409,9 @@ const PostModel = ({ post, loading = false }) => {
               className="font-custom-bold"
               style={{ color: textColor, marginTop: 8 }}
             >
-              {post.likes + (likedPosts[post.id] ? 1 : 0)} likes
+              {postLikesCount[post.id] || post.likes.length} likes
             </Text>
+
             <Text className="font-custom" style={{ color: textColor }}>
               <Text className="font-custom-bold">{post.username}</Text>
               {post.caption}
@@ -355,6 +461,10 @@ const PostModel = ({ post, loading = false }) => {
                   className="font-custom-italic"
                   placeholder="Add a comment..."
                   placeholderTextColor="#6B7280"
+                  value={myComment.text}
+                  onChangeText={(text) =>
+                    setMyComment((prev) => ({ ...prev, text }))
+                  }
                   style={{
                     flex: 1,
                     fontSize: 14,
@@ -364,16 +474,21 @@ const PostModel = ({ post, loading = false }) => {
                     color: "black",
                   }}
                 />
-                <TouchableOpacity style={{ marginLeft: 10 }}>
-                  <Text
-                    className="font-custom-bold"
-                    style={{
-                      color: "#3B82F6",
-                      fontSize: 14,
-                    }}
-                  >
-                    POST
-                  </Text>
+                <TouchableOpacity
+                  style={{ marginLeft: 10, opacity: isCommenting ? 0.6 : 1 }}
+                  onPress={() => AddComment()}
+                  disabled={isCommenting}
+                >
+                  {isCommenting ? (
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                  ) : (
+                    <Text
+                      className="font-custom-bold"
+                      style={{ color: "#3B82F6", fontSize: 14 }}
+                    >
+                      POST
+                    </Text>
+                  )}
                 </TouchableOpacity>
               </View>
             </View>

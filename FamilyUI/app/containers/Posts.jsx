@@ -8,6 +8,7 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+import loginSignup from "../api/loginSignup";
 import PostService from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
@@ -16,6 +17,9 @@ const Posts = () => {
   const navigation = useNavigation();
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
+  const [secondProfile, setSecondProfile] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
+
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
@@ -26,7 +30,7 @@ const Posts = () => {
 
   const [posts, setPosts] = useState(selectedPost ? [selectedPost] : []);
   const flatListRef = useRef(null);
-
+  const videoRefs = useRef({});
   const fetchUserPosts = async () => {
     if (!selectedPost?.userId) return;
 
@@ -58,7 +62,6 @@ const Posts = () => {
             const filteredPosts = updatedPosts.filter(
               (post) => post.id !== selectedPost.id
             );
-
             const newPosts = [...filteredPosts];
             newPosts.splice(selectedIndex, 0, selectedPost);
             return newPosts;
@@ -84,6 +87,69 @@ const Posts = () => {
     fetchUserPosts();
   }, [selectedPost?.userId]);
 
+  //SECOND PROFILE
+  const getSecondProfile = async () => {
+    if (selectedPost?.userId) {
+      const response = await loginSignup.getSecondProfile(selectedPost?.userId);
+      if (response.status) {
+        const secondProfile = response.data;
+        let imageUrl = require("../../assets/images/profile.png");
+        if (secondProfile.photoId) {
+          try {
+            const response = await loginSignup.getProfileImage(
+              secondProfile.photoId
+            );
+            imageUrl = response.data;
+          } catch (error) {
+            console.log("Error fetching profile image:", error);
+          }
+        }
+        setSecondProfile({ ...secondProfile, imageUrl });
+      }
+    }
+  };
+  useEffect(() => {
+    getSecondProfile();
+  }, []);
+
+  //MY PROFILE
+  const fetchUserProfile = async () => {
+    const profile = await loginSignup.getStoredUserProfile();
+    if (profile) {
+      let imageUrl = require("../../assets/images/profile.png");
+      if (profile.photoId) {
+        try {
+          const response = await loginSignup.getProfileImage(profile.photoId);
+          imageUrl = response.data;
+        } catch (error) {
+          console.log("Error fetching profile image:", error);
+        }
+      }
+      setMyProfile({ ...profile, imageUrl });
+    }
+  };
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  const onViewableItemsChanged = ({ viewableItems }) => {
+    const visiblePostIds = new Set(viewableItems.map((item) => item.item.id));
+    Object.keys(videoRefs.current).forEach((id) => {
+      if (videoRefs.current[id]) {
+        if (visiblePostIds.has(id)) {
+          videoRefs.current[id]?.playAsync();
+        } else {
+          videoRefs.current[id]?.pauseAsync();
+        }
+      }
+    });
+  };
+
+  const viewabilityConfig = { itemVisiblePercentThreshold: 50 };
+  const viewabilityConfigCallbackPairs = useRef([
+    { onViewableItemsChanged, viewabilityConfig },
+  ]);
+
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
@@ -102,7 +168,15 @@ const Posts = () => {
         data={posts}
         keyExtractor={(item) => item.id.toString()}
         initialNumToRender={5}
-        renderItem={({ item }) => <PostModel post={item} loading={false} />}
+        renderItem={({ item }) => (
+          <PostModel
+            post={item}
+            loading={false}
+            videoRefs={videoRefs}
+            myProfile={myProfile}
+            secondProfile={secondProfile}
+          />
+        )}
         getItemLayout={(data, index) => ({
           length: 500,
           offset: 500 * index,
@@ -117,6 +191,7 @@ const Posts = () => {
             });
           });
         }}
+        viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
         ListEmptyComponent={
           <View className="flex-1 justify-center items-center">
             <Text className="text-gray-500 text-lg">No posts available</Text>
