@@ -68,6 +68,14 @@ public class UserController {
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 
+    @PostMapping("/byId")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<Profile>> getProfileByID(@RequestParam("userId") String userId)
+            throws UserException {
+        Profile profile = userService.getUserByUserId(userId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
+    }
+
     @PostMapping("/updateEmail")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<String>> updateEmail(@RequestParam("id") String id,

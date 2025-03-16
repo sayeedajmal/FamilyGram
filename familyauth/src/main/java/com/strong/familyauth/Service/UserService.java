@@ -191,6 +191,24 @@ public class UserService implements UserDetailsService {
         return profile;
     }
 
+    public Profile getUserByUserId(String userId) throws UserException {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new UserException("User not found"));
+        Profile profile = new Profile();
+        profile.setId(user.getId());
+        profile.setEmail(user.getEmail());
+        profile.setUsername(user.getUsername());
+        profile.setName(user.getName());
+        profile.setPhone(user.getPhone());
+        profile.setPhotoId(user.getPhotoId());
+        profile.setBio(user.getBio());
+        profile.setWebsite(user.getWebsite());
+        profile.setPrivate(user.isPrivate());
+        profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        return profile;
+    }
+
     public Profile getUserByEmail(String email) throws UserException {
 
         String loggedInEmail = getAuthenticatedUserEmail();
