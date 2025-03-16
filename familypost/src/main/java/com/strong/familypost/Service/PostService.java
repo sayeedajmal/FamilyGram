@@ -66,6 +66,7 @@ public class PostService {
      * @return The saved post object
      * @throws PostException If the post object is null or unauthorized
      */
+    @Transactional
     public Post savePost(List<MultipartFile> files, List<MultipartFile> thumbnails, Post post) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
@@ -86,9 +87,13 @@ public class PostService {
             }
 
             if (files != null && !files.isEmpty()) {
-                // Step 2: Upload media and thumbnails
-                List<Map<String, String>> uploadedFiles = storageService.uploadMedia(files, thumbnails,
-                        savedPost.getId());
+                // Step 2: Try uploading media and thumbnails
+                List<Map<String, String>> uploadedFiles;
+                try {
+                    uploadedFiles = storageService.uploadMedia(files, thumbnails, savedPost.getId());
+                } catch (Exception e) {
+                    throw new PostException("Media upload failed, rolling back: " + e.getMessage());
+                }
 
                 // Step 3: Extract media and thumbnail IDs
                 for (Map<String, String> mediaData : uploadedFiles) {
@@ -101,6 +106,9 @@ public class PostService {
             }
 
             return savedPost;
+
+        } catch (PostException e) {
+            throw e; // Preserve PostException messages
         } catch (Exception e) {
             throw new PostException("Error saving post: " + e.getMessage());
         }

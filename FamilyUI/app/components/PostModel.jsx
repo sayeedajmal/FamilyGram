@@ -15,12 +15,22 @@ import {
   useColorScheme,
   View,
 } from "react-native";
+
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import Modal from "react-native-modal";
 import postService, { default as PostService } from "../api/postHandle";
 import { Colors } from "../constants/Colors";
+import Comments from "./Comments";
+
 const mediaContentCache = new Map();
 
-const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile }) => {
+const PostModel = ({
+  post,
+  loading = false,
+  videoRefs,
+  myProfile,
+  secondProfile,
+}) => {
   const videoRef = useRef(null);
   const [likedPosts, setLikedPosts] = useState({});
   const [savedPosts, setSavedPosts] = useState({});
@@ -35,6 +45,8 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
   const [timeAgo, setTimeAgo] = useState("");
   const [postLikesCount, setPostLikesCount] = useState({});
   const [allComments, setAllComments] = useState({});
+  const [activeComment, setActiveComment] = useState(false);
+
   const [isCommenting, setIsCommenting] = useState(false);
   const [myComment, setMyComment] = useState({
     postId: null,
@@ -137,8 +149,9 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
     };
 
     setMyComment((prev) => ({
-      ...prev, // Keep existing values
-      postId: post?.id, // Only update userId
+      ...prev,
+      postId: post?.id,
+      userId: myProfile?.id,
     }));
     fetchMediaUrls();
   }, [post?.mediaIds]);
@@ -148,8 +161,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
       videoRefs.current[post.id] = videoRef.current;
     }
   }, [videoRef.current]);
-
-  
 
   const AddComment = async () => {
     if (!myComment.postId || !myComment.userId || !myComment.text?.trim())
@@ -164,8 +175,9 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
         setMyComment({
           postId: myComment.postId,
           userId: myComment.userId,
-          text: "", // Reset text while keeping postId & userId
+          text: "",
         });
+        Alert.alert("", "Comment Posted");
       } else {
         console.error("Failed to add comment:", response.message);
         Alert.alert("Error", "Failed to add comment. Please try again.");
@@ -250,7 +262,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
         keyboardShouldPersistTaps="handled"
       >
         {loading ? (
-          <View ref={ref}>
+          <View>
             {[1, 2].map((_, index) => (
               <ContentLoader
                 key={index}
@@ -296,7 +308,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
               }}
             >
               <Image
-                source={secondProfile?.imageUrl}
+                source={{ uri: secondProfile?.imageUrl }}
                 style={{ width: 32, height: 32, borderRadius: 16 }}
               />
               <View style={{ marginLeft: 8 }}>
@@ -378,7 +390,10 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
                     color={likedPosts[post.id] ? "red" : iconColor}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={{ marginRight: 16 }}>
+                <TouchableOpacity
+                  onPress={() => setActiveComment(true)}
+                  style={{ marginRight: 16 }}
+                >
                   <Ionicons
                     name="chatbubble-outline"
                     size={26}
@@ -460,7 +475,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
                 <TextInput
                   className="font-custom-italic"
                   placeholder="Add a comment..."
-                  placeholderTextColor="#6B7280"
+                  placeholderTextColor="#3B82F6"
                   value={myComment.text}
                   onChangeText={(text) =>
                     setMyComment((prev) => ({ ...prev, text }))
@@ -471,7 +486,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
                     paddingVertical: 6,
                     paddingHorizontal: 10,
                     borderRadius: 8,
-                    color: "black",
+                    color: "#3B82F6",
                   }}
                 />
                 <TouchableOpacity
@@ -494,6 +509,25 @@ const PostModel = ({ post, loading = false, videoRefs, myProfile, secondProfile 
             </View>
           </View>
         )}
+
+        <Modal
+          visible={activeComment}
+          animationType="slide"
+          onRequestClose={() => setActiveComment(false)}
+          onSwipeComplete={() => setActiveComment(false)}
+          swipeDirection="down"
+          transparent
+          className="w-screen ml-0 mb-0"
+          coverScreen
+          avoidKeyboard
+          statusBarTranslucent
+        >
+          <View className="flex-1 justify-end h-auto">
+            <View className="w-full bg-white rounded-t-2xl shadow-lg">
+              <Comments onEdit={() => setActiveComment(false)} />
+            </View>
+          </View>
+        </Modal>
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>
   );

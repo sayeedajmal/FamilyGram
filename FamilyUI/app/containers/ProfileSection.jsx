@@ -6,13 +6,13 @@ import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   FlatList,
   Image,
-  Modal,
   RefreshControl,
   Text,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
+import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
 import { default as PostService } from "../api/postHandle";
 import ProfileEdit from "../components/ProfileEdit";
@@ -23,6 +23,7 @@ export const ProfileSection = () => {
   const [activeEdit, setActiveEdit] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
   const [myPosts, setMyPosts] = useState([]);
+  const [fetch, setFetch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
@@ -53,6 +54,7 @@ export const ProfileSection = () => {
 
   const fetchMyPosts = async () => {
     if (!userProfile?.id) return;
+    setFetch(true);
     try {
       const response = await PostService.GetPostByUserId(userProfile.id);
       if (response?.status) {
@@ -77,8 +79,10 @@ export const ProfileSection = () => {
             })
           );
           setMyPosts(updatedPosts);
+          setFetch(false);
         } else {
           setMyPosts([]);
+          setFetch(false);
         }
       }
     } catch (error) {
@@ -208,19 +212,19 @@ export const ProfileSection = () => {
           </View>
           <View className="w-full flex-row justify-between items-center">
             <TouchableOpacity
-              className="flex-1 bg-blue-500 p-2 rounded-md mx-[1%]"
+              className="flex-1 bg-blue-500 py-1 rounded-md mx-[1%]"
               onPress={() => setActiveEdit(true)}
             >
               <Text className="text-center font-custom text-white">
                 Edit Profile
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+            <TouchableOpacity className="flex-1 bg-gray-200 py-1 rounded-md mx-[1%]">
               <Text className="text-center font-custom">Share Profile</Text>
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+            {/* <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
               <Text className="text-center font-custom">Call</Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
           </View>
         </View>
       </View>
@@ -275,31 +279,58 @@ export const ProfileSection = () => {
   const getTabContent = () => {
     switch (activeTab) {
       case "Posts":
-        return myPosts.length > 0 ? (
-          <FlatList
-            data={activeTab === "Posts" ? myPosts : []}
-            keyExtractor={(item) => item.id.toString()}
-            numColumns={3}
-            renderItem={renderPostItem}
-            ListHeaderComponent={renderHeader}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={themeColors.icon}
-                colors={[themeColors.icon]}
-              />
-            }
-            style={{ backgroundColor: bg }}
-          />
-        ) : (
+        return (
           <View style={{ flex: 1, backgroundColor: bg }}>
             {renderHeader()}
-            <View className="flex-1 justify-center items-center">
-              <Text className="text-gray-500 text-3xl font-custom-bold">
-                No posts available
-              </Text>
-            </View>
+
+            {fetch ? (
+              <FlatList
+                data={Array(9).fill(0)} // Fake data for loader
+                keyExtractor={(_, index) => index.toString()}
+                numColumns={3}
+                renderItem={() => (
+                  <View className="w-[33%] p-1">
+                    <ContentLoader
+                      speed={2}
+                      height={110}
+                      viewBox="0 0 110 110"
+                      backgroundColor="#e0e0e0"
+                      foregroundColor="#d6d6d6"
+                    >
+                      <Rect
+                        x="0"
+                        y="0"
+                        rx="8"
+                        ry="8"
+                        width="100%"
+                        height="110"
+                      />
+                    </ContentLoader>
+                  </View>
+                )}
+              />
+            ) : myPosts.length > 0 ? (
+              <FlatList
+                data={activeTab === "Posts" ? myPosts : []}
+                keyExtractor={(item) => item.id.toString()}
+                numColumns={3}
+                renderItem={renderPostItem}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={themeColors.icon}
+                    colors={[themeColors.icon]}
+                  />
+                }
+              />
+            ) : (
+              <View className="flex-1 justify-center items-center">
+                <Text className="text-gray-500 text-3xl font-custom-bold">
+                  No posts available
+                </Text>
+              </View>
+            )}
           </View>
         );
       case "Reels":
@@ -339,10 +370,15 @@ export const ProfileSection = () => {
       {getTabContent()}
       {/* Re-added Modal */}
       <Modal
+        className="w-screen ml-0 mb-0"
         visible={activeEdit}
         animationType="slide"
+        avoidKeyboard
+        swipeDirection="down"
         transparent
         statusBarTranslucent
+        onRequestClose={() => setActiveEdit(false)}
+        onSwipeComplete={() => setActiveEdit(false)}
       >
         <View className="flex-1 justify-end bg-#0278ae/40">
           <View className="h-[90%] rounded-t-2xl shadow-lg">

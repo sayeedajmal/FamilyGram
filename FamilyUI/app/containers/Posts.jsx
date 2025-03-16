@@ -31,6 +31,8 @@ const Posts = () => {
   const [posts, setPosts] = useState(selectedPost ? [selectedPost] : []);
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
+  const [loading, setLoading] = useState(true);
+
   const fetchUserPosts = async () => {
     if (!selectedPost?.userId) return;
 
@@ -42,7 +44,7 @@ const Posts = () => {
           const updatedPosts = await Promise.all(
             fetchedPosts.map(async (post) => {
               let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
-              if (post.thumbnailIds && post.thumbnailIds.length > 0) {
+              if (post.thumbnailIds?.length > 0) {
                 try {
                   const thumbnailResponse = await PostService.getPostMedia(
                     post.thumbnailIds[0]
@@ -58,14 +60,15 @@ const Posts = () => {
             })
           );
 
-          setPosts((prevPosts) => {
-            const filteredPosts = updatedPosts.filter(
-              (post) => post.id !== selectedPost.id
-            );
-            const newPosts = [...filteredPosts];
-            newPosts.splice(selectedIndex, 0, selectedPost);
-            return newPosts;
-          });
+          // Insert selectedPost at the correct index
+          const filteredPosts = updatedPosts.filter(
+            (post) => post.id !== selectedPost.id
+          );
+          const newPosts = [...filteredPosts];
+          newPosts.splice(selectedIndex, 0, selectedPost);
+
+          setPosts(newPosts);
+          setLoading(false);
 
           setTimeout(() => {
             flatListRef.current?.scrollToIndex({
@@ -75,13 +78,19 @@ const Posts = () => {
           }, 100);
         } else {
           setPosts(selectedPost ? [selectedPost] : []);
+          setLoading(false);
         }
       }
     } catch (error) {
       console.error("Error fetching user posts:", error);
       setPosts(selectedPost ? [selectedPost] : []);
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchUserPosts();
+  }, [selectedPost?.userId]);
 
   useEffect(() => {
     fetchUserPosts();
@@ -167,17 +176,17 @@ const Posts = () => {
         ref={flatListRef}
         data={posts}
         keyExtractor={(item) => item.id.toString()}
-        initialNumToRender={5}
-        renderItem={({ item }) => (
+        initialNumToRender={1}
+        renderItem={({ item, index }) => (
           <PostModel
             post={item}
-            loading={false}
+            loading={false} // Show loader for non-selected posts
             videoRefs={videoRefs}
             myProfile={myProfile}
             secondProfile={secondProfile}
           />
         )}
-        getItemLayout={(data, index) => ({
+        getItemLayout={(index) => ({
           length: 500,
           offset: 500 * index,
           index,
