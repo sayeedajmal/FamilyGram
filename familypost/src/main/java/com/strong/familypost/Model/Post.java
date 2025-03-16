@@ -36,15 +36,15 @@ public class Post {
     @NonNull
     private String userId;
 
-    /** Type of the post (e.g., "photo", "video", etc.) */
-    @NonNull
-    private String type;
-
     private String caption;
 
-    /** List of URLs pointing to media content associated with the post */
+    /** List of media IDs (original files) */
     @NonNull
     private List<String> mediaIds;
+
+    /** List of thumbnail IDs (for quick previews) */
+    @NonNull
+    private List<String> thumbnailIds;
 
     /** Location with the post */
     private String location;

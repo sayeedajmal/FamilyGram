@@ -3,10 +3,12 @@ package com.strong.familypost.Service;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
@@ -40,6 +42,9 @@ public class PostService {
     @Autowired
     private StorageService storageService;
 
+    @Autowired
+    private UserServiceClient client;
+
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
 
@@ -52,46 +57,46 @@ public class PostService {
         return null;
     }
 
-    private boolean isPrivate() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
-        if (principal instanceof User) {
-            User userDetails = (User) principal;
-            // Return the username
-            return userDetails.isPrivate();
-        }
-        return false;
-    }
-
     /**
-     * Saves a new post to the repository.
+     * Saves a new post to the repository with media attachments.
      *
-     * @param post The post object to be saved
+     * @param files      List of media files (images/videos)
+     * @param thumbnails List of corresponding thumbnail images
+     * @param post       The post object to be saved
      * @return The saved post object
-     * @throws PostException If the post object is null
+     * @throws PostException If the post object is null or unauthorized
      */
-    public Post savePost(MultipartFile file, Post post) throws PostException {
+    public Post savePost(List<MultipartFile> files, List<MultipartFile> thumbnails, Post post) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
         if (!post.getUserId().equals(loggedId)) {
-            throw new PostException("You are not authorized to access this Resource");
+            throw new PostException("You are not authorized to access this resource");
         }
 
         try {
             // Step 1: Save post first to generate an ID
             Post savedPost = postRepo.save(post);
 
-            // Ensure mediaIds is initialized
+            // Initialize media and thumbnail lists if null
             if (savedPost.getMediaIds() == null) {
                 savedPost.setMediaIds(new ArrayList<>());
             }
+            if (savedPost.getThumbnailIds() == null) {
+                savedPost.setThumbnailIds(new ArrayList<>());
+            }
 
-            if (file != null && !file.isEmpty()) {
-                // Step 2: Upload media with the generated post ID
-                String mediaId = storageService.uploadMedia(file, savedPost.getId());
+            if (files != null && !files.isEmpty()) {
+                // Step 2: Upload media and thumbnails
+                List<Map<String, String>> uploadedFiles = storageService.uploadMedia(files, thumbnails,
+                        savedPost.getId());
 
-                // Step 3: Add media ID to list and save post again
-                savedPost.getMediaIds().add(mediaId);
+                // Step 3: Extract media and thumbnail IDs
+                for (Map<String, String> mediaData : uploadedFiles) {
+                    savedPost.getMediaIds().add(mediaData.get("mediaId"));
+                    savedPost.getThumbnailIds().add(mediaData.get("thumbnailId"));
+                }
+
+                // Step 4: Save post with updated media references
                 postRepo.save(savedPost);
             }
 
@@ -121,7 +126,7 @@ public class PostService {
             throw new PostException("PostId cannot be null or empty");
         }
         if (!postRepo.existsById(postId)) {
-            throw new PostException("Post not found with id: " + postId);
+            throw new PostException("No Post with id: " + postId);
         }
 
         commentRepo.deleteByPostId(postId);
@@ -137,12 +142,22 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    public Post getPost(String postId) throws PostException {
-        if (postId == null || postId.trim().isEmpty()) {
-            throw new PostException("PostId cannot be null or empty");
+    public Post getPostById(String userId, String postId, String token) throws PostException {
+        String authenticatedUserId = getAuthenticatedUserId();
+        try {
+            // Call FamilyAuth Service to check privacy settings
+            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return postRepo.findById(postId)
+                        .orElseThrow(() -> new PostException("No Post with postId: " + postId));
+            } else {
+                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
+            }
+
+        } catch (Exception e) {
+            throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
-        return postRepo.findById(postId)
-                .orElseThrow(() -> new PostException("Post not found with id: " + postId));
     }
 
     /**
@@ -150,28 +165,24 @@ public class PostService {
      * 
      * @return A List containing all Post objects
      */
-    public List<Post> getAllPublicPosts() throws PostException {
-        // Check if the current user is private
-        if (isPrivate()) {
-            // Throw exception if private users shouldn't access public posts
-            throw new PostException("You are not authorized to access this Resource", HttpStatus.FORBIDDEN);
-        }
-        // Return all posts if user is not private
-        return postRepo.findAll();
-    }
-
-    public List<Post> getAllPrivatePosts(String userId) throws PostException {
-        // Get the currently authenticated user's ID
+    public List<Post> getUserPosts(String userId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
-
-        // Check if the user is trying to access their own posts
-        if (!userId.equals(authenticatedUserId)) {
-            // Throw an exception if the user is trying to access someone else's posts
-            throw new PostException("You are not authorized to access this Resource", HttpStatus.FORBIDDEN);
+        if (userId.equals(authenticatedUserId)) {
+            return postRepo.findByUserId(userId);
         }
+        try {
+            // Call FamilyAuth Service to check privacy settings
+            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
 
-        // Return posts for the authenticated user if authorized
-        return postRepo.findByUserId(userId); // Assuming you have a method like this in the repository
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return postRepo.findByUserId(userId);
+            } else {
+                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
+            }
+
+        } catch (Exception e) {
+            throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -180,23 +191,23 @@ public class PostService {
      * If the user hasn't liked the post, a like is added.
      * 
      * @param postId The unique identifier of the post
-     * @param id     The unique identifier of the user toggling the like
+     * @param userId The unique identifier of the user toggling the like
      * @return The updated number of likes on the post
      * @throws PostException if the post cannot be found or if there's an error
      *                       processing the like
      */
-    public int toggleLike(String postId, String id) throws PostException {
-        Post post = getPost(postId);
+    public int toggleLike(String postId, String userId, String token) throws PostException {
+        Post post = getPostById(userId, postId, token);
         Set<String> likes = post.getLikes();
 
         if (likes == null) {
             likes = new HashSet<>();
         }
 
-        if (likes.contains(id)) {
-            likes.remove(id);
+        if (likes.contains(userId)) {
+            likes.remove(userId);
         } else {
-            likes.add(id);
+            likes.add(userId);
         }
 
         post.setLikes(likes);

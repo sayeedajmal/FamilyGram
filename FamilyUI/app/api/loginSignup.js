@@ -2,8 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-//const API_URL = "http://192.168.31.218:8082"; // Local backend
-const API_URL = `https://familygram.onrender.com`; // Production
+// Auth & Post Service URLs
+const AUTH_API_URL = "https://familygram.onrender.com"; // Auth Service
 
 const Storage = {
     setItem: async (key, value) => {
@@ -62,7 +62,7 @@ class ApiService {
             if (!refreshToken) return null;
 
             try {
-                const response = await fetch(`${API_URL}/auth/refresh`, {
+                const response = await fetch(`${AUTH_API_URL}/auth/refresh`, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -86,14 +86,15 @@ class ApiService {
         return this.refreshingPromise;
     }
 
-    async request(endpoint, options = {}) {
+    // 🚀 Universal Request Function (Now Accepts Full URL)
+    async request(url, options = {}) {
         let accessToken = await this.getAccessToken();
 
         if (!options.headers) options.headers = {};
         if (accessToken) options.headers.Authorization = `Bearer ${accessToken}`;
 
         try {
-            let response = await fetch(`${API_URL}${endpoint}`, options);
+            let response = await fetch(url, options);
 
             if (response.status === 406) {
                 console.warn("Access token expired. Refreshing token...");
@@ -103,8 +104,9 @@ class ApiService {
                 }
 
                 options.headers.Authorization = `Bearer ${accessToken}`;
-                response = await fetch(`${API_URL}${endpoint}`, options);
+                response = await fetch(url, options);
             }
+
             const responseData = await response.json();
             return { status: response.ok, message: responseData.message || "Success", data: responseData };
         } catch (error) {
@@ -112,8 +114,9 @@ class ApiService {
         }
     }
 
+    // Auth Requests (Uses AUTH_API_URL)
     async loginUser(userData) {
-        const response = await this.request("/auth/login", {
+        const response = await this.request(`${AUTH_API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
@@ -136,7 +139,7 @@ class ApiService {
     }
 
     async registerUser(userData) {
-        const response = await this.request("/auth/register", {
+        const response = await this.request(`${AUTH_API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
@@ -159,12 +162,11 @@ class ApiService {
     }
 
     async sendSignupOtp(email) {
-        return await this.request(`/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, { method: "POST" });
+        return await fetch(`${AUTH_API_URL}/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, { method: "POST" });
     }
 
     async fetchUserProfileByEmail(email) {
-
-        const response = await this.request(`/user/email?email=${encodeURIComponent(email)}`, {
+        const response = await this.request(`${AUTH_API_URL}/user/email?email=${encodeURIComponent(email)}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
@@ -211,7 +213,7 @@ class ApiService {
     async checkUsernameAvailability(username) {
         if (!username) return null;
 
-        const response = await fetch(`${API_URL}/auth/checkUsername?username=${username}`, {
+        const response = await fetch(`${AUTH_API_URL}/auth/checkUsername?username=${username}`, {
             method: "POST", // Ensure backend supports POST for this
             headers: { "Content-Type": "application/json" },
         });
@@ -224,7 +226,7 @@ class ApiService {
     async getProfileImage(fieldId) {
         if (!fieldId) return { status: false, message: "No image available", data: null };
 
-        const response = await fetch(`${API_URL}/auth/image/${fieldId}`);
+        const response = await fetch(`${AUTH_API_URL}/auth/image/${fieldId}`);
         if (!response.ok) return { status: false, message: "Failed to fetch image", data: null };
 
         if (Platform.OS === "web") {

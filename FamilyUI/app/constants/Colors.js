@@ -16,7 +16,7 @@ export const Colors = {
   },
   dark: {
     text: "#ECEDEE",
-    background: "#18191a", // **Darker background for more depth**
+    background: "black", // **Darker background for more depth**
     tint: tintColorDark,
     icon: "#0278ae",
     messageUser: "#242526", // Slightly lighter than bg for separation

@@ -34,7 +34,6 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       const userProfile = await loginSignup.getStoredUserProfile();
-      console.log("FULL :", userProfile);
 
       if (userProfile) {
         setId(userProfile.id);

@@ -7,13 +7,37 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import Posts from "../components/Posts";
+import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
 
 const stories = [
   { id: 1, username: "Your Story", image: "https://placekitten.com/100/100" },
   { id: 2, username: "john_doe", image: "https://placekitten.com/101/101" },
   { id: 3, username: "jane_doe", image: "https://placekitten.com/102/102" },
+];
+
+const postsData = [
+  {
+    id: 1,
+    username: "sayeed__ajmal",
+    userImage:
+      "https://images.unsplash.com/photo-1604537466158-719b1972feb8?ixlib=rb-1.2.1&auto=format&fit=crop&w=700&q=80",
+    postImage:
+      "https://images.unsplash.com/photo-1604537466158-719b1972feb8?ixlib=rb-1.2.1&auto=format&fit=crop&w=700&q=80",
+    likes: 123,
+    caption:
+      "Enjoying the amazing view today! The weather is perfect for a day out in nature. #nature #travel #adventure",
+  },
+  {
+    id: 2,
+    username: "shoaib_akhtar",
+    userImage:
+      "https://plus.unsplash.com/premium_photo-1686835759214-526932717a7e?q=80&w=1527&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    postImage:
+      "https://plus.unsplash.com/premium_photo-1686835759214-526932717a7e?q=80&w=1527&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+    likes: 98,
+    caption: "Chilling at the beach! #sunset",
+  },
 ];
 
 const HomePage = () => {
@@ -72,7 +96,7 @@ const HomePage = () => {
         </ScrollView>
 
         {/* Posts */}
-        <Posts />
+        <PostModel posts={postsData} loading={false} />
       </ScrollView>
     </View>
   );

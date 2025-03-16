@@ -1,136 +1,261 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
-import React, { useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { Video } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
+import React, { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   Image,
+  KeyboardAvoidingView,
   ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
-  View,
   useColorScheme,
+  View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import { Video } from "expo-av";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import loginSignup from "../api/loginSignup";
+import postHandle from "../api/postHandle";
 import { Colors } from "../constants/Colors";
 
 const PostCreationScreen = () => {
   const [caption, setCaption] = useState("");
   const [location, setLocation] = useState("");
-  const [media, setMedia] = useState(null);
-  const [mediaType, setMediaType] = useState(null);
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [userProfile, setUserProfile] = useState(null);
+  const [isUpdating, setIsUpdating] = useState(false);
 
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
+  const navigation = useNavigation();
 
-  // Open Image/Video Picker
+  useFocusEffect(
+    useCallback(() => {
+      return () => {
+        setCaption("");
+        setLocation("");
+        setMediaFiles([]);
+        setIsUpdating(false);
+      };
+    }, [])
+  );
+
+  // Open Image/Video Picker (Multiple Selection)
   const pickMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.All,
-      allowsEditing: true,
+      allowsMultipleSelection: true,
       quality: 1,
     });
 
     if (!result.canceled) {
-      const selectedAsset = result.assets[0];
-      setMedia(selectedAsset.uri);
-      setMediaType(selectedAsset.type);
+      const selectedFiles = result.assets.map((asset) => ({
+        uri: asset.uri,
+        type:
+          asset.mimeType ||
+          (asset.type.includes("video") ? "video/mp4" : "image/jpeg"),
+        name: asset.fileName || `media_${Date.now()}`,
+      }));
+      setMediaFiles([...mediaFiles, ...selectedFiles]);
+    }
+  };
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const profile = await loginSignup.getStoredUserProfile();
+
+        if (profile) {
+          if (profile.photoId) {
+            const response = await loginSignup.getProfileImage(profile.photoId);
+            setUserProfile({ ...profile, imageUrl: response.data });
+          } else {
+            setUserProfile(profile);
+          }
+        }
+      } catch (error) {
+        Alert.alert("Error", "Failed to fetch profile image.");
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
+  const PostCreation = async () => {
+    if (mediaFiles.length === 0) {
+      Alert.alert("Error", "Please choose at least one media file.");
+      return;
+    }
+
+    setIsUpdating(true);
+
+    const newPost = {
+      userId: userProfile?.id,
+      caption,
+      location,
+    };
+
+    const response = await postHandle.createPostWithThumbnails(
+      newPost,
+      mediaFiles
+    );
+
+    if (response.status) {
+      setIsUpdating(false);
+      Alert.alert("Success", "Post Created Successfully!");
+      navigation.reset({ index: 0, routes: [{ name: "Home" }] });
+    } else {
+      setIsUpdating(false);
+      Alert.alert("Error", response.message);
     }
   };
 
   return (
-    <ScrollView className="p-6 flex-1" style={{ backgroundColor: bg }}>
-      {/* Header */}
-      <View className="flex-row justify-between items-center">
-        <Text style={{ color: textColor }} className="text-lg font-custom-bold">
-          Create New Post
-        </Text>
-        <TouchableOpacity>
-          <Ionicons name="send-outline" size={28} color={iconColor} />
-        </TouchableOpacity>
-      </View>
-
-      {/* Media Upload & Preview */}
-      <TouchableOpacity onPress={pickMedia}>
-        {media ? (
-          mediaType === "video" ? (
-            <Video
-              source={{ uri: media }}
-              style={{ width: "100%", height: "100%", borderRadius: 10 }}
-              useNativeControls // Enables play/pause controls
-              resizeMode="contain"
-              isLooping={false}
-            />
-          ) : (
-            // Render image
-            <Image source={{ uri: media }} className="w-full h-60 rounded-lg" />
-          )
-        ) : (
-          // Upload Placeholder
-          <View
-            style={{ backgroundColor: themeColors.tint }}
-            className="w-full h-[80%] border-2 border-dashed border-gray-300 flex items-center justify-center my-6 rounded-lg"
+    <KeyboardAwareScrollView
+      enableOnAndroid
+      keyboardShouldPersistTaps="handled"
+      style={{ backgroundColor: bg, flex: 1 }}
+    >
+      <KeyboardAvoidingView style={{ flex: 1, padding: 16 }}>
+        {/* Header */}
+        <View className="flex-row justify-between items-center mb-4">
+          <Text
+            style={{ color: textColor }}
+            className="text-lg font-custom-bold"
           >
-            <Feather name="plus" size={32} color={iconColor} />
-            <Text style={{ color: textColor }} className="text-gray-500 mt-2">
-              Select a photo or video
-            </Text>
-          </View>
-        )}
-      </TouchableOpacity>
+            Create New Post
+          </Text>
+          <TouchableOpacity onPress={PostCreation} disabled={isUpdating}>
+            {isUpdating ? (
+              <ActivityIndicator size="small" color={iconColor} />
+            ) : (
+              <Ionicons name="send-outline" size={28} color={iconColor} />
+            )}
+          </TouchableOpacity>
+        </View>
 
-      {/* User Info */}
-      <View className="flex-row items-center space-x-3 mb-6">
-        <Image
-          source={require("../../assets/images/profile.png")}
-          className="w-10 h-10 rounded-full"
-        />
-        <Text style={{ color: textColor }} className="font-custom text-sm ml-2">
-          Sayeed__ajmal
-        </Text>
-      </View>
+        {/* Media Upload & Preview */}
+        <TouchableOpacity onPress={pickMedia} className="mb-6 w-[90vw]">
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            className="flex-row w-[90vw]"
+          >
+            {mediaFiles.length > 0 ? (
+              mediaFiles.map((file, index) => (
+                <TouchableOpacity key={index}>
+                  {file.type.includes("video") ? (
+                    <Video
+                      source={{ uri: file.uri }}
+                      shouldPlay
+                      usePoster
+                      isLooping
+                      style={{
+                        width: 300,
+                        height: 300,
+                        marginRight: 10,
+                        borderRadius: 10,
+                      }}
+                      useNativeControls
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <Image
+                      source={{ uri: file.uri }}
+                      style={{
+                        width: 300,
+                        height: 300,
+                        marginRight: 10,
+                        borderRadius: 10,
+                      }}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))
+            ) : (
+              <View
+                style={{ backgroundColor: themeColors.tint }}
+                className="w-[90vw] h-80 border-2 border-dashed border-gray-300 flex items-center justify-center rounded-lg"
+              >
+                <Feather name="plus" size={32} color={iconColor} />
+                <Text
+                  style={{ color: textColor }}
+                  className="text-gray-500 mt-2"
+                >
+                  Select photos or videos
+                </Text>
+              </View>
+            )}
+          </ScrollView>
+        </TouchableOpacity>
 
-      {/* Caption Input */}
-      <TextInput
-        style={{ color: textColor }}
-        placeholder="Write a caption..."
-        value={caption}
-        placeholderTextColor="#aaa"
-        onChangeText={setCaption}
-        className="border-b pb-2 text-sm font-custom mb-4"
-        multiline
-      />
+        {/* User Info */}
+        <View className="flex-row items-center mb-6">
+          <Image
+            source={
+              userProfile?.imageUrl
+                ? { uri: userProfile.imageUrl }
+                : require("../../assets/images/profile.png")
+            }
+            className="w-10 h-10 rounded-full"
+          />
+          <Text
+            style={{ color: textColor }}
+            className="font-custom-bold text-lg ml-2"
+          >
+            {userProfile?.username || "You"}
+          </Text>
+        </View>
 
-      {/* Location Input */}
-      <View className="flex-row justify-between items-center mb-6 font-custom">
+        {/* Caption Input */}
         <TextInput
-          style={{ color: textColor }}
-          placeholder="Add location"
-          value={location}
+          style={{
+            color: textColor,
+            borderBottomWidth: 1,
+            borderBottomColor: "#ccc",
+            paddingBottom: 6,
+          }}
+          placeholder="Write a caption..."
+          value={caption}
+          className="font-custom"
           placeholderTextColor="#aaa"
-          onChangeText={setLocation}
-          className="flex-1 text-sm"
+          onChangeText={setCaption}
+          multiline
         />
-        <Ionicons name="location-outline" size={20} color={iconColor} />
-      </View>
 
-      {/* Options */}
-      <TouchableOpacity className="flex-row justify-between items-center py-4 border-t border-b">
-        <Text style={{ color: textColor }} className="text-sm">
-          Tag People
-        </Text>
-        <Feather name="chevron-right" size={18} color={iconColor} />
-      </TouchableOpacity>
+        {/* Location Input */}
+        <View className="flex-row justify-between items-center my-6">
+          <TextInput
+            style={{ color: textColor, flex: 1 }}
+            placeholder="Add location"
+            value={location}
+            placeholderTextColor="#aaa"
+            onChangeText={setLocation}
+          />
+          <Ionicons name="location-outline" size={20} color={iconColor} />
+        </View>
 
-      <TouchableOpacity className="flex-row justify-between items-center py-4 border-b">
-        <Text style={{ color: textColor }} className="text-sm">
-          Add Music
-        </Text>
-        <Feather name="chevron-right" size={18} color={iconColor} />
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Options */}
+        <TouchableOpacity className="flex-row justify-between items-center py-4 border-t border-b">
+          <Text style={{ color: textColor }} className="text-sm">
+            Tag People
+          </Text>
+          <Feather name="chevron-right" size={18} color={iconColor} />
+        </TouchableOpacity>
+
+        <TouchableOpacity className="flex-row justify-between items-center py-4 border-b">
+          <Text style={{ color: textColor }} className="text-sm">
+            Add Music
+          </Text>
+          <Feather name="chevron-right" size={18} color={iconColor} />
+        </TouchableOpacity>
+      </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 };
 

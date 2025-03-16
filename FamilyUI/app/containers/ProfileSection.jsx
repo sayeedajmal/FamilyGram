@@ -1,0 +1,353 @@
+import { MaterialIcons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
+import * as Linking from "expo-linking";
+import React, { useEffect, useState } from "react";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
+import {
+  FlatList,
+  Image,
+  Modal,
+  RefreshControl,
+  Text,
+  TouchableOpacity,
+  View,
+  useColorScheme,
+} from "react-native";
+import loginSignup from "../api/loginSignup";
+import { default as PostService } from "../api/postHandle";
+import ProfileEdit from "../components/ProfileEdit";
+import { Colors } from "../constants/Colors";
+
+export const ProfileSection = () => {
+  const [userProfile, setUserProfile] = useState(null);
+  const [activeEdit, setActiveEdit] = useState(false);
+  const [activeTab, setActiveTab] = useState("Posts");
+  const [myPosts, setMyPosts] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const theme = useColorScheme();
+  const themeColors = Colors[theme] || Colors.light;
+  const iconColor = themeColors.icon;
+  const bg = themeColors.background;
+  const textColor = themeColors.text;
+  const navigation = useNavigation();
+
+  const fetchUserProfile = async () => {
+    const profile = await loginSignup.getStoredUserProfile();
+    if (profile) {
+      let imageUrl = require("../../assets/images/profile.png");
+      if (profile.photoId) {
+        try {
+          const response = await loginSignup.getProfileImage(profile.photoId);
+          imageUrl = response.data;
+        } catch (error) {
+          console.log("Error fetching profile image:", error);
+        }
+      }
+      setUserProfile({ ...profile, imageUrl });
+    }
+    setRefreshing(false);
+  };
+
+  const fetchMyPosts = async () => {
+    if (!userProfile?.id) return;
+    const response = await PostService.GetPostByUserId(userProfile?.id);
+    if (response?.status) {
+      const posts = response.data.data;
+      if (Array.isArray(posts) && posts.length > 0) {
+        const updatedPosts = await Promise.all(
+          posts.map(async (post) => {
+            let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
+            if (post.thumbnailIds && post.thumbnailIds.length > 0) {
+              try {
+                const thumbnailResponse = await PostService.getPostMedia(
+                  post.thumbnailIds[0]
+                );
+                if (thumbnailResponse?.status) {
+                  thumbnailUrl = thumbnailResponse.data;
+                }
+              } catch (error) {
+                console.error("Error fetching thumbnail:", error);
+              }
+            }
+            return { ...post, thumbnailUrl };
+          })
+        );
+        setMyPosts(updatedPosts);
+      } else {
+        setMyPosts([]);
+      }
+    }
+    setRefreshing(false);
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    Promise.all([fetchUserProfile(), fetchMyPosts()]);
+  };
+
+  useEffect(() => {
+    fetchUserProfile();
+  }, []);
+
+  useEffect(() => {
+    if (userProfile) fetchMyPosts();
+  }, [userProfile]);
+
+  if (!userProfile) {
+    return (
+      <View
+        className="flex-1 items-center justify-center"
+        style={{ backgroundColor: bg }}
+      >
+        <ContentLoader
+          speed={2}
+          width={300}
+          height={300}
+          viewBox="0 0 300 300"
+          backgroundColor={themeColors.skeletonFg}
+          foregroundColor={themeColors.skeletonFg}
+        >
+          <Circle cx="150" cy="50" r="40" />
+          <Rect x="75" y="100" rx="5" ry="5" width="150" height="15" />
+          <Rect x="40" y="130" rx="5" ry="5" width="50" height="15" />
+          <Rect x="125" y="130" rx="5" ry="5" width="50" height="15" />
+          <Rect x="210" y="130" rx="5" ry="5" width="50" height="15" />
+          <Rect x="40" y="160" rx="5" ry="5" width="220" height="10" />
+          <Rect x="40" y="175" rx="5" ry="5" width="180" height="10" />
+          <Rect x="40" y="200" rx="10" ry="10" width="220" height="40" />
+        </ContentLoader>
+      </View>
+    );
+  }
+
+  const openPost = (post, index) => {
+    navigation.navigate("Posts", { postData: post, selectedIndex: index });
+  };
+
+  const renderHeader = () => (
+    <>
+      {/* Profile Header */}
+      <View className="w-full flex-row justify-center self-center text-center">
+        <View className="w-full flex-col items-center">
+          <View className="w-full flex-row justify-between items-center px-4">
+            <Text
+              className="text-lg font-custom-bold w-[80%] overflow-hidden"
+              style={{ color: textColor }}
+            >
+              {userProfile.username}
+            </Text>
+            <TouchableOpacity>
+              <MaterialIcons
+                name="menu-open"
+                size={28}
+                style={{ color: iconColor }}
+              />
+            </TouchableOpacity>
+          </View>
+          <View className="p-2 w-full flex-row justify-around items-center">
+            <Image
+              source={userProfile.imageUrl}
+              style={{ width: 96, height: 96, borderRadius: 48 }}
+            />
+            <View className="flex-row gap-6">
+              <Text
+                className="text-center font-custom"
+                style={{ color: textColor }}
+              >
+                <Text className="font-custom">0</Text>
+                {"\n"} posts
+              </Text>
+              <Text
+                className="text-center font-custom"
+                style={{ color: textColor }}
+              >
+                <Text className="font-custom">{userProfile.followerCount}</Text>
+                {"\n"} followers
+              </Text>
+              <Text
+                className="text-center font-custom"
+                style={{ color: textColor }}
+              >
+                <Text className="font-custom">
+                  {userProfile.followingCount}
+                </Text>
+                {"\n"} following
+              </Text>
+            </View>
+          </View>
+          <View className="px-4 pb-2 w-full flex-col items-start">
+            <Text
+              className="text-lg font-custom-bold"
+              style={{ color: textColor }}
+            >
+              {userProfile.name || "Name"}
+            </Text>
+            <Text
+              className="text-start w-[90%] font-custom-italic"
+              style={{ color: textColor }}
+            >
+              {userProfile.bio || "Bio"}
+            </Text>
+            <TouchableOpacity
+              onPress={() => Linking.openURL(userProfile.website || "#")}
+            >
+              <Text
+                className="font-custom underline"
+                style={{ color: textColor }}
+              >
+                {userProfile.website || "No website"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View className="w-full flex-row justify-between items-center">
+            <TouchableOpacity
+              className="flex-1 bg-blue-500 p-2 rounded-md mx-[1%]"
+              onPress={() => setActiveEdit(true)}
+            >
+              <Text className="text-center font-custom text-white">
+                Edit Profile
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+              <Text className="text-center font-custom">Share Profile</Text>
+            </TouchableOpacity>
+            <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
+              <Text className="text-center font-custom">Call</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+
+      {/* Tabs Navigation */}
+      <View className="p-4 w-[full] flex-row justify-between gap-8 px-4 text-center">
+        {["Posts", "Reels", "Saved", "Tagged"].map((tab) => (
+          <TouchableOpacity
+            key={tab}
+            className="items-center"
+            onPress={() => setActiveTab(tab)}
+          >
+            <MaterialIcons
+              name={
+                tab === "Posts"
+                  ? "grid-on"
+                  : tab === "Reels"
+                  ? "slideshow"
+                  : tab === "Saved"
+                  ? "bookmark"
+                  : "account-box"
+              }
+              size={24}
+              color={activeTab === tab ? "#0278ae" : "gray"}
+            />
+            <Text
+              style={{ color: activeTab === tab ? textColor : "gray" }}
+              className="font-custom"
+            >
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </>
+  );
+
+  const renderPostItem = ({ item, index }) => (
+    <TouchableOpacity
+      style={{ width: "33.33%", aspectRatio: 1 }}
+      onPress={() => openPost(item, index)}
+    >
+      <Image
+        source={{ uri: item.thumbnailUrl }}
+        style={{ width: "100%", height: "100%" }}
+        className="border border-gray-400"
+        resizeMode="cover"
+      />
+    </TouchableOpacity>
+  );
+
+  const getTabContent = () => {
+    switch (activeTab) {
+      case "Posts":
+        return myPosts.length > 0 ? (
+          <FlatList
+            data={myPosts}
+            keyExtractor={(item) => item.id.toString()}
+            numColumns={3}
+            renderItem={renderPostItem}
+            ListHeaderComponent={renderHeader}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={themeColors.icon}
+                colors={[themeColors.icon]}
+              />
+            }
+            style={{ backgroundColor: bg }}
+          />
+        ) : (
+          <View style={{ flex: 1, backgroundColor: bg }}>
+            {renderHeader()}
+            <View className="flex-1 justify-center items-center">
+              <Text className="text-gray-500 text-3xl font-custom-bold">
+                No posts available
+              </Text>
+            </View>
+          </View>
+        );
+      case "Reels":
+        return (
+          <View style={{ flex: 1, backgroundColor: bg }}>
+            {renderHeader()}
+            <View className="flex-1 items-center justify-center">
+              <Text>No reels available</Text>
+            </View>
+          </View>
+        );
+      case "Saved":
+        return (
+          <View style={{ flex: 1, backgroundColor: bg }}>
+            {renderHeader()}
+            <View className="flex-1 items-center justify-center">
+              <Text>No saved posts</Text>
+            </View>
+          </View>
+        );
+      case "Tagged":
+        return (
+          <View style={{ flex: 1, backgroundColor: bg }}>
+            {renderHeader()}
+            <View className="flex-1 items-center justify-center">
+              <Text>No tagged posts</Text>
+            </View>
+          </View>
+        );
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <>
+      {getTabContent()}
+      {/* Re-added Modal */}
+      <Modal
+        visible={activeEdit}
+        animationType="slide"
+        transparent
+        statusBarTranslucent
+      >
+        <View className="flex-1 justify-end bg-#0278ae/40">
+          <View className="h-[90%] rounded-t-2xl shadow-lg">
+            <ProfileEdit
+              onEdit={() => setActiveEdit(false)}
+              onUpdate={fetchUserProfile}
+            />
+          </View>
+        </View>
+      </Modal>
+    </>
+  );
+};
+
+export default ProfileSection;

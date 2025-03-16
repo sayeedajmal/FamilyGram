@@ -1,13 +1,12 @@
 package com.strong.familypost.Service;
 
-import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
-import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
-
-import javax.imageio.ImageIO;
+import java.util.Map;
 
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -33,48 +32,61 @@ public class StorageService {
     private static final List<String> SUPPORTED_VIDEO_TYPES = Arrays.asList("video/mp4", "video/mkv",
             "video/quicktime");
 
-    public String uploadMedia(MultipartFile file, String postId) throws PostException {
+    public List<Map<String, String>> uploadMedia(List<MultipartFile> files, List<MultipartFile> thumbnails,
+            String postId) throws PostException {
+        if (files == null || files.isEmpty()) {
+            throw new PostException("No media files provided");
+        }
+
+        if (thumbnails == null || thumbnails.size() != files.size()) {
+            throw new PostException("Thumbnails must be provided for each media file");
+        }
+
+        List<Map<String, String>> uploadedFiles = new ArrayList<>();
+
         try {
-            String originalFileName = file.getOriginalFilename();
-            String contentType = file.getContentType();
+            for (int i = 0; i < files.size(); i++) {
+                MultipartFile file = files.get(i);
+                MultipartFile thumbnail = thumbnails.get(i);
 
-            if (contentType == null || originalFileName == null) {
-                throw new PostException("Invalid file type");
+                String originalFileName = file.getOriginalFilename();
+                String contentType = file.getContentType();
+
+                if (contentType == null || originalFileName == null) {
+                    throw new PostException("Invalid file type");
+                }
+
+                if (!SUPPORTED_IMAGE_TYPES.contains(contentType) && !SUPPORTED_VIDEO_TYPES.contains(contentType)) {
+                    throw new PostException("Unsupported file type: " + contentType);
+                }
+
+                // Upload media file
+                String fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
+                String mediaFileName = postId + "_" + System.currentTimeMillis() + "." + fileExtension;
+                GridFSUploadOptions mediaOptions = new GridFSUploadOptions()
+                        .chunkSizeBytes(256 * 1024)
+                        .metadata(new org.bson.Document("type", contentType));
+
+                ObjectId mediaId = gridFSBucket.uploadFromStream(mediaFileName, file.getInputStream(), mediaOptions);
+
+                // Upload thumbnail file
+                String thumbnailFileName = postId + "_thumbnail_" + System.currentTimeMillis() + ".jpg";
+                GridFSUploadOptions thumbnailOptions = new GridFSUploadOptions()
+                        .chunkSizeBytes(64 * 1024)
+                        .metadata(new org.bson.Document("type", "image/jpeg"));
+
+                ObjectId thumbnailId = gridFSBucket.uploadFromStream(thumbnailFileName, thumbnail.getInputStream(),
+                        thumbnailOptions);
+
+                // Store mediaId and thumbnailId in a map
+                Map<String, String> mediaData = new HashMap<>();
+                mediaData.put("mediaId", mediaId.toHexString());
+                mediaData.put("thumbnailId", thumbnailId.toHexString());
+
+                uploadedFiles.add(mediaData);
             }
+            return uploadedFiles;
 
-            if (!SUPPORTED_IMAGE_TYPES.contains(contentType) && !SUPPORTED_VIDEO_TYPES.contains(contentType)) {
-                throw new PostException("Unsupported file type: " + contentType);
-            }
-
-            InputStream inputStream;
-            String fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
-
-            if (SUPPORTED_IMAGE_TYPES.contains(contentType)) {
-                // Convert image to JPEG
-                BufferedImage originalImage = ImageIO.read(file.getInputStream());
-                BufferedImage jpegImage = new BufferedImage(
-                        originalImage.getWidth(),
-                        originalImage.getHeight(),
-                        BufferedImage.TYPE_INT_RGB);
-                jpegImage.createGraphics().drawImage(originalImage, 0, 0, null);
-
-                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                ImageIO.write(jpegImage, "jpg", baos);
-                inputStream = new ByteArrayInputStream(baos.toByteArray());
-                fileExtension = "jpg"; // Convert all images to JPEG
-            } else {
-                // For video, use the original file input stream
-                inputStream = file.getInputStream();
-            }
-
-            // Upload media file
-            String fileName = postId + "_" + System.currentTimeMillis() + "." + fileExtension;
-            GridFSUploadOptions options = new GridFSUploadOptions()
-                    .chunkSizeBytes(256 * 1024)
-                    .metadata(new org.bson.Document("type", contentType));
-
-            ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
-            return fileId.toHexString();
         } catch (Exception e) {
             throw new PostException("Failed to upload media: " + e.getLocalizedMessage());
         }

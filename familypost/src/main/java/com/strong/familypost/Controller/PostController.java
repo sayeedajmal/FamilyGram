@@ -61,15 +61,12 @@ public class PostController {
     private PostService postService;
 
     @Autowired
-    private CommentService commentService;
-
-    @Autowired
     private StorageService storageService;
 
     /**
-     * Creates a new post with optional file attachment.
-     * 
-     * @param file     Optional multipart file to be attached to the post
+     * Creates a new post with multiple media attachments.
+     *
+     * @param files    List of multipart files to be attached to the post
      * @param postJson JSON string containing post data
      * @return ResponseEntity containing the created post
      * @throws PostException if there's an error processing the request
@@ -78,16 +75,25 @@ public class PostController {
     @PreAuthorize("isAuthenticated()")
     @Transactional
     public ResponseEntity<ResponseWrapper<Post>> createPost(
-            @RequestPart(value = "file", required = true) MultipartFile file,
+            @RequestPart(value = "files", required = true) List<MultipartFile> files,
+            @RequestPart(value = "thumbnails", required = true) List<MultipartFile> thumbnails,
             @RequestParam("post") String postJson) throws PostException {
 
-        if (file.isEmpty()) {
-            throw new PostException("Choose A Video or Picture");
+        if (files == null || files.isEmpty()) {
+            throw new PostException("Choose at least one video or picture.");
         }
+
+        if (thumbnails == null || thumbnails.isEmpty() || thumbnails.size() != files.size()) {
+            throw new PostException("Each media file must have a corresponding thumbnail.");
+        }
+
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             Post post = objectMapper.readValue(postJson, Post.class);
-            Post savedPost = postService.savePost(file, post);
+
+            // Save post with multiple media files and thumbnails
+            Post savedPost = postService.savePost(files, thumbnails, post);
+
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post created successfully", savedPost));
         } catch (JsonProcessingException e) {
             throw new PostException("Error processing JSON: " + e.getMessage());
@@ -110,30 +116,18 @@ public class PostController {
     }
 
     /**
-     * Retrieves all public posts.
-     * 
-     * @return ResponseEntity containing list of public posts
-     * @throws PostException if there's an error retrieving posts
-     */
-    @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts() throws PostException {
-        List<Post> posts = postService.getAllPublicPosts();
-        return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
-    }
-
-    /**
-     * Retrieves all private posts for a specific user.
+     * Retrieves all posts for a specific user.
      * 
      * @param id ID of the user whose private posts are to be retrieved
      * @return ResponseEntity containing list of private posts
      * @throws PostException if there's an error retrieving posts
      */
-    @GetMapping("/{userId}")
+    @GetMapping()
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getPrivateAllPosts(@RequestParam("userId") String userId)
+    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts(@RequestParam("userId") String userId,
+            @RequestHeader("Authorization") String token)
             throws PostException {
-        List<Post> posts = postService.getAllPrivatePosts(userId);
+        List<Post> posts = postService.getUserPosts(userId, token);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }
 
@@ -145,12 +139,15 @@ public class PostController {
      */
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Post>> getPost(@PathVariable String postId) {
+    public ResponseEntity<ResponseWrapper<Post>> getPostById(
+            @PathVariable String postId,
+            @RequestParam("userId") String userId,
+            @RequestHeader("Authorization") String token) {
         try {
-            Post post = postService.getPost(postId);
+            Post post = postService.getPostById(userId, postId, token);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
-            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Post not found", null));
+            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));
         }
     }
 
@@ -168,7 +165,7 @@ public class PostController {
             postService.deletePost(postId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post deleted successfully", null));
         } catch (PostException e) {
-            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Post not found", null));
+            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));
         }
     }
 
@@ -181,30 +178,15 @@ public class PostController {
      */
     @PostMapping("/{postId}/toggle-like")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Integer>> toggleLike(@PathVariable String postId,
-            @RequestHeader("id") String id) {
+    public ResponseEntity<ResponseWrapper<Integer>> toggleLike(
+            @PathVariable String postId,
+            @RequestParam("userId") String userId,
+            @RequestHeader("Authorization") String token) {
         try {
-            int totalLikes = postService.toggleLike(postId, id);
+            int totalLikes = postService.toggleLike(postId, userId, token);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
         } catch (PostException e) {
             return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));
-        }
-    }
-
-    /**
-     * Retrieves all comments for a specific post.
-     * 
-     * @param postId ID of the post to retrieve comments for
-     * @return ResponseEntity containing list of comments
-     */
-    @GetMapping("/{postId}/comments")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Comment>>> getComments(@PathVariable String postId) {
-        try {
-            List<Comment> comments = commentService.getCommentsByPostId(postId);
-            return ResponseEntity.ok(new ResponseWrapper<>(200, "Comments retrieved successfully", comments));
-        } catch (PostException e) {
-            return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "Comments not found", null));
         }
     }
 }
