@@ -7,7 +7,6 @@ import {
   FlatList,
   Image,
   RefreshControl,
-  ScrollView,
   Text,
   TouchableOpacity,
   View,

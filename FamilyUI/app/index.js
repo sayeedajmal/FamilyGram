@@ -133,69 +133,6 @@ export default function App() {
     );
   }
 
-  const MainTabs = () => (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarStyle: {
-          backgroundColor: themeColors.background,
-          height: Platform.OS === 'ios' ? 0 : 50,
-        },
-        headerShown: false,
-        tabBarIcon: ({ focused, color, size }) => {
-          if (route.name === "Profile") {
-            Animated.timing(scaleAnim, {
-              toValue: focused ? 1.2 : 1,
-              duration: 200,
-              easing: Easing.ease,
-              useNativeDriver: true,
-            }).start();
-
-            return (
-              <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-                <Image
-                  source={
-                    profileImage
-                      ? { uri: profileImage }
-                      : require("../assets/images/profile.png")
-                  }
-                  style={{
-                    width: size,
-                    height: size,
-                    borderRadius: size / 2,
-                    borderWidth: focused ? 2 : 0,
-                    borderColor: focused ? "#0278ae" : "transparent",
-                  }}
-                />
-              </Animated.View>
-            );
-          }
-
-          const icons = {
-            Home: "home",
-            Search: "search",
-            Add: "add-circle",
-            Play: "play-circle",
-          };
-          return (
-            <Ionicons
-              name={focused ? icons[route.name] : `${icons[route.name]}-outline`}
-              size={size}
-              color={color}
-            />
-          );
-        },
-        tabBarActiveTintColor: "#0278ae",
-        tabBarInactiveTintColor: "gray",
-      })}
-    >
-      <Tab.Screen name="Home" component={HomePage} />
-      <Tab.Screen name="Search" component={UploadMedia} />
-      <Tab.Screen name="Add" component={PostCreationScreen} />
-      <Tab.Screen name="Play" component={HomePage} />
-      <Tab.Screen name="Profile" component={ProfileSection} />
-    </Tab.Navigator>
-  );
-
   return (
     <View style={{ flex: 1 }}>
       <StatusBar
@@ -212,11 +149,72 @@ export default function App() {
       />
       {isAuthenticated ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-          <Stack.Screen
-            name="MainTabs"
-            children={() => <MainTabs theme={theme} />}
-          />
+          <Stack.Screen name="MainTabs">
+            {(props) => (
+              <Tab.Navigator
+                screenOptions={({ route }) => ({
+                  tabBarStyle: {
+                    backgroundColor: themeColors.background,
+                    height: Platform.OS === "ios" ? 0 : 50,
+                  },
+                  headerShown: false,
+                  tabBarIcon: ({ focused, color, size }) => {
+                    if (route.name === "Profile") {
+                      Animated.timing(scaleAnim, {
+                        toValue: focused ? 1.2 : 1,
+                        duration: 200,
+                        easing: Easing.ease,
+                        useNativeDriver: true,
+                      }).start();
+
+                      return (
+                        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+                          <Image
+                            source={
+                              profileImage
+                                ? { uri: profileImage }
+                                : require("../assets/images/profile.png")
+                            }
+                            style={{
+                              width: size,
+                              height: size,
+                              borderRadius: size / 2,
+                              borderWidth: focused ? 2 : 0,
+                              borderColor: focused ? "#0278ae" : "transparent",
+                            }}
+                          />
+                        </Animated.View>
+                      );
+                    }
+
+                    const icons = {
+                      Home: "home",
+                      Search: "search",
+                      Add: "add-circle",
+                      Play: "play-circle",
+                    };
+                    return (
+                      <Ionicons
+                        name={focused ? icons[route.name] : `${icons[route.name]}-outline`}
+                        size={size}
+                        color={color}
+                      />
+                    );
+                  },
+                  tabBarActiveTintColor: "#0278ae",
+                  tabBarInactiveTintColor: "gray",
+                })}
+              >
+                <Tab.Screen name="Home" component={HomePage} />
+                <Tab.Screen name="Search" component={UploadMedia} />
+                <Tab.Screen name="Add" component={PostCreationScreen} />
+                <Tab.Screen name="Play" component={HomePage} />
+                <Tab.Screen name="Profile" component={ProfileSection} />
+              </Tab.Navigator>
+            )}
+          </Stack.Screen>
           <Stack.Screen name="Posts" component={Posts} />
+
         </Stack.Navigator>
       ) : (
         <Stack.Navigator
