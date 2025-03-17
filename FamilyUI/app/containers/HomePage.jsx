@@ -8,8 +8,6 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import PostService from "../api/postHandle";
-import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
 
 const HomePage = () => {
@@ -25,15 +23,15 @@ const HomePage = () => {
 
   // Fetch posts from all users (or a default user for now)
   const fetchPosts = async () => {
-    try {
-      const response = await PostService.GetAllPosts();
-      if (response?.status) {
-        setPosts(response.data.data || []);
-      }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-      setPosts([]);
-    }
+    // try {
+    //   const response = await PostService.GetAllPosts();
+    //   if (response?.status) {
+    //     setPosts(response.data.data || []);
+    //   }
+    // } catch (error) {
+    //   console.error("Error fetching posts:", error);
+    //   setPosts([]);
+    // }
   };
 
   useEffect(() => {
@@ -60,7 +58,7 @@ const HomePage = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      {/* Header */}
+      {/* Header (Fixed) */}
       <View className="flex-row justify-between items-center px-4 py-1">
         <Image
           source={require("../../assets/images/logo.png")}
@@ -82,54 +80,67 @@ const HomePage = () => {
         </View>
       </View>
 
-      {/* Stories */}
-      <FlatList
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        data={[
-          {
-            id: "your_story",
-            username: "Your Story",
-            image: "https://placekitten.com/100/100",
-          },
-          {
-            id: "john_doe",
-            username: "john_doe",
-            image: "https://placekitten.com/101/101",
-          },
-          {
-            id: "jane_doe",
-            username: "jane_doe",
-            image: "https://placekitten.com/102/102",
-          },
-        ]}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <View className="mr-4 items-center">
-            <View
-              className="border-2 rounded-full p-1"
-              style={{ borderColor: iconColor }}
-            >
-              <Image
-                source={{ uri: item.image }}
-                className="w-16 h-16 rounded-full"
-              />
-            </View>
-            <Text className="text-xs mt-1" style={{ color: textColor }}>
-              {item.username}
-            </Text>
-          </View>
-        )}
-      />
-
-      {/* Posts */}
+      {/* Combined Scrollable List (Stories + Posts) */}
       <FlatList
         ref={flatListRef}
-        data={posts}
-        keyExtractor={(item) => item.id.toString()}
-        renderItem={({ item }) => (
-          <PostModel post={item} loading={false} videoRefs={videoRefs} />
-        )}
+        data={[{ type: "stories" }, ...posts]} // Adding a "stories" item at the top
+        keyExtractor={(item, index) =>
+          item.type === "stories" ? "stories" : item.id.toString()
+        }
+        renderItem={({ item }) => {
+          if (item.type === "stories") {
+            return (
+              <View className="py-2">
+                <FlatList
+                  horizontal
+                  className="px-2"
+                  showsHorizontalScrollIndicator={false}
+                  data={[
+                    {
+                      id: "your_story",
+                      username: "Your Story",
+                      image: "https://placekitten.com/100/100",
+                    },
+                    {
+                      id: "john_doe",
+                      username: "john_doe",
+                      image: "https://placekitten.com/101/101",
+                    },
+                    {
+                      id: "jane_doe",
+                      username: "jane_doe",
+                      image: "https://placekitten.com/102/102",
+                    },
+                  ]}
+                  keyExtractor={(story) => story.id}
+                  renderItem={({ item }) => (
+                    <View className="ml-4 items-center">
+                      <View
+                        className="border-2 rounded-full p-1"
+                        style={{ borderColor: iconColor }}
+                      >
+                        <Image
+                          source={{ uri: item.image }}
+                          className="w-16 h-16 rounded-full"
+                        />
+                      </View>
+                      <Text
+                        className="text-xs mt-1 text-center"
+                        style={{ color: textColor }}
+                      >
+                        {item.username}
+                      </Text>
+                    </View>
+                  )}
+                />
+              </View>
+            );
+          }
+
+          return (
+            <PostModel post={item} loading={false} videoRefs={videoRefs} />
+          );
+        }}
         initialNumToRender={5}
         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
         ListEmptyComponent={

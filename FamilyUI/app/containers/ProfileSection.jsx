@@ -7,6 +7,7 @@ import {
   FlatList,
   Image,
   RefreshControl,
+  ScrollView,
   Text,
   TouchableOpacity,
   View,
@@ -222,9 +223,6 @@ export const ProfileSection = () => {
             <TouchableOpacity className="flex-1 bg-gray-200 py-1 rounded-md mx-[1%]">
               <Text className="text-center font-custom">Share Profile</Text>
             </TouchableOpacity>
-            {/* <TouchableOpacity className="flex-1 bg-gray-200 p-2 rounded-md mx-[1%]">
-              <Text className="text-center font-custom">Call</Text>
-            </TouchableOpacity> */}
           </View>
         </View>
       </View>

@@ -93,60 +93,65 @@ class ApiService {
         if (!options.headers) options.headers = {};
         if (accessToken) options.headers.Authorization = `Bearer ${accessToken}`;
 
-        try {
-            let response = await fetch(url, options);
+        let response = await fetch(url, options);
 
-            if (response.status === 406) {
-                console.warn("Access token expired. Refreshing token...");
-                accessToken = await this.refreshAccessToken();
-                if (!accessToken) {
-                    return { status: false, message: "Session expired. Please log in again.", data: null };
-                }
+        if (response.status === 406) {
+            console.warn("Access token expired. Refreshing token...");
+            accessToken = await this.refreshAccessToken();
 
-                options.headers.Authorization = `Bearer ${accessToken}`;
-                response = await fetch(url, options);
+            if (!accessToken) {
+                return { status: false, message: "Session expired. Please log in again.", data: null };
             }
 
-            const responseData = await response.json();
-            return { status: response.ok, message: responseData.message || "Success", data: responseData };
-        } catch (error) {
-            return { status: false, message: "Network error. Please try again.", data: null };
+            options.headers.Authorization = `Bearer ${accessToken}`;
+            response = await fetch(url, options);
         }
+
+        const responseData = await response.json();
+        return { status: response.ok, message: responseData.message || "Success", data: responseData };
     }
+
 
     // Auth Requests (Uses AUTH_API_URL)
     async loginUser(userData) {
-        const response = await this.request(`${AUTH_API_URL}/auth/login`, {
+        console.log("TEST");
+
+        const response = await fetch(`${AUTH_API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
         });
 
-        if (response.status) {
-            const { accessToken, refreshToken } = response.data.data;
+        const responseData = await response.json();
+
+        if (response.ok) {
+            const { accessToken, refreshToken } = responseData.data || {};
             if (accessToken && refreshToken) {
                 await this.saveTokens(accessToken, refreshToken);
             }
 
             const profileResponse = await this.fetchUserProfileByEmail(userData.email);
-
             if (profileResponse.status) {
                 return { status: true, message: "Login successful", data: profileResponse.data };
             }
-        } else {
-            return { status: false, message: response.message || "Login failed", data: null };
         }
+
+        return { status: false, message: responseData.message || "Login failed", data: null };
     }
 
+
     async registerUser(userData) {
-        const response = await this.request(`${AUTH_API_URL}/auth/register`, {
+
+        const response = await fetch(`${AUTH_API_URL}/auth/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(userData),
         });
 
-        if (response.status) {
-            const { accessToken, refreshToken } = response.data.data;
+        const responseData = await response.json();
+
+        if (response.ok) {
+            const { accessToken, refreshToken } = responseData.data || {};
             if (accessToken && refreshToken) {
                 await this.saveTokens(accessToken, refreshToken);
             }
@@ -155,11 +160,13 @@ class ApiService {
             if (profileResponse.status) {
                 return { status: true, message: "Registration successful", data: profileResponse.data };
             }
-            return { status: false, message: "Registration successful but failed to fetch profile", data: null };
-        } else {
-            return { status: false, message: response.message || "Registration failed", data: null };
+
+            return { status: false, message: "Registration successful, but failed to fetch profile", data: null };
         }
+
+        return { status: false, message: responseData.message || "Registration failed", data: null };
     }
+
 
     async sendSignupOtp(email) {
         return await fetch(`${AUTH_API_URL}/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, { method: "POST" });
@@ -207,16 +214,19 @@ class ApiService {
         formData.append("user", JSON.stringify(userData));
 
         if (file) {
-            if (Platform.OS === "web") {
-                formData.append("file", file);
-            } else {
-                formData.append("file", { uri: file.uri, name: file.name || "image.jpg", type: file.type || "image/jpeg" });
-            }
+            formData.append("file", {
+                uri: file.uri,
+                name: file.name || "image.jpg",
+                type: file.type || "image/jpeg"
+            });
         }
 
-        const response = await this.request("/user/update", {
+        const response = await this.request(`${AUTH_API_URL}/user/update`, {
             method: "POST",
             body: formData,
+            headers: {
+                "Content-Type": "multipart/form-data"
+            }
         });
 
 

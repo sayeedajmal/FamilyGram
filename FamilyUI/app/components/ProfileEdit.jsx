@@ -114,12 +114,12 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       updatedUser,
       selectedImage
     );
-    if (response) {
+    if (response.status) {
       Alert.alert("Success", "Profile updated successfully");
       onUpdate();
       onEdit();
     } else {
-      Alert.alert("Error", "Failed to update profile");
+      Alert.alert("Error",response.message);
       setIsUpdating(false);
     }
   };
