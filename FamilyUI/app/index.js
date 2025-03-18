@@ -101,8 +101,8 @@ export default function App() {
 
     const fetchUserProfile = async () => {
       const profile = await loginSignup.getStoredUserProfile();
-      if (profile?.photoId) {
-        const imageUrl = await loginSignup.getProfileImage(profile.photoId);
+      if (profile?.thumbnailId) {
+        const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
         setProfileImage(imageUrl.data);
       }
     };
@@ -114,6 +114,18 @@ export default function App() {
   if (!fontsLoaded || isAuthenticated === null) {
     return (
       <View style={{ flex: 1, backgroundColor: themeColors.background, justifyContent: "center", alignItems: "center" }}>
+        <StatusBar
+          barStyle={
+            theme === "dark"
+              ? Platform.OS === "ios"
+                ? "light-content"
+                : "dark-content"
+              : "dark-content"
+          }
+          animated={true}
+          showHideTransition="fade"
+          backgroundColor={themeColors.background}
+        />
         <ContentLoader
           speed={2}
           width={400}

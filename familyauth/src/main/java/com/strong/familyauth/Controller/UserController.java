@@ -90,6 +90,15 @@ public class UserController {
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profiles retrieved", users));
     }
 
+    @PostMapping("/liteUser")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<Map<String, Object>>> getLiteUser(
+            @RequestParam("userId") String userId)
+            throws UserException {
+        Map<String, Object> profile = userService.liteUser(userId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
+    }
+
     @PostMapping("/byId")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<User>> getProfileByID(@RequestParam("mineId") String mineId,

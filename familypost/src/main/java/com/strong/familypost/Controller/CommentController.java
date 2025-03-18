@@ -42,6 +42,7 @@ public class CommentController {
     @PostMapping
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Comment>> createComment(@RequestBody Comment comment) throws PostException {
+        System.out.println("HELLO: "+comment.toString());
         Comment createdComment = commentService.createComment(comment);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Comment created successfully", createdComment));
     }

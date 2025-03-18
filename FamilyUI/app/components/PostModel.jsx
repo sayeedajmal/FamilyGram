@@ -6,31 +6,27 @@ import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   ActivityIndicator,
   Alert,
+  FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   useColorScheme,
   View,
 } from "react-native";
-
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Modal from "react-native-modal";
+import loginSignup from "../api/loginSignup";
 import postService, { default as PostService } from "../api/postHandle";
 import { Colors } from "../constants/Colors";
-import Comments from "./Comments";
-
+import CommentModel from "./CommentsModal";
 const mediaContentCache = new Map();
 
-const PostModel = ({
-  post,
-  loading = false,
-  videoRefs,
-  myProf,
-  userProf,
-}) => {
+const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const videoRef = useRef(null);
   const [likedPosts, setLikedPosts] = useState({});
   const [savedPosts, setSavedPosts] = useState({});
@@ -51,6 +47,8 @@ const PostModel = ({
   const [myComment, setMyComment] = useState({
     postId: null,
     userId: null,
+    username: null,
+    thumbnailId: null,
     text: null,
   });
 
@@ -66,7 +64,7 @@ const PostModel = ({
     if (post) {
       setPostLikesCount((prev) => ({
         ...prev,
-        [post.id]: post.likes.length,
+        [post.id]: post?.likes?.length,
       }));
     }
   }, [post]);
@@ -152,6 +150,8 @@ const PostModel = ({
       ...prev,
       postId: post?.id,
       userId: myProf?.id,
+      username: myProf?.username,
+      thumbnailId: myProf?.thumbnailId,
     }));
     fetchMediaUrls();
   }, [post?.mediaIds]);
@@ -162,22 +162,85 @@ const PostModel = ({
     }
   }, [videoRef.current]);
 
+  const fetchComments = async () => {
+    const response = await postService.showCommentByPostId(post?.id);
+    if (response.status) {
+      const updatedComments = await Promise.all(
+        response.data.data.map(async (item) => {
+          let thumbnailUrl = item.thumbnailId;
+          if (item.thumbnailId) {
+            try {
+              const imageResponse = await loginSignup.getProfileImage(
+                item.thumbnailId
+              );
+              if (imageResponse.status) {
+                thumbnailUrl = imageResponse.data;
+              }
+            } catch (error) {
+              console.error("Error fetching profile image:", error);
+            }
+          }
+
+          // Convert Java LocalDateTime to a readable format
+          const postDate = moment(item.createdAt); // Assuming createdAt is in ISO format
+          const now = moment();
+          const diffInMinutes = now.diff(postDate, "minutes");
+          const diffInHours = now.diff(postDate, "hours");
+          const diffInDays = now.diff(postDate, "days");
+
+          let formattedTime;
+          if (diffInMinutes < 1) {
+            formattedTime = "Just now";
+          } else if (diffInMinutes < 60) {
+            formattedTime = `${diffInMinutes} MINUTES AGO`;
+          } else if (diffInHours < 24) {
+            formattedTime = `${diffInHours} HOURS AGO`;
+          } else if (diffInDays < 7) {
+            formattedTime = `${diffInDays} DAYS AGO`;
+          } else {
+            formattedTime = postDate.format("MMM D, YYYY");
+          }
+
+          return {
+            ...item,
+            thumbnailId: thumbnailUrl,
+            createdAt: formattedTime, // Add formatted time
+          };
+        })
+      );
+
+      setAllComments(updatedComments);
+    } else {
+      Alert.alert("Error", response.message);
+    }
+  };
+
+  useEffect(() => {
+    fetchComments();
+  }, [post]);
+
   const AddComment = async () => {
     if (!myComment.postId || !myComment.userId || !myComment.text?.trim())
       return;
 
     setIsCommenting(true); // Start loader
+    const thumbnailId = myComment.thumbnailId?.uri?.split("/").pop();
 
+    const updatedComment = {
+      ...myComment,
+      thumbnailId,
+    };
     try {
-      const response = await postService.addComment(myComment);
+      const response = await postService.addComment(updatedComment);
 
       if (response.status) {
-        setMyComment({
-          postId: myComment.postId,
-          userId: myComment.userId,
+        setMyComment((prev) => ({
+          ...prev,
           text: "",
-        });
-        Alert.alert("", "Comment Posted");
+        }));
+
+        Keyboard.dismiss();
+        fetchComments();
       } else {
         console.error("Failed to add comment:", response.message);
         Alert.alert("Error", "Failed to add comment. Please try again.");
@@ -424,7 +487,7 @@ const PostModel = ({
               className="font-custom-bold"
               style={{ color: textColor, marginTop: 8 }}
             >
-              {postLikesCount[post.id] || post.likes.length} likes
+              {postLikesCount[post.id] || post?.likes?.length} likes
             </Text>
 
             <Text className="font-custom" style={{ color: textColor }}>
@@ -436,7 +499,6 @@ const PostModel = ({
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
-                marginTop: 4,
               }}
             >
               <TouchableOpacity>
@@ -444,7 +506,7 @@ const PostModel = ({
                   className="font-custom"
                   style={{ color: "#6B7280", fontSize: 12 }}
                 >
-                  View all {post.totalComments || 0} comments
+                  View all comments
                 </Text>
               </TouchableOpacity>
               <Text
@@ -512,21 +574,119 @@ const PostModel = ({
 
         <Modal
           visible={activeComment}
+          statusBarTranslucent
           animationType="slide"
           onRequestClose={() => setActiveComment(false)}
           onSwipeComplete={() => setActiveComment(false)}
           swipeDirection="down"
-          transparent
-          className="w-screen ml-0 mb-0"
-          coverScreen
           avoidKeyboard
-          statusBarTranslucent
+          style={{ margin: 0 }}
         >
-          <View className="flex-1 justify-end h-auto">
-            <View className="w-full bg-white rounded-t-2xl shadow-lg">
-              <Comments onEdit={() => setActiveComment(false)} />
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View
+              style={{
+                flex: 1,
+                justifyContent: "flex-end", // Moves modal content to the bottom
+              }}
+            >
+              <View
+                style={{
+                  height: "60%",
+                  backgroundColor: bg,
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                  paddingBottom: 20,
+                }}
+              >
+                <Text
+                  className="font-custom pl-4 text-2xl m-4"
+                  style={{ color: textColor }}
+                >
+                  Comments
+                </Text>
+                {/* Scrollable Comments Section */}
+                <FlatList
+                  data={allComments}
+                  keyExtractor={(item) => item.id}
+                  renderItem={({ item }) => <CommentModel item={item} />}
+                  contentContainerStyle={{
+                    paddingHorizontal: 16,
+                    paddingVertical: 10,
+                  }}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                />
+
+                {/* Fixed Input Box at the Bottom */}
+                <View
+                  style={{
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: bg,
+                    borderTopWidth: 1,
+                    borderTopColor: "#e5e7eb",
+                    paddingTop: 8,
+                    paddingBottom: 16,
+                    paddingHorizontal: 16,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                    }}
+                  >
+                    <Image
+                      source={myProf.thumbnailId}
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        marginRight: 12,
+                      }}
+                    />
+                    <TextInput
+                      placeholder="Add a comment..."
+                      placeholderTextColor="#aaa"
+                      value={myComment.text}
+                      onChangeText={(text) =>
+                        setMyComment((prev) => ({ ...prev, text }))
+                      }
+                      style={{
+                        flex: 1,
+                        padding: 12,
+                        borderRadius: 9999,
+                        fontSize: 14,
+                        color: textColor,
+                        backgroundColor: themeColors.tint,
+                      }}
+                    />
+                    <TouchableOpacity
+                      style={{
+                        marginLeft: 10,
+                        opacity: isCommenting ? 0.6 : 1,
+                      }}
+                      onPress={() => AddComment()}
+                      disabled={isCommenting}
+                    >
+                      {isCommenting ? (
+                        <ActivityIndicator size="small" color="#3B82F6" />
+                      ) : (
+                        <Text
+                          className="font-custom-bold"
+                          style={{ color: "#3B82F6", fontSize: 14 }}
+                        >
+                          POST
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
             </View>
-          </View>
+          </TouchableWithoutFeedback>
         </Modal>
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>

@@ -19,7 +19,7 @@ import ProfileEdit from "../components/ProfileEdit";
 import { Colors } from "../constants/Colors";
 
 export const ProfileSection = () => {
-  const [userProfile, setUserProfile] = useState(null);
+  const [myProfile, setMyProfile] = useState(null);
   const [activeEdit, setActiveEdit] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
   const [myPosts, setMyPosts] = useState([]);
@@ -36,27 +36,30 @@ export const ProfileSection = () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
       let imageUrl = require("../../assets/images/profile.png");
-      if (profile.photoId) {
+      if (profile.thumbnailId) {
         try {
-          const response = await loginSignup.getProfileImage(profile.photoId);
+          const response = await loginSignup.getProfileImage(
+            profile.thumbnailId
+          );
           imageUrl = response.data;
         } catch (error) {
           console.log("Error fetching profile image:", error);
         }
       }
-      setUserProfile({
+      setMyProfile({
         ...profile,
-        imageUrl: typeof imageUrl === "string" ? { uri: imageUrl } : imageUrl,
+        thumbnailId:
+          typeof imageUrl === "string" ? { uri: imageUrl } : imageUrl,
       });
     }
     setRefreshing(false);
   };
 
   const fetchMyPosts = async () => {
-    if (!userProfile?.id) return;
+    if (!myProfile?.id) return;
     setFetch(true);
     try {
-      const response = await PostService.GetPostByUserId(userProfile.id);
+      const response = await PostService.GetPostByUserId(myProfile.id);
       if (response?.status) {
         const posts = response.data.data;
         if (Array.isArray(posts) && posts.length > 0) {
@@ -102,10 +105,10 @@ export const ProfileSection = () => {
   }, []);
 
   useEffect(() => {
-    if (userProfile) fetchMyPosts();
-  }, [userProfile]);
+    if (myProfile) fetchMyPosts();
+  }, [myProfile]);
 
-  if (!userProfile) {
+  if (!myProfile) {
     return (
       <View
         className="flex-1 items-center justify-center"
@@ -136,8 +139,8 @@ export const ProfileSection = () => {
     navigation.navigate("Posts", {
       selectedPost: post,
       selectedIndex: index,
-      myProf: userProfile,
-      userProf: userProfile,
+      myProf: myProfile,
+      userProf: myProfile,
     });
   };
 
@@ -151,7 +154,7 @@ export const ProfileSection = () => {
               className="text-lg font-custom-bold w-[80%] overflow-hidden"
               style={{ color: textColor }}
             >
-              {userProfile.username}
+              {myProfile.username}
             </Text>
             <TouchableOpacity>
               <MaterialIcons
@@ -163,7 +166,7 @@ export const ProfileSection = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={userProfile.imageUrl}
+              source={myProfile.thumbnailId}
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
@@ -178,16 +181,14 @@ export const ProfileSection = () => {
                 className="text-center font-custom"
                 style={{ color: textColor }}
               >
-                <Text className="font-custom">{userProfile.followerCount}</Text>
+                <Text className="font-custom">{myProfile.followerCount}</Text>
                 {"\n"} followers
               </Text>
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
               >
-                <Text className="font-custom">
-                  {userProfile.followingCount}
-                </Text>
+                <Text className="font-custom">{myProfile.followingCount}</Text>
                 {"\n"} following
               </Text>
             </View>
@@ -197,22 +198,22 @@ export const ProfileSection = () => {
               className="text-lg font-custom-bold"
               style={{ color: textColor }}
             >
-              {userProfile.name || "Name"}
+              {myProfile.name || "Name"}
             </Text>
             <Text
               className="text-start w-[90%] font-custom-italic"
               style={{ color: textColor }}
             >
-              {userProfile.bio || "Bio"}
+              {myProfile.bio || "Bio"}
             </Text>
             <TouchableOpacity
-              onPress={() => Linking.openURL(userProfile.website || "#")}
+              onPress={() => Linking.openURL(myProfile.website || "#")}
             >
               <Text
                 className="font-custom underline"
-                style={{ color: textColor }}
+                style={{ color: iconColor }}
               >
-                {userProfile.website || "No website"}
+                {myProfile.website || "No website"}
               </Text>
             </TouchableOpacity>
           </View>

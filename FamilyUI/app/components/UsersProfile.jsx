@@ -171,7 +171,7 @@ export const UsersProfile = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={thumbnailId}
+              source={{ uri: thumbnailId }}
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">

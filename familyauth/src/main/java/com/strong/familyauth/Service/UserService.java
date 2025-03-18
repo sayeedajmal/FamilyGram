@@ -174,7 +174,7 @@ public class UserService implements UserDetailsService {
     }
 
     public List<Map<String, Object>> searchByUserName(String username) {
-        List<User> users = userRepo.findByUsernameContaining("sayeed");
+        List<User> users = userRepo.findByUsernameContaining(username);
         List<Map<String, Object>> result = new ArrayList<>();
 
         for (User user : users) {
@@ -187,6 +187,23 @@ public class UserService implements UserDetailsService {
         }
 
         return result;
+    }
+
+    public Map<String, Object> liteUser(String userId) {
+        Optional<User> userOptional = userRepo.findById(userId);
+
+        if (userOptional.isEmpty()) {
+            return null;
+        }
+
+        User user = userOptional.get();
+        Map<String, Object> userMap = new HashMap<>();
+        userMap.put("id", user.getId());
+        userMap.put("username", user.getUsername());
+        userMap.put("name", user.getName());
+        userMap.put("thumbnailId", user.getThumbnailId());
+
+        return userMap;
     }
 
     // BY USERNAME

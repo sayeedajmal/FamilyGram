@@ -34,13 +34,32 @@ const Search = () => {
         searchQuery.toLowerCase()
       );
       if (response.status) {
-        setMediaData(response.data.data);
+        console.log("HELLO: ", response.data.data);
+        const updatedMedia = await Promise.all(
+          response.data.data.map(async (item) => {
+            let thumbnailUrl = item.thumbnailId; 
+            if (item.thumbnailId) {
+              try {
+                const imageResponse = await loginSignup.getProfileImage(
+                  item.thumbnailId
+                );
+                if (imageResponse.status) {
+                  thumbnailUrl = imageResponse.data;
+                }
+              } catch (error) {
+                console.error("Error fetching profile image:", error);
+              }
+            }
+            return { ...item, thumbnailId: thumbnailUrl }; 
+          })
+        );
+        setMediaData(updatedMedia);
       } else {
         setMediaData([]);
       }
     }, 500);
 
-    return () => clearTimeout(delay);
+    return () => clearTimeout(delay); // Cleanup timeout
   }, [searchQuery]);
 
   const renderProfile = ({ item }) => (
@@ -52,13 +71,13 @@ const Search = () => {
           userId: item.id,
           username: item.username,
           name: item.name,
-          thumbnailId: item.thumbnailId || "https://via.placeholder.com/150",
+          thumbnailId: item.thumbnailId,
         })
       }
     >
       {/* Profile Image */}
       <Image
-        source={{ uri: item.thumbnailId || "https://via.placeholder.com/150" }}
+        source={{ uri: item.thumbnailId }}
         style={{ width: 40, height: 40, borderRadius: 20 }}
       />
 

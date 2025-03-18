@@ -121,8 +121,6 @@ class ApiService {
 
 
     async loginUser(userData) {
-        console.log("TEST");
-
         const response = await fetch(`${AUTH_API_URL}/auth/login`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -199,6 +197,21 @@ class ApiService {
 
     }
 
+    async getLiteUser(userId) {
+        const response = await this.request(`${AUTH_API_URL}/user/liteUser?userId=${encodeURIComponent(userId)}`, {
+            method: "POST",
+        });
+
+        if (response.status) {
+            const userProfile = response.data.data;
+
+
+            return { status: true, message: "LiteUser Fetched", data: userProfile };
+        } else {
+            return { status: false, message: response.message || "Failed to fetch user profile", data: null };
+        }
+
+    }
     async getSecondProfile(userId, mineId) {
         const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}&mineId=${mineId}`, {
             method: "POST",

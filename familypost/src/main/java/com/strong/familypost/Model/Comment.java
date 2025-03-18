@@ -34,6 +34,13 @@ public class Comment {
     @NonNull
     private String userId;
 
+    /** username of the user who created this comment */
+    @NonNull
+    private String username;
+
+    @NonNull
+    private String thumbnailId;
+    
     /** The actual content/text of the comment */
     @NonNull
     private String text;

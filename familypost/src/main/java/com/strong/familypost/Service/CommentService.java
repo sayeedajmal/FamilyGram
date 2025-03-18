@@ -43,7 +43,6 @@ public class CommentService {
      */
     public Comment createComment(Comment comment) throws PostException {
         String loggedId = getAuthenticatedUserId();
-
         if (!comment.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
