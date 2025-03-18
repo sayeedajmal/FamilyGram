@@ -48,7 +48,7 @@ const PostCreationScreen = () => {
   // Open Image/Video Picker (Multiple Selection)
   const pickMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.All,
+      mediaTypes: ['images', 'videos'],
       allowsMultipleSelection: true,
       quality: 1,
     });

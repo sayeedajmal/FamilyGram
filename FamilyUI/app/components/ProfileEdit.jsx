@@ -82,7 +82,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
 
   const pickImage = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 1,
@@ -119,7 +119,7 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
       onUpdate();
       onEdit();
     } else {
-      Alert.alert("Error",response.message);
+      Alert.alert("Error", response.message);
       setIsUpdating(false);
     }
   };

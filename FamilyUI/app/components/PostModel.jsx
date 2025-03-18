@@ -28,8 +28,8 @@ const PostModel = ({
   post,
   loading = false,
   videoRefs,
-  myProfile,
-  secondProfile,
+  myProf,
+  userProf,
 }) => {
   const videoRef = useRef(null);
   const [likedPosts, setLikedPosts] = useState({});
@@ -151,7 +151,7 @@ const PostModel = ({
     setMyComment((prev) => ({
       ...prev,
       postId: post?.id,
-      userId: myProfile?.id,
+      userId: myProf?.id,
     }));
     fetchMediaUrls();
   }, [post?.mediaIds]);
@@ -191,13 +191,13 @@ const PostModel = ({
   };
 
   useEffect(() => {
-    if (myProfile && post?.likes) {
+    if (myProf && post?.likes) {
       setLikedPosts((prev) => ({
         ...prev,
-        [post.id]: post.likes.includes(myProfile.id),
+        [post.id]: post.likes.includes(myProf.id),
       }));
     }
-  }, [myProfile, post]);
+  }, [myProf, post]);
 
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
@@ -213,7 +213,7 @@ const PostModel = ({
     }));
 
     try {
-      const response = await postService.toggleLike(myProfile.id, postId);
+      const response = await postService.toggleLike(myProf.id, postId);
 
       if (!response.status) {
         setLikedPosts((prev) => ({
@@ -308,12 +308,12 @@ const PostModel = ({
               }}
             >
               <Image
-                source={{ uri: secondProfile?.imageUrl }}
+                source={{ uri: userProf?.imageUrl }}
                 style={{ width: 32, height: 32, borderRadius: 16 }}
               />
               <View style={{ marginLeft: 8 }}>
                 <Text className="font-custom-bold" style={{ color: textColor }}>
-                  {secondProfile?.username}
+                  {userProf?.username}
                 </Text>
                 {post.location && (
                   <Text

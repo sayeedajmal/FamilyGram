@@ -10,13 +10,14 @@ import { Animated, Appearance, Easing, Image, Platform, StatusBar, View } from "
 import "../global.css";
 import loginSignup from "./api/loginSignup";
 import LoginScreen from "./components/LoginScreen";
+import Search from "./components/Search";
 import SignupScreen from "./components/SignupScreen";
+import UsersProfile from "./components/UsersProfile";
 import { Colors } from "./constants/Colors";
 import HomePage from "./containers/HomePage";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
-import UploadMedia from "./containers/UploadMedia";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -206,14 +207,23 @@ export default function App() {
                 })}
               >
                 <Tab.Screen name="Home" component={HomePage} />
-                <Tab.Screen name="Search" component={UploadMedia} />
+                <Tab.Screen name="Search" component={Search} />
                 <Tab.Screen name="Add" component={PostCreationScreen} />
                 <Tab.Screen name="Play" component={HomePage} />
                 <Tab.Screen name="Profile" component={ProfileSection} />
               </Tab.Navigator>
             )}
           </Stack.Screen>
-          <Stack.Screen name="Posts" component={Posts} />
+          <Stack.Screen name="Posts" options={{
+            presentation: 'transparentModal',
+            animation: 'slide_from_right',
+            gestureEnabled: true
+          }} component={Posts} />
+          <Stack.Screen name="UsersProfile" options={{
+            presentation: 'transparentModal',
+            animation: 'slide_from_right',
+            gestureEnabled: true
+          }} component={UsersProfile} />
 
         </Stack.Navigator>
       ) : (

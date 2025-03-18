@@ -3,7 +3,10 @@ package com.strong.familyauth.Service;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 import javax.imageio.ImageIO;
 
@@ -25,7 +28,8 @@ public class ImageStorageService {
     @Autowired
     private GridFSBucket gridFSBucket;
 
-    public String uploadProfileImage(MultipartFile file, String id) throws UserException {
+    public Map<String, String> uploadProfileImage(MultipartFile file, String id, MultipartFile thumbnail)
+            throws UserException {
         try {
             // First, try to find and delete existing image for the username
             GridFSFile existingFile = gridFSBucket
@@ -36,29 +40,47 @@ public class ImageStorageService {
                 gridFSBucket.delete(existingFile.getObjectId());
             }
 
-            // Convert image to JPEG
-            BufferedImage originalImage = ImageIO.read(file.getInputStream());
-            BufferedImage jpegImage = new BufferedImage(
-                    originalImage.getWidth(),
-                    originalImage.getHeight(),
-                    BufferedImage.TYPE_INT_RGB);
-            jpegImage.createGraphics().drawImage(originalImage, 0, 0, null);
+            // Upload the main profile image
+            String profileImageId = uploadImage(file, id);
 
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            ImageIO.write(jpegImage, "jpg", baos);
-            InputStream inputStream = new ByteArrayInputStream(baos.toByteArray());
+            // Upload the thumbnail
+            String thumbnailId = uploadImage(thumbnail, id);
 
-            // Upload converted image
-            String fileName = id + "_" + System.currentTimeMillis() + ".jpg";
-            System.out.println("HELLL: "+fileName);
-            GridFSUploadOptions options = new GridFSUploadOptions()
-                    .chunkSizeBytes(1024)
-                    .metadata(new org.bson.Document("type", "image/jpeg"));
-            ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
-            return fileId.toHexString();
+            // Return both media and thumbnail IDs in a Map
+            Map<String, String> result = new HashMap<>();
+            result.put("mediaId", profileImageId);
+            result.put("thumbnailId", thumbnailId);
+
+            return result;
         } catch (Exception e) {
-            throw new UserException(e.getLocalizedMessage().toString());
+            throw new UserException(e.getLocalizedMessage());
         }
+    }
+
+    private String uploadImage(MultipartFile file, String id) throws IOException {
+        // Convert image to JPEG
+        BufferedImage originalImage = ImageIO.read(file.getInputStream());
+        BufferedImage jpegImage = new BufferedImage(
+                originalImage.getWidth(),
+                originalImage.getHeight(),
+                BufferedImage.TYPE_INT_RGB);
+        jpegImage.createGraphics().drawImage(originalImage, 0, 0, null);
+
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ImageIO.write(jpegImage, "jpg", baos);
+        InputStream inputStream = new ByteArrayInputStream(baos.toByteArray());
+
+        // Generate a unique file name
+        String fileName = id + "_" + System.currentTimeMillis() + ".jpg";
+
+        // Upload the image
+        GridFSUploadOptions options = new GridFSUploadOptions()
+                .chunkSizeBytes(1024)
+                .metadata(new org.bson.Document("type", "image/jpeg"));
+        ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
+
+        // Return the fileId as a hex string
+        return fileId.toHexString();
     }
 
     public InputStreamResource getImageStream(String fileId) throws UserException {

@@ -1,13 +1,7 @@
-import { Ionicons } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
-import {
-  FlatList,
-  Text,
-  TouchableOpacity,
-  useColorScheme,
-  View,
-} from "react-native";
+import { FlatList, Text, TouchableOpacity, useColorScheme, View } from "react-native";
 import PostService from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
@@ -21,8 +15,10 @@ const Posts = () => {
   const textColor = themeColors.text;
 
   const route = useRoute();
-  const selectedPost = route.params?.postData;
+  const selectedPost = route.params?.selectedPost;
   const selectedIndex = route.params?.selectedIndex || 0;
+  const myProfile = route.params?.myProf;
+  const userProfile = route.params?.userProf;
 
   const [posts, setPosts] = useState(selectedPost ? [selectedPost] : []);
   const flatListRef = useRef(null);
@@ -40,9 +36,7 @@ const Posts = () => {
               let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
               if (post.thumbnailIds && post.thumbnailIds.length > 0) {
                 try {
-                  const thumbnailResponse = await PostService.getPostMedia(
-                    post.thumbnailIds[0]
-                  );
+                  const thumbnailResponse = await PostService.getPostMedia(post.thumbnailIds[0]);
                   if (thumbnailResponse?.status) {
                     thumbnailUrl = thumbnailResponse.data;
                   }
@@ -54,29 +48,19 @@ const Posts = () => {
             })
           );
 
-          setPosts((prevPosts) => {
-            const filteredPosts = updatedPosts.filter(
-              (post) => post.id !== selectedPost.id
-            );
+          // Filter out selectedPost to avoid duplicates, then insert at selectedIndex
+          const filteredPosts = updatedPosts.filter((post) => post.id !== selectedPost.id);
+          const newPosts = [...filteredPosts];
+          newPosts.splice(selectedIndex, 0, selectedPost);
 
-            const newPosts = [...filteredPosts];
-            newPosts.splice(selectedIndex, 0, selectedPost);
-            return newPosts;
-          });
-
+          setPosts(newPosts);
           setTimeout(() => {
-            flatListRef.current?.scrollToIndex({
-              index: selectedIndex,
-              animated: true,
-            });
+            flatListRef.current?.scrollToIndex({ index: selectedIndex, animated: true });
           }, 100);
-        } else {
-          setPosts(selectedPost ? [selectedPost] : []);
         }
       }
     } catch (error) {
       console.error("Error fetching user posts:", error);
-      setPosts(selectedPost ? [selectedPost] : []);
     }
   };
 
@@ -89,7 +73,7 @@ const Posts = () => {
       {/* Header */}
       <View className="flex-row items-center p-4">
         <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={24} color={iconColor} />
+          <MaterialIcons name="arrow-back-ios-new" size={24} color={iconColor} />
         </TouchableOpacity>
         <Text className="text-lg font-bold ml-4" style={{ color: textColor }}>
           Posts
@@ -102,7 +86,9 @@ const Posts = () => {
         data={posts}
         keyExtractor={(item) => item.id.toString()}
         initialNumToRender={5}
-        renderItem={({ item }) => <PostModel post={item} loading={false} />}
+        renderItem={({ item }) => (
+          <PostModel post={item} loading={false} myProf={myProfile} userProf={userProfile} />
+        )}
         getItemLayout={(data, index) => ({
           length: 500,
           offset: 500 * index,
@@ -111,10 +97,7 @@ const Posts = () => {
         onScrollToIndexFailed={(info) => {
           const wait = new Promise((resolve) => setTimeout(resolve, 500));
           wait.then(() => {
-            flatListRef.current?.scrollToIndex({
-              index: info.index,
-              animated: true,
-            });
+            flatListRef.current?.scrollToIndex({ index: info.index, animated: true });
           });
         }}
         ListEmptyComponent={

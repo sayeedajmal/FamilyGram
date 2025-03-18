@@ -1,5 +1,7 @@
 package com.strong.familyauth.Controller;
 
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,7 +20,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.strong.familyauth.Model.Profile;
 import com.strong.familyauth.Model.ResponseWrapper;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.UserService;
@@ -35,16 +36,18 @@ public class UserController {
 
     @PostMapping("/update")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Profile>> updateProfile(
+    public ResponseEntity<ResponseWrapper<User>> updateProfile(
             @RequestPart(value = "file", required = false) MultipartFile file,
-            @RequestParam("user") String userJson) throws UserException, JsonProcessingException {
+            @RequestParam("user") String userJson,
+            @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail)
+            throws UserException, JsonProcessingException {
 
         ObjectMapper objectMapper = new ObjectMapper();
         User updatedUser = objectMapper.readValue(userJson, User.class);
-        Profile updatedProfile = userService.updateUser(file, updatedUser);
+        User updatedProfile = userService.updateUser(file, updatedUser, thumbnail);
 
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(new ResponseWrapper<>(HttpStatus.ACCEPTED.value(), "Profile updated successfully",
+                .body(new ResponseWrapper<>(HttpStatus.ACCEPTED.value(), "User updated successfully",
                         updatedProfile));
     }
 
@@ -62,17 +65,37 @@ public class UserController {
 
     @PostMapping("/profile")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Profile>> getProfile(@RequestParam("username") String username)
+    public ResponseEntity<ResponseWrapper<User>> getProfile(@RequestParam("mineId") String mineId,
+            @RequestParam("username") String username)
             throws UserException {
-        Profile profile = userService.getUserByUsername(username);
+        User profile = userService.getUserByUsername(mineId, username);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
+    }
+
+    @GetMapping("/search")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<?>> searchByUsername(
+            @RequestParam("username") String username) {
+
+        // Fetch matching users from the userService
+        List<Map<String, Object>> users = userService.searchByUserName(username);
+
+        // If no users are found, return a 404 response
+        if (users == null || users.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ResponseWrapper<>(HttpStatus.NOT_FOUND.value(), "No users found", null));
+        }
+
+        // Return a list of users wrapped in the response
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profiles retrieved", users));
     }
 
     @PostMapping("/byId")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Profile>> getProfileByID(@RequestParam("userId") String userId)
+    public ResponseEntity<ResponseWrapper<User>> getProfileByID(@RequestParam("mineId") String mineId,
+            @RequestParam("userId") String userId)
             throws UserException {
-        Profile profile = userService.getUserByUserId(userId);
+        User profile = userService.getUserByUserId(mineId, userId);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 
@@ -95,9 +118,9 @@ public class UserController {
 
     @PostMapping("/email")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Profile>> getProfileByEmail(@RequestParam("email") String email)
+    public ResponseEntity<ResponseWrapper<User>> getProfileByEmail(@RequestParam("email") String email)
             throws UserException {
-        Profile profile = userService.getUserByEmail(email);
+        User profile = userService.getUserByEmail(email);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 

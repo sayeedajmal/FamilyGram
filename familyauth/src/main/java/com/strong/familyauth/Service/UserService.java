@@ -1,5 +1,6 @@
 package com.strong.familyauth.Service;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -20,7 +21,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.strong.familyauth.Model.Profile;
 import com.strong.familyauth.Model.Token;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Repository.TokenRepository;
@@ -157,7 +157,7 @@ public class UserService implements UserDetailsService {
         } catch (AuthenticationException e) {
             throw new UserException(e.getMessage());
         }
-
+        revokeAllTokens(user);
         String accessToken = jwtUtil.generateAccessToken(user);
         String refreshToken = jwtUtil.generateRefreshToken(user);
 
@@ -169,68 +169,72 @@ public class UserService implements UserDetailsService {
     }
 
     public boolean isUsernameAvailable(String username) {
-        Optional<User> existingUser = userRepo.findByusername(username);
+        Optional<User> existingUser = userRepo.findByUsername(username);
         return !existingUser.isPresent();
     }
 
-    public Profile getUserByUsername(String username) throws UserException {
-        User user = userRepo.findByusername(username)
-                .orElseThrow(() -> new UserException("User not found"));
-        Profile profile = new Profile();
-        profile.setId(user.getId());
-        profile.setEmail(user.getEmail());
-        profile.setUsername(user.getUsername());
-        profile.setName(user.getName());
-        profile.setPhone(user.getPhone());
-        profile.setPhotoId(user.getPhotoId());
-        profile.setBio(user.getBio());
-        profile.setWebsite(user.getWebsite());
-        profile.setPrivate(user.isPrivate());
-        profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
-        return profile;
+    public List<Map<String, Object>> searchByUserName(String username) {
+        List<User> users = userRepo.findByUsernameContaining("sayeed");
+        List<Map<String, Object>> result = new ArrayList<>();
+
+        for (User user : users) {
+            Map<String, Object> userMap = new HashMap<>();
+            userMap.put("id", user.getId());
+            userMap.put("username", user.getUsername());
+            userMap.put("name", user.getName());
+            userMap.put("thumbnailId", user.getThumbnailId());
+            result.add(userMap);
+        }
+
+        return result;
     }
 
-    public Profile getUserByUserId(String userId) throws UserException {
+    // BY USERNAME
+    public User getUserByUsername(String mineId, String username) throws UserException {
+        User user = userRepo.findByUsername(username)
+                .orElseThrow(() -> new UserException("User not found"));
+        boolean canAccessProfile = canAccessProfile(mineId, user.getId());
+        if (canAccessProfile) {
+            user.setFollowers(user.getFollowers());
+            user.setFollowing(user.getFollowing());
+        }
+        user.setFollowers(new HashSet<>());
+        user.setFollowing(new HashSet<>());
+        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        user.setPassword(null);
+        return user;
+    }
+
+    // BY USERID
+    public User getUserByUserId(String mineId, String userId) throws UserException {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new UserException("User not found"));
-        Profile profile = new Profile();
-        profile.setId(user.getId());
-        profile.setEmail(user.getEmail());
-        profile.setUsername(user.getUsername());
-        profile.setName(user.getName());
-        profile.setPhone(user.getPhone());
-        profile.setPhotoId(user.getPhotoId());
-        profile.setBio(user.getBio());
-        profile.setWebsite(user.getWebsite());
-        profile.setPrivate(user.isPrivate());
-        profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
-        return profile;
+        boolean canAccessProfile = canAccessProfile(mineId, userId);
+        if (canAccessProfile) {
+            user.setFollowers(user.getFollowers());
+            user.setFollowing(user.getFollowing());
+        }
+        user.setFollowers(new HashSet<>());
+        user.setFollowing(new HashSet<>());
+        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        user.setPassword(null);
+        return user;
     }
 
-    public Profile getUserByEmail(String email) throws UserException {
-
-        String loggedInEmail = getAuthenticatedUserEmail();
-
-        if (!email.equals(loggedInEmail)) {
+    // BY EMAIL
+    public User getUserByEmail(String email) throws UserException {
+        String authenticatedUserEmail = getAuthenticatedUserEmail();
+        if (!email.equals(authenticatedUserEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
-        Profile profile = new Profile();
-        profile.setId(user.getId());
-        profile.setEmail(user.getEmail());
-        profile.setUsername(user.getUsername());
-        profile.setName(user.getName());
-        profile.setPhone(user.getPhone());
-        profile.setPhotoId(user.getPhotoId());
-        profile.setBio(user.getBio());
-        profile.setWebsite(user.getWebsite());
-        profile.setPrivate(user.isPrivate());
-        profile.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        profile.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
-        return profile;
+        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        user.setPassword(null);
+        return user;
     }
 
     private String getAuthenticatedUserEmail() {
@@ -243,6 +247,7 @@ public class UserService implements UserDetailsService {
         return null;
     }
 
+    // UPATE EMAIL
     public String updateUserEmail(String id, String email) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
 
@@ -264,7 +269,7 @@ public class UserService implements UserDetailsService {
         return savedUser.getPhone();
     }
 
-    public Profile updateUser(MultipartFile file, User updatedUser) throws UserException {
+    public User updateUser(MultipartFile file, User updatedUser, MultipartFile thumbnail) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
 
         if (!updatedUser.getEmail().equals(loggedInEmail)) {
@@ -276,8 +281,10 @@ public class UserService implements UserDetailsService {
 
         // Handle profile picture update
         if (file != null && !file.isEmpty()) {
-            String uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId());
-            existingUser.setPhotoId(uploadImage);
+            Map<String, String> uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId(),
+                    thumbnail);
+            existingUser.setPhotoId(uploadImage.get("mediaId"));
+            existingUser.setThumbnailId(uploadImage.get("thumbnailId"));
         }
 
         // Update only non-null fields
@@ -295,20 +302,11 @@ public class UserService implements UserDetailsService {
             existingUser.setBio(updatedUser.getBio());
         }
 
-        User savedUser = userRepo.save(existingUser);
-        Profile profile = new Profile();
-        profile.setId(savedUser.getId());
-        profile.setEmail(savedUser.getEmail());
-        profile.setUsername(savedUser.getUsername());
-        profile.setName(savedUser.getName());
-        profile.setPhone(savedUser.getPhone());
-        profile.setPhotoId(savedUser.getPhotoId());
-        profile.setBio(savedUser.getBio());
-        profile.setWebsite(savedUser.getWebsite());
-        profile.setPrivate(savedUser.isPrivate());
-        profile.setFollowerCount(savedUser.getFollowers() != null ? savedUser.getFollowers().size() : 0);
-        profile.setFollowingCount(savedUser.getFollowing() != null ? savedUser.getFollowing().size() : 0);
-        return profile;
+        User user = userRepo.save(existingUser);
+        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
+        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        user.setPassword(null);
+        return user;
     }
 
     public void deleteUser(String id) throws UserException {
@@ -371,7 +369,6 @@ public class UserService implements UserDetailsService {
         tokenRepository.delete(token);
     }
 
-    @SuppressWarnings("unused")
     private void revokeAllTokens(User user) {
         List<Token> validTokens = tokenRepository.findByUser(user.getId());
         if (!validTokens.isEmpty()) {

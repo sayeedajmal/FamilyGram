@@ -1,9 +1,10 @@
 import { MaterialIcons } from "@expo/vector-icons";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
+  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -12,47 +13,58 @@ import {
   View,
   useColorScheme,
 } from "react-native";
-import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
 import { default as PostService } from "../api/postHandle";
-import ProfileEdit from "../components/ProfileEdit";
 import { Colors } from "../constants/Colors";
 
-export const ProfileSection = () => {
+export const UsersProfile = () => {
+  const [myProfile, setMyProfile] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
-  const [activeEdit, setActiveEdit] = useState(false);
-  const [activeTab, setActiveTab] = useState("Posts");
-  const [myPosts, setMyPosts] = useState([]);
+  const [userPosts, setUserPosts] = useState([]);
   const [fetch, setFetch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [activeEdit, setActiveEdit] = useState(false);
+  const [activeTab, setActiveTab] = useState("Posts");
+
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
-  const navigation = useNavigation();
 
-  const fetchUserProfile = async () => {
+  const navigation = useNavigation();
+  const route = useRoute();
+  const userId = route.params?.userId;
+  const username = route.params?.username;
+  const thumbnailId = route.params?.thumbnailId;
+  const name = route.params?.name;
+
+  const fetchMyProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
-      let imageUrl = require("../../assets/images/profile.png");
-      if (profile.photoId) {
-        try {
-          const response = await loginSignup.getProfileImage(profile.photoId);
-          imageUrl = response.data;
-        } catch (error) {
-          console.log("Error fetching profile image:", error);
-        }
-      }
-      setUserProfile({
-        ...profile,
-        imageUrl: typeof imageUrl === "string" ? { uri: imageUrl } : imageUrl,
-      });
+      setMyProfile(profile);
     }
-    setRefreshing(false);
   };
 
-  const fetchMyPosts = async () => {
+  const fetchUserProfile = async () => {
+    if (!userId) return;
+
+    try {
+      const response = await loginSignup.getSecondProfile(
+        userId,
+        myProfile?.id
+      );
+      if (response.status) {
+        setUserProfile(response.data);
+      } else {
+        Alert.alert("Error", response.message);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Failed to fetch user profile");
+    }
+  };
+
+  const FetchPosts = async () => {
     if (!userProfile?.id) return;
     setFetch(true);
     try {
@@ -78,65 +90,47 @@ export const ProfileSection = () => {
               return { ...post, thumbnailUrl };
             })
           );
-          setMyPosts(updatedPosts);
-          setFetch(false);
+          setUserPosts(updatedPosts);
         } else {
-          setMyPosts([]);
-          setFetch(false);
+          setUserPosts([]);
         }
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
+    } finally {
+      setFetch(false);
     }
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
+    await fetchMyProfile();
     await fetchUserProfile();
-    await fetchMyPosts();
+    await FetchPosts();
     setRefreshing(false);
   };
 
   useEffect(() => {
-    fetchUserProfile();
+    fetchMyProfile();
   }, []);
 
   useEffect(() => {
-    if (userProfile) fetchMyPosts();
-  }, [userProfile]);
+    if (myProfile && userId) {
+      fetchUserProfile();
+    }
+  }, [myProfile, userId]);
 
-  if (!userProfile) {
-    return (
-      <View
-        className="flex-1 items-center justify-center"
-        style={{ backgroundColor: bg }}
-      >
-        <ContentLoader
-          speed={2}
-          width={300}
-          height={300}
-          viewBox="0 0 300 300"
-          backgroundColor={themeColors.skeletonFg}
-          foregroundColor={themeColors.skeletonFg}
-        >
-          <Circle cx="150" cy="50" r="40" />
-          <Rect x="75" y="100" rx="5" ry="5" width="150" height="15" />
-          <Rect x="40" y="130" rx="5" ry="5" width="50" height="15" />
-          <Rect x="125" y="130" rx="5" ry="5" width="50" height="15" />
-          <Rect x="210" y="130" rx="5" ry="5" width="50" height="15" />
-          <Rect x="40" y="160" rx="5" ry="5" width="220" height="10" />
-          <Rect x="40" y="175" rx="5" ry="5" width="180" height="10" />
-          <Rect x="40" y="200" rx="10" ry="10" width="220" height="40" />
-        </ContentLoader>
-      </View>
-    );
-  }
+  useEffect(() => {
+    if (userProfile) {
+      FetchPosts();
+    }
+  }, [userProfile]);
 
   const openPost = (post, index) => {
     navigation.navigate("Posts", {
       selectedPost: post,
       selectedIndex: index,
-      myProf: userProfile,
+      myProf: myProfile,
       userProf: userProfile,
     });
   };
@@ -147,12 +141,26 @@ export const ProfileSection = () => {
       <View className="w-full flex-row justify-center self-center text-center">
         <View className="w-full flex-col items-center">
           <View className="w-full flex-row justify-between items-center px-4">
+            <TouchableOpacity onPress={() => navigation.goBack()}>
+              <MaterialIcons
+                name="arrow-back-ios-new"
+                size={28}
+                style={{ color: iconColor }}
+              />
+            </TouchableOpacity>
             <Text
-              className="text-lg font-custom-bold w-[80%] overflow-hidden"
+              className="text-xl font-custom-bold w-[80%] overflow-hidden"
               style={{ color: textColor }}
             >
-              {userProfile.username}
+              {username}
             </Text>
+            <TouchableOpacity>
+              <MaterialIcons
+                name="notifications-none"
+                size={28}
+                style={{ color: iconColor }}
+              />
+            </TouchableOpacity>
             <TouchableOpacity>
               <MaterialIcons
                 name="menu-open"
@@ -163,7 +171,7 @@ export const ProfileSection = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={userProfile.imageUrl}
+              source={thumbnailId}
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
@@ -178,7 +186,9 @@ export const ProfileSection = () => {
                 className="text-center font-custom"
                 style={{ color: textColor }}
               >
-                <Text className="font-custom">{userProfile.followerCount}</Text>
+                <Text className="font-custom">
+                  {userProfile?.followerCount || "0"}
+                </Text>
                 {"\n"} followers
               </Text>
               <Text
@@ -186,7 +196,7 @@ export const ProfileSection = () => {
                 style={{ color: textColor }}
               >
                 <Text className="font-custom">
-                  {userProfile.followingCount}
+                  {userProfile?.followingCount || "0"}
                 </Text>
                 {"\n"} following
               </Text>
@@ -197,22 +207,22 @@ export const ProfileSection = () => {
               className="text-lg font-custom-bold"
               style={{ color: textColor }}
             >
-              {userProfile.name || "Name"}
+              {name}
             </Text>
             <Text
               className="text-start w-[90%] font-custom-italic"
               style={{ color: textColor }}
             >
-              {userProfile.bio || "Bio"}
+              {userProfile?.bio || "Bio"}
             </Text>
             <TouchableOpacity
-              onPress={() => Linking.openURL(userProfile.website || "#")}
+              onPress={() => Linking.openURL(userProfile?.website || "#")}
             >
               <Text
                 className="font-custom underline"
-                style={{ color: textColor }}
+                style={{ color: iconColor }}
               >
-                {userProfile.website || "No website"}
+                {userProfile?.website || "No website"}
               </Text>
             </TouchableOpacity>
           </View>
@@ -221,20 +231,38 @@ export const ProfileSection = () => {
               className="flex-1 bg-blue-500 py-1 rounded-md mx-[1%]"
               onPress={() => setActiveEdit(true)}
             >
-              <Text className="text-center font-custom text-white">
-                Edit Profile
+              <Text className="text-center font-custom text-white">Follow</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              className="flex-1 border py-1 rounded-md mx-[1%]"
+              style={{ borderColor: themeColors.text }}
+              onPress={() => setActiveEdit(true)}
+            >
+              <Text
+                className="text-center font-custom"
+                style={{ color: themeColors.text }}
+              >
+                Message
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity className="flex-1 bg-gray-200 py-1 rounded-md mx-[1%]">
-              <Text className="text-center font-custom">Share Profile</Text>
+            <TouchableOpacity
+              className="flex-1 border py-1 rounded-md mx-[1%]"
+              style={{ borderColor: themeColors.text }}
+            >
+              <Text
+                className="text-center font-custom"
+                style={{ color: themeColors.text }}
+              >
+                Share Profile
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
       </View>
 
       {/* Tabs Navigation */}
-      <View className="p-4 w-[full] flex-row justify-between gap-8 px-4 text-center">
-        {["Posts", "Reels", "Saved", "Tagged"].map((tab) => (
+      <View className="p-4 w-[full] flex-row justify-center gap-8 px-4 text-center">
+        {["Posts", "Reels", "Tagged"].map((tab) => (
           <TouchableOpacity
             key={tab}
             className="items-center"
@@ -246,19 +274,11 @@ export const ProfileSection = () => {
                   ? "grid-4x4"
                   : tab === "Reels"
                   ? "slow-motion-video"
-                  : tab === "Saved"
-                  ? "bookmark"
                   : "account-box"
               }
               size={24}
               color={activeTab === tab ? "#0278ae" : "gray"}
             />
-            <Text
-              style={{ color: activeTab === tab ? textColor : "gray" }}
-              className="font-custom"
-            >
-              {tab}
-            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -288,7 +308,7 @@ export const ProfileSection = () => {
 
             {fetch ? (
               <FlatList
-                data={Array(9).fill(0)} // Fake data for loader
+                data={Array(9).fill(0)}
                 keyExtractor={(_, index) => index.toString()}
                 numColumns={3}
                 renderItem={() => (
@@ -312,9 +332,9 @@ export const ProfileSection = () => {
                   </View>
                 )}
               />
-            ) : myPosts.length > 0 ? (
+            ) : userPosts.length > 0 ? (
               <FlatList
-                data={activeTab === "Posts" ? myPosts : []}
+                data={activeTab === "Posts" ? userPosts : []}
                 keyExtractor={(item) => item.id.toString()}
                 numColumns={3}
                 renderItem={renderPostItem}
@@ -345,15 +365,6 @@ export const ProfileSection = () => {
             </View>
           </View>
         );
-      case "Saved":
-        return (
-          <View style={{ flex: 1, backgroundColor: bg }}>
-            {renderHeader()}
-            <View className="flex-1 items-center justify-center">
-              <Text>No saved posts</Text>
-            </View>
-          </View>
-        );
       case "Tagged":
         return (
           <View style={{ flex: 1, backgroundColor: bg }}>
@@ -370,30 +381,34 @@ export const ProfileSection = () => {
 
   return (
     <>
-      {getTabContent()}
-      {/* Re-added Modal */}
-      <Modal
-        className="w-screen ml-0 mb-0"
-        visible={activeEdit}
-        animationType="slide"
-        avoidKeyboard
-        swipeDirection="down"
-        transparent
-        statusBarTranslucent
-        onRequestClose={() => setActiveEdit(false)}
-        onSwipeComplete={() => setActiveEdit(false)}
-      >
-        <View className="flex-1 justify-end bg-#0278ae/40">
-          <View className="h-[90%] rounded-t-2xl shadow-lg">
-            <ProfileEdit
-              onEdit={() => setActiveEdit(false)}
-              onUpdate={fetchUserProfile}
-            />
-          </View>
+      {!myProfile || !userProfile ? (
+        <View
+          className="flex-1 items-center justify-center"
+          style={{ backgroundColor: bg }}
+        >
+          <ContentLoader
+            speed={2}
+            width={300}
+            height={300}
+            viewBox="0 0 300 300"
+            backgroundColor={themeColors.skeletonFg}
+            foregroundColor={themeColors.skeletonFg}
+          >
+            <Circle cx="150" cy="50" r="40" />
+            <Rect x="75" y="100" rx="5" ry="5" width="150" height="15" />
+            <Rect x="40" y="130" rx="5" ry="5" width="50" height="15" />
+            <Rect x="125" y="130" rx="5" ry="5" width="50" height="15" />
+            <Rect x="210" y="130" rx="5" ry="5" width="50" height="15" />
+            <Rect x="40" y="160" rx="5" ry="5" width="220" height="10" />
+            <Rect x="40" y="175" rx="5" ry="5" width="180" height="10" />
+            <Rect x="40" y="200" rx="10" ry="10" width="220" height="40" />
+          </ContentLoader>
         </View>
-      </Modal>
+      ) : (
+        getTabContent()
+      )}
     </>
   );
 };
 
-export default ProfileSection;
+export default UsersProfile;

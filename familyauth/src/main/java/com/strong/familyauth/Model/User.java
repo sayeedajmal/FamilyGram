@@ -30,6 +30,7 @@ public class User implements UserDetails {
     private String phone;
 
     private String photoId;
+    private String thumbnailId;
     private boolean accountNonExpired;
     private boolean accountNonLocked;
     private boolean enabled;

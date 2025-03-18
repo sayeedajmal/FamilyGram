@@ -1,9 +1,10 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-// Auth & Post Service URLs
-const AUTH_API_URL = "https://familygram.onrender.com"; // Auth Service
+const AUTH_API_URL = "http://192.168.31.218:8082";
+//const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {
@@ -86,7 +87,7 @@ class ApiService {
         return this.refreshingPromise;
     }
 
-    // 🚀 Universal Request Function (Now Accepts Full URL)
+
     async request(url, options = {}) {
         let accessToken = await this.getAccessToken();
 
@@ -112,7 +113,13 @@ class ApiService {
     }
 
 
-    // Auth Requests (Uses AUTH_API_URL)
+    async searchByUsername(username) {
+        return await this.request(`${AUTH_API_URL}/user/search?username=${encodeURIComponent(username)}`, {
+            method: 'GET',
+        });
+    }
+
+
     async loginUser(userData) {
         console.log("TEST");
 
@@ -181,10 +188,10 @@ class ApiService {
         if (response.status) {
             const userProfile = response.data.data;
 
-            // Store the user profile in storage as a JSON string
+
             await Storage.setItem("userProfile", JSON.stringify(userProfile));
 
-            // Retrieve and parse the stored profile to confirm
+
             return { status: true, message: "User profile fetched and stored", data: userProfile };
         } else {
             return { status: false, message: response.message || "Failed to fetch user profile", data: null };
@@ -192,8 +199,8 @@ class ApiService {
 
     }
 
-    async getSecondProfile(userId) {
-        const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}`, {
+    async getSecondProfile(userId, mineId) {
+        const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}&mineId=${mineId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
@@ -201,7 +208,7 @@ class ApiService {
         if (response.status) {
             const userProfile = response.data.data;
 
-            // Retrieve and parse the stored profile to confirm
+
             return { status: true, message: "Second Profile Fetched", data: userProfile };
         } else {
             return { status: false, message: response.message || "Failed to fetch user profile", data: null };
@@ -209,15 +216,26 @@ class ApiService {
 
     }
 
-    async updateUserProfile(userData, file) {
+    async updateUserProfile(userData, file, thumbnail) {
         const formData = new FormData();
         formData.append("user", JSON.stringify(userData));
-
         if (file) {
             formData.append("file", {
                 uri: file.uri,
                 name: file.name || "image.jpg",
                 type: file.type || "image/jpeg"
+            });
+
+            const resizedImage = await ImageManipulator.manipulateAsync(
+                file.uri,
+                [{ resize: { width: 300 } }],
+                { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+            );
+
+            formData.append("thumbnail", {
+                uri: resizedImage.uri,
+                name: resizedImage.name || "thumbnail.jpg",
+                type: resizedImage.type || "image/jpeg"
             });
         }
 
@@ -241,7 +259,7 @@ class ApiService {
         if (!username) return null;
 
         const response = await fetch(`${AUTH_API_URL}/auth/checkUsername?username=${username}`, {
-            method: "POST", // Ensure backend supports POST for this
+            method: "POST",
             headers: { "Content-Type": "application/json" },
         });
 
