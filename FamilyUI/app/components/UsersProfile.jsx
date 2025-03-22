@@ -67,38 +67,34 @@ export const UsersProfile = () => {
   const FetchPosts = async () => {
     if (!userProfile?.id) return;
     setFetch(true);
-    try {
-      const response = await PostService.GetPostByUserId(userProfile.id);
-      if (response?.status) {
-        const posts = response.data.data;
-        if (Array.isArray(posts) && posts.length > 0) {
-          const updatedPosts = await Promise.all(
-            posts.map(async (post) => {
-              let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
-              if (post.thumbnailIds && post.thumbnailIds.length > 0) {
-                try {
-                  const thumbnailResponse = await PostService.getPostMedia(
-                    post.thumbnailIds[0]
-                  );
-                  if (thumbnailResponse?.status) {
-                    thumbnailUrl = thumbnailResponse.data;
-                  }
-                } catch (error) {
-                  console.error("Error fetching thumbnail:", error);
+    const response = await PostService.GetPostByUserId(userProfile.id);
+    if (response?.status) {
+      const posts = response.data.data;
+      if (Array.isArray(posts) && posts.length > 0) {
+        const updatedPosts = await Promise.all(
+          posts.map(async (post) => {
+            let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
+            if (post.thumbnailIds && post.thumbnailIds.length > 0) {
+              try {
+                const thumbnailResponse = await PostService.getPostMedia(
+                  post.thumbnailIds[0]
+                );
+                if (thumbnailResponse?.status) {
+                  thumbnailUrl = thumbnailResponse.data;
                 }
+              } catch (error) {
+                console.error("Error fetching thumbnail:", error);
               }
-              return { ...post, thumbnailUrl };
-            })
-          );
-          setUserPosts(updatedPosts);
-        } else {
-          setUserPosts([]);
-        }
+            }
+            return { ...post, thumbnailUrl };
+          })
+        );
+        setUserPosts(updatedPosts);
+        setFetch(false);
+      } else {
+        setUserPosts([]);
+        setFetch(false);
       }
-    } catch (error) {
-      console.error("Error fetching posts:", error);
-    } finally {
-      setFetch(false);
     }
   };
 

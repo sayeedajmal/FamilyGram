@@ -2,8 +2,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import Platform from "react-native";
 import loginSignup from "./loginSignup";
-const POST_API_URL = "http://192.168.31.218:8083";
-//const POST_API_URL = "https://familypost.onrender.com";
+//const POST_API_URL = "http://192.168.31.218:8083";
+const POST_API_URL = "https://familypost.onrender.com";
 class PostService {
     async createPost(post, file) {
 
@@ -135,18 +135,14 @@ class PostService {
 
     async addComment(comment) {
         if (!comment || !comment.text?.trim()) return null;
-        try {
-            const response = await loginSignup.request(`${POST_API_URL}/comments`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(comment),
-            });
 
-            return response;
-        } catch (error) {
-            console.error("Error adding comment:", error);
-            return null;
-        }
+        const response = await loginSignup.request(`${POST_API_URL}/comments`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(comment),
+        });
+        
+        return response;
     }
 
     async showCommentByPostId(postId) {

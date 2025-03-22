@@ -15,9 +15,7 @@ const CommentModel = ({ item }) => {
   const textColor = themeColors.text;
 
   return (
-    <View
-      className="flex-row items-start mb-4"
-    >
+    <View className="flex-row items-start mb-4">
       <Image
         source={{ uri: item.thumbnailId }}
         className="w-10 h-10 rounded-full mr-3"

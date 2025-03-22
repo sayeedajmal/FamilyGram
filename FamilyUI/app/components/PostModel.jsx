@@ -220,16 +220,27 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   }, [post]);
 
   const AddComment = async () => {
-    if (!myComment.postId || !myComment.userId || !myComment.text?.trim())
+    if (
+      !myComment.postId ||
+      !myComment.userId ||
+      !myComment.username ||
+      !myComment.thumbnailId ||
+      !myComment.text?.trim()
+    )
       return;
 
-    setIsCommenting(true); // Start loader
-    const thumbnailId = myComment.thumbnailId?.uri?.split("/").pop();
+    setIsCommenting(true);
 
-    const updatedComment = {
-      ...myComment,
-      thumbnailId,
-    };
+    let updatedComment = { ...myComment };
+
+    const parsedThumbnailId = myComment.thumbnailId?.uri
+      ? myComment.thumbnailId.uri.split("/").pop()
+      : myComment.thumbnailId.includes("/")
+      ? myComment.thumbnailId.split("/").pop()
+      : myComment.thumbnailId;
+
+    updatedComment.thumbnailId = parsedThumbnailId;
+
     try {
       const response = await postService.addComment(updatedComment);
 
@@ -243,7 +254,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
         fetchComments();
       } else {
         console.error("Failed to add comment:", response.message);
-        Alert.alert("Error", "Failed to add comment. Please try again.");
+        Alert.alert("Error", response.message);
       }
     } catch (error) {
       console.error("Unexpected error:", error);
@@ -292,8 +303,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
         Alert.alert("Error", "Failed to toggle like. Please try again.");
       }
     } catch (error) {
-      console.error("Unexpected error in toggleLike:", error);
-
+      Alert.alert("Error", "Failed Like " + error);
       setLikedPosts((prev) => ({
         ...prev,
         [postId]: isCurrentlyLiked,
@@ -535,7 +545,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                   <Ionicons name="happy-outline" size={24} color="#6B7280" />
                 </TouchableOpacity>
                 <TextInput
-                  className="font-custom-italic"
+                  className="font-custom"
                   placeholder="Add a comment..."
                   placeholderTextColor="#3B82F6"
                   value={myComment.text}
@@ -575,6 +585,8 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
         <Modal
           visible={activeComment}
           statusBarTranslucent
+          transparent
+          onDismiss={() => setActiveComment(false)}
           animationType="slide"
           onRequestClose={() => setActiveComment(false)}
           onSwipeComplete={() => setActiveComment(false)}
@@ -582,109 +594,134 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
           avoidKeyboard
           style={{ margin: 0 }}
         >
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+          <TouchableWithoutFeedback onPress={() => setActiveComment(false)}>
             <View
               style={{
                 flex: 1,
-                justifyContent: "flex-end", // Moves modal content to the bottom
+                backgroundColor: "rgba(0,0,0,0.5)", // Add overlay like cardOverlayEnabled
+                justifyContent: "flex-end", // Keeps modal at bottom
               }}
             >
-              <View
-                style={{
-                  height: "60%",
-                  backgroundColor: bg,
-                  borderTopLeftRadius: 20,
-                  borderTopRightRadius: 20,
-                  paddingBottom: 20,
-                }}
-              >
-                <Text
-                  className="font-custom pl-4 text-2xl m-4"
-                  style={{ color: textColor }}
-                >
-                  Comments
-                </Text>
-                {/* Scrollable Comments Section */}
-                <FlatList
-                  data={allComments}
-                  keyExtractor={(item) => item.id}
-                  renderItem={({ item }) => <CommentModel item={item} />}
-                  contentContainerStyle={{
-                    paddingHorizontal: 16,
-                    paddingVertical: 10,
-                  }}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                />
-
-                {/* Fixed Input Box at the Bottom */}
+              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                 <View
                   style={{
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
+                    height: "60%",
                     backgroundColor: bg,
-                    borderTopWidth: 1,
-                    borderTopColor: "#e5e7eb",
-                    paddingTop: 8,
-                    paddingBottom: 16,
-                    paddingHorizontal: 16,
+                    borderTopLeftRadius: 20,
+                    borderTopRightRadius: 20,
+                    overflow: "hidden", // Like in cardStyle
+                    paddingBottom: 20,
                   }}
                 >
+                  {/* Add a drag handle for gestureEnabled feel */}
                   <View
                     style={{
-                      flexDirection: "row",
+                      width: "100%",
                       alignItems: "center",
+                      paddingTop: 12,
+                      paddingBottom: 8,
                     }}
                   >
-                    <Image
-                      source={myProf.thumbnailId}
+                    <View
                       style={{
-                        width: 36,
-                        height: 36,
-                        borderRadius: 18,
-                        marginRight: 12,
+                        width: 40,
+                        height: 5,
+                        borderRadius: 2.5,
+                        backgroundColor: "#DDDDDD",
                       }}
                     />
-                    <TextInput
-                      placeholder="Add a comment..."
-                      placeholderTextColor="#aaa"
-                      value={myComment.text}
-                      onChangeText={(text) =>
-                        setMyComment((prev) => ({ ...prev, text }))
-                      }
+                  </View>
+
+                  <Text
+                    className="font-custom pl-4 text-2xl m-4"
+                    style={{ color: textColor }}
+                  >
+                    Comments
+                  </Text>
+
+                  {/* Scrollable Comments Section */}
+                  <FlatList
+                    data={allComments}
+                    keyExtractor={(item) => item.id}
+                    renderItem={({ item }) => <CommentModel item={item} />}
+                    contentContainerStyle={{
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      paddingBottom: 60, // Make room for input box
+                    }}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                  />
+
+                  {/* Fixed Input Box at the Bottom */}
+                  <View
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      backgroundColor: bg,
+                      borderTopWidth: 1,
+                      borderTopColor: "#e5e7eb",
+                      paddingTop: 8,
+                      paddingBottom: 16,
+                      paddingHorizontal: 16,
+                    }}
+                  >
+                    <View
                       style={{
-                        flex: 1,
-                        padding: 12,
-                        borderRadius: 9999,
-                        fontSize: 14,
-                        color: textColor,
-                        backgroundColor: themeColors.tint,
+                        flexDirection: "row",
+                        alignItems: "center",
                       }}
-                    />
-                    <TouchableOpacity
-                      style={{
-                        marginLeft: 10,
-                        opacity: isCommenting ? 0.6 : 1,
-                      }}
-                      onPress={() => AddComment()}
-                      disabled={isCommenting}
                     >
-                      {isCommenting ? (
-                        <ActivityIndicator size="small" color="#3B82F6" />
-                      ) : (
-                        <Text
-                          className="font-custom-bold"
-                          style={{ color: "#3B82F6", fontSize: 14 }}
-                        >
-                          POST
-                        </Text>
-                      )}
-                    </TouchableOpacity>
+                      <Image
+                        source={myProf.thumbnailId}
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 18,
+                          marginRight: 12,
+                        }}
+                      />
+                      <TextInput
+                        placeholder="Add a comment..."
+                        placeholderTextColor="#aaa"
+                        value={myComment.text}
+                        onChangeText={(text) =>
+                          setMyComment((prev) => ({ ...prev, text }))
+                        }
+                        style={{
+                          flex: 1,
+                          padding: 12,
+                          borderRadius: 9999,
+                          fontSize: 14,
+                          color: textColor,
+                          backgroundColor: themeColors.tint,
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={{
+                          marginLeft: 10,
+                          opacity: isCommenting ? 0.6 : 1,
+                        }}
+                        onPress={() => AddComment()}
+                        disabled={isCommenting}
+                      >
+                        {isCommenting ? (
+                          <ActivityIndicator size="small" color="#3B82F6" />
+                        ) : (
+                          <Text
+                            className="font-custom-bold"
+                            style={{ color: "#3B82F6", fontSize: 14 }}
+                          >
+                            POST
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
-              </View>
+              </TouchableWithoutFeedback>
             </View>
           </TouchableWithoutFeedback>
         </Modal>

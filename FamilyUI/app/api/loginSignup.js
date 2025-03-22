@@ -3,8 +3,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const AUTH_API_URL = "http://192.168.31.218:8082";
-//const AUTH_API_URL = "https://familygram.onrender.com";
+//const AUTH_API_URL = "http://192.168.31.218:8082";
+const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {
@@ -101,6 +101,8 @@ class ApiService {
             accessToken = await this.refreshAccessToken();
 
             if (!accessToken) {
+                console.warn("Refresh token invalid. Logging out...");
+                await this.handleLogout(); // Call logout function
                 return { status: false, message: "Session expired. Please log in again.", data: null };
             }
 
@@ -112,10 +114,28 @@ class ApiService {
         return { status: response.ok, message: responseData.message || "Success", data: responseData };
     }
 
+    async handleLogout() {
+        await this.clearTokens();
+        Alert.alert("Session Expired", "Please log in again.");
+
+        // Reset navigation stack and go to LoginScreen
+        this.navigation.dispatch(
+            CommonActions.reset({
+                index: 0,
+                routes: [{ name: "Login" }],
+            })
+        );
+    }
 
     async searchByUsername(username) {
         return await this.request(`${AUTH_API_URL}/user/search?username=${encodeURIComponent(username)}`, {
             method: 'GET',
+        });
+    }
+
+    async logout() {
+        return await this.request(`${AUTH_API_URL}/user/logout`, {
+            method: 'POST',
         });
     }
 

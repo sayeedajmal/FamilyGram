@@ -7,6 +7,7 @@ import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import { Animated, Appearance, Easing, Image, Platform, StatusBar, View } from "react-native";
+import Settings from "../app/containers/Settings";
 import "../global.css";
 import loginSignup from "./api/loginSignup";
 import LoginScreen from "./components/LoginScreen";
@@ -150,14 +151,12 @@ export default function App() {
     <View style={{ flex: 1 }}>
       <StatusBar
         barStyle={
-          theme === "dark"
-            ? Platform.OS === "ios"
-              ? "light-content"
-              : "dark-content"
-            : "dark-content"
+          themeColors === 'dark'
+            ? Platform.OS === 'ios'
+              ? 'light-content'
+              : 'light-content'
+            : 'dark-content'
         }
-        animated={true}
-        showHideTransition="fade"
         backgroundColor={themeColors.background}
       />
       {isAuthenticated ? (
@@ -228,9 +227,27 @@ export default function App() {
           </Stack.Screen>
           <Stack.Screen name="Posts" options={{
             presentation: 'transparentModal',
-            animation: 'slide_from_right',
-            gestureEnabled: true
+            animation: 'slide_from_right'
           }} component={Posts} />
+          <Stack.Screen
+            name="Settings"
+            options={{
+              presentation: "card",
+              gestureEnabled: true,
+              gestureDirection: "horizontal",
+              cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+              headerShown: false,
+              cardOverlayEnabled: true,
+              detachPreviousScreen: false,
+              cardStyle: {
+                overflow: "hidden",
+              },
+              overlayEnabled: true,
+            }}
+          >
+            {(props) => <Settings {...props} setIsAuthenticated={setIsAuthenticated} />}
+          </Stack.Screen>
+
           <Stack.Screen name="UsersProfile" options={{
             presentation: 'transparentModal',
             animation: 'slide_from_right',
@@ -247,7 +264,6 @@ export default function App() {
               open: { animation: 'timing', config: { duration: 300 } },
               close: { animation: 'timing', config: { duration: 300 } },
             },
-            cardStyleInterpolator: CardStyleInterpolators.forFadeFromBottomAndroid,
           }}
         >
           <Stack.Screen name="Login">

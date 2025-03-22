@@ -34,7 +34,6 @@ const Search = () => {
         searchQuery.toLowerCase()
       );
       if (response.status) {
-        console.log("HELLO: ", response.data.data);
         const updatedMedia = await Promise.all(
           response.data.data.map(async (item) => {
             let thumbnailUrl = item.thumbnailId; 
@@ -97,7 +96,7 @@ const Search = () => {
     <View className="h-screen w-screen" style={{ backgroundColor: bg }}>
       {/* Search Bar */}
       <View className="p-4">
-        <View>
+    <View>
           <TextInput
             placeholder="Search"
             placeholderTextColor="#aaa"
@@ -128,7 +127,7 @@ const Search = () => {
           </Text>
           <TouchableOpacity>
             <Text
-              className="text-sm font-custom transition-colors"
+              className="text-sm font-custom"
               style={{ color: themeColors.icon }}
             >
               Clear all
