@@ -101,8 +101,6 @@ class ApiService {
             accessToken = await this.refreshAccessToken();
 
             if (!accessToken) {
-                console.warn("Refresh token invalid. Logging out...");
-                await this.handleLogout(); // Call logout function
                 return { status: false, message: "Session expired. Please log in again.", data: null };
             }
 
@@ -114,18 +112,6 @@ class ApiService {
         return { status: response.ok, message: responseData.message || "Success", data: responseData };
     }
 
-    async handleLogout() {
-        await this.clearTokens();
-        Alert.alert("Session Expired", "Please log in again.");
-
-        // Reset navigation stack and go to LoginScreen
-        this.navigation.dispatch(
-            CommonActions.reset({
-                index: 0,
-                routes: [{ name: "Login" }],
-            })
-        );
-    }
 
     async searchByUsername(username) {
         return await this.request(`${AUTH_API_URL}/user/search?username=${encodeURIComponent(username)}`, {

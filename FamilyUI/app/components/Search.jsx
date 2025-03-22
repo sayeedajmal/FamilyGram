@@ -10,14 +10,15 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import loginSignup from "../api/loginSignup";
 import { Colors } from "../constants/Colors";
 
 const Search = () => {
   const navigation = useNavigation();
-
   const [searchQuery, setSearchQuery] = useState("");
   const [mediaData, setMediaData] = useState([]);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.dark;
   const bg = themeColors.background;
@@ -26,17 +27,21 @@ const Search = () => {
   useEffect(() => {
     if (!searchQuery) {
       setMediaData([]);
+      setIsLoading(false);
       return;
     }
+
+    setIsLoading(true); // Start loading
 
     const delay = setTimeout(async () => {
       const response = await loginSignup.searchByUsername(
         searchQuery.toLowerCase()
       );
+
       if (response.status) {
         const updatedMedia = await Promise.all(
           response.data.data.map(async (item) => {
-            let thumbnailUrl = item.thumbnailId; 
+            let thumbnailUrl = item.thumbnailId;
             if (item.thumbnailId) {
               try {
                 const imageResponse = await loginSignup.getProfileImage(
@@ -49,16 +54,18 @@ const Search = () => {
                 console.error("Error fetching profile image:", error);
               }
             }
-            return { ...item, thumbnailId: thumbnailUrl }; 
+            return { ...item, thumbnailId: thumbnailUrl };
           })
         );
         setMediaData(updatedMedia);
       } else {
         setMediaData([]);
       }
+
+      setIsLoading(false); // Stop loading
     }, 500);
 
-    return () => clearTimeout(delay); // Cleanup timeout
+    return () => clearTimeout(delay);
   }, [searchQuery]);
 
   const renderProfile = ({ item }) => (
@@ -96,12 +103,12 @@ const Search = () => {
     <View className="h-screen w-screen" style={{ backgroundColor: bg }}>
       {/* Search Bar */}
       <View className="p-4">
-    <View>
+        <View>
           <TextInput
             placeholder="Search"
             placeholderTextColor="#aaa"
             style={{ backgroundColor: themeColors.tint, color: textColor }}
-            className="pl-8 rounded-2xl font-custom text-center"
+            className="pl-8 rounded-2xl font-custom"
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -118,9 +125,8 @@ const Search = () => {
         </View>
       </View>
 
-      {/* Render the profile list */}
+      {/* Recent section */}
       <View className="px-4">
-        {/* Recent section (optional, you can add functionality here) */}
         <View className="flex-row justify-between items-center mb-4">
           <Text className="text-sm font-custom" style={{ color: textColor }}>
             Recent
@@ -135,12 +141,33 @@ const Search = () => {
           </TouchableOpacity>
         </View>
 
-        {/* FlatList to render user profiles */}
-        <FlatList
-          data={mediaData}
-          renderItem={renderProfile}
-          keyExtractor={(item) => item.id}
-        />
+        {/* Show Skeleton Loader when loading */}
+        {isLoading ? (
+          <View>
+            {[1, 2, 3, 4, 5].map((index) => (
+              <ContentLoader
+                key={index}
+                speed={2}
+                width={400}
+                height={60}
+                viewBox="0 0 400 60"
+                backgroundColor={themeColors.skeletonBg}
+                foregroundColor={themeColors.skeletonFg}
+              >
+                <Circle cx="30" cy="30" r="20" />
+                <Rect x="60" y="20" rx="5" ry="5" width="200" height="10" />
+                <Rect x="60" y="40" rx="5" ry="5" width="150" height="10" />
+              </ContentLoader>
+            ))}
+          </View>
+        ) : (
+          // Show real search results
+          <FlatList
+            data={mediaData}
+            renderItem={renderProfile}
+            keyExtractor={(item) => item.id}
+          />
+        )}
       </View>
     </View>
   );

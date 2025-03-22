@@ -19,6 +19,8 @@ import HomePage from "./containers/HomePage";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
+import Follow from "./containers/Follow"
+
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -229,6 +231,21 @@ export default function App() {
             presentation: 'transparentModal',
             animation: 'slide_from_right'
           }} component={Posts} />
+
+          <Stack.Screen name="Follow" options={{
+            presentation: "card",
+            gestureEnabled: true,
+            gestureDirection: "horizontal",
+            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+            headerShown: false,
+            cardOverlayEnabled: true,
+            detachPreviousScreen: false,
+            cardStyle: {
+              overflow: "hidden",
+            },
+            overlayEnabled: true,
+          }} component={Follow} />
+
           <Stack.Screen
             name="Settings"
             options={{

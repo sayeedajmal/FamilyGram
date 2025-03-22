@@ -107,6 +107,7 @@ class PostService {
         const response = await loginSignup.request(`${POST_API_URL}/posts?userId=${userId}`, {
             method: "GET",
         });
+        console.log("BUDDY: ", response);
 
         return response;
     }
@@ -141,7 +142,7 @@ class PostService {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(comment),
         });
-        
+
         return response;
     }
 

@@ -2,7 +2,7 @@ import { MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
-import ContentLoader, { Circle, Rect } from "react-content-loader/native";
+import ContentLoader, { Rect } from "react-content-loader/native";
 import {
   Alert,
   FlatList,
@@ -375,36 +375,7 @@ export const UsersProfile = () => {
     }
   };
 
-  return (
-    <>
-      {!myProfile || !userProfile ? (
-        <View
-          className="flex-1 items-center justify-center"
-          style={{ backgroundColor: bg }}
-        >
-          <ContentLoader
-            speed={2}
-            width={300}
-            height={300}
-            viewBox="0 0 300 300"
-            backgroundColor={themeColors.skeletonFg}
-            foregroundColor={themeColors.skeletonFg}
-          >
-            <Circle cx="150" cy="50" r="40" />
-            <Rect x="75" y="100" rx="5" ry="5" width="150" height="15" />
-            <Rect x="40" y="130" rx="5" ry="5" width="50" height="15" />
-            <Rect x="125" y="130" rx="5" ry="5" width="50" height="15" />
-            <Rect x="210" y="130" rx="5" ry="5" width="50" height="15" />
-            <Rect x="40" y="160" rx="5" ry="5" width="220" height="10" />
-            <Rect x="40" y="175" rx="5" ry="5" width="180" height="10" />
-            <Rect x="40" y="200" rx="10" ry="10" width="220" height="40" />
-          </ContentLoader>
-        </View>
-      ) : (
-        getTabContent()
-      )}
-    </>
-  );
+  return getTabContent();
 };
 
 export default UsersProfile;

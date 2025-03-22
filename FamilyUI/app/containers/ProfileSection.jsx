@@ -59,6 +59,8 @@ export const ProfileSection = () => {
     if (!myProfile?.id) return;
     setFetch(true);
     const response = await PostService.GetPostByUserId(myProfile.id);
+    console.log("BUDY: "+response.status);
+    
     if (response?.status) {
       const posts = response.data.data;
       if (Array.isArray(posts) && posts.length > 0) {
@@ -135,6 +137,9 @@ export const ProfileSection = () => {
     navigation.navigate("Settings");
   };
 
+  const OpenFollw = () => {
+    navigation.navigate("Follow");
+  };
   const openPost = (post, index) => {
     navigation.navigate("Posts", {
       selectedPost: post,
@@ -180,6 +185,7 @@ export const ProfileSection = () => {
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
+                onPress={OpenFollw}
               >
                 <Text className="font-custom">{myProfile.followerCount}</Text>
                 {"\n"} followers
@@ -187,6 +193,7 @@ export const ProfileSection = () => {
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
+                onPress={OpenFollw}
               >
                 <Text className="font-custom">{myProfile.followingCount}</Text>
                 {"\n"} following
