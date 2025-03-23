@@ -40,20 +40,20 @@ const Posts = () => {
         if (Array.isArray(fetchedPosts) && fetchedPosts.length > 0) {
           const updatedPosts = await Promise.all(
             fetchedPosts.map(async (post) => {
-              let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
-              if (post.thumbnailIds && post.thumbnailIds.length > 0) {
+              let postThumbnailUrl = "";
+              if (post.postThumbnailUrl && post.postThumbnailUrl.length > 0) {
                 try {
                   const thumbnailResponse = await PostService.getPostMedia(
-                    post.thumbnailIds[0]
+                    post.postThumbnailUrl[0]
                   );
                   if (thumbnailResponse?.status) {
-                    thumbnailUrl = thumbnailResponse.data;
+                    postThumbnailUrl = thumbnailResponse.data;
                   }
                 } catch (error) {
                   console.error("Error fetching thumbnail:", error);
                 }
               }
-              return { ...post, thumbnailUrl };
+              return { ...post, postThumbnailUrl };
             })
           );
 
@@ -79,7 +79,7 @@ const Posts = () => {
   };
 
   useEffect(() => {
-    //fetchUserPosts();
+    //fetchUserPosts();    
   }, [selectedPost?.userId]);
 
   // Handle video play/pause based on visibility

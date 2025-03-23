@@ -2,8 +2,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
 import Platform from "react-native";
 import loginSignup from "./loginSignup";
-//const POST_API_URL = "http://192.168.31.218:8083";
-const POST_API_URL = "https://familypost.onrender.com";
+const POST_API_URL = "http://192.168.31.218:8083";
+//const POST_API_URL = "https://familypost.onrender.com";
 class PostService {
     async createPost(post, file) {
 
@@ -107,7 +107,6 @@ class PostService {
         const response = await loginSignup.request(`${POST_API_URL}/posts?userId=${userId}`, {
             method: "GET",
         });
-        console.log("BUDDY: ", response);
 
         return response;
     }

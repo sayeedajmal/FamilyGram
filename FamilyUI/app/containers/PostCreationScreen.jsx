@@ -48,7 +48,7 @@ const PostCreationScreen = () => {
   // Open Image/Video Picker (Multiple Selection)
   const pickMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
+      mediaTypes: ["images"],
       allowsMultipleSelection: true,
       quality: 1,
     });
@@ -69,15 +69,7 @@ const PostCreationScreen = () => {
     const fetchUserProfile = async () => {
       try {
         const profile = await loginSignup.getStoredUserProfile();
-
-        if (profile) {
-          if (profile.photoId) {
-            const response = await loginSignup.getProfileImage(profile.photoId);
-            setUserProfile({ ...profile, imageUrl: response.data });
-          } else {
-            setUserProfile(profile);
-          }
-        }
+        setUserProfile(profile);
       } catch (error) {
         Alert.alert("Error", "Failed to fetch profile image.");
       }
@@ -197,11 +189,7 @@ const PostCreationScreen = () => {
         {/* User Info */}
         <View className="flex-row items-center mb-6">
           <Image
-            source={
-              userProfile?.imageUrl
-                ? { uri: userProfile.imageUrl }
-                : require("../../assets/images/profile.png")
-            }
+            source={{ uri: userProfile?.thumbnailUrl }}
             className="w-10 h-10 rounded-full"
           />
           <Text

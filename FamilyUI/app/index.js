@@ -92,9 +92,9 @@ export default function App() {
           loginSignup.clearTokens();
           return;
         }
-
-        const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        setIsAuthenticated(profile.status === true);
+        setProfileImage(userProfile.thumbnailUrl);
+        //const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
+        setIsAuthenticated(true);
       } catch (error) {
         console.error("Authentication check failed:", error);
         loginSignup.clearTokens();
@@ -102,16 +102,16 @@ export default function App() {
       }
     };
 
-    const fetchUserProfile = async () => {
-      const profile = await loginSignup.getStoredUserProfile();
-      if (profile?.thumbnailId) {
-        const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
-        setProfileImage(imageUrl.data);
-      }
-    };
+    // const fetchUserProfile = async () => {
+    //   const profile = await loginSignup.getStoredUserProfile();
+    //   if (profile?.thumbnailId) {
+    //     const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
+    //     setProfileImage(imageUrl.data);
+    //   }
+    // };
 
     checkAuth();
-    fetchUserProfile();
+    //fetchUserProfile();
   }, []);
 
   if (!fontsLoaded || isAuthenticated === null) {
@@ -266,9 +266,17 @@ export default function App() {
           </Stack.Screen>
 
           <Stack.Screen name="UsersProfile" options={{
-            presentation: 'transparentModal',
-            animation: 'slide_from_right',
-            gestureEnabled: true
+            presentation: "card",
+            gestureEnabled: true,
+            gestureDirection: "horizontal",
+            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+            headerShown: false,
+            cardOverlayEnabled: true,
+            detachPreviousScreen: false,
+            cardStyle: {
+              overflow: "hidden",
+            },
+            overlayEnabled: true,
           }} component={UsersProfile} />
 
         </Stack.Navigator>

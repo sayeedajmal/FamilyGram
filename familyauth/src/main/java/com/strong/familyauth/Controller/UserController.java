@@ -149,6 +149,27 @@ public class UserController {
     }
 
     /**
+     * @param mineId   ID of the authenticated user (the one performing the
+     *                 follow/unfollow action)
+     * @param yourId   ID of the user to be followed or unfollowed
+     * @param imageUrl The image URL used for follow request emails (if applicable)
+     * @return A ResponseEntity containing a ResponseWrapper with the result message
+     *         and the updated user data (including following/followers lists)
+     * @throws UserException if either of the users cannot be found or any other
+     *                       user-related error occurs
+     */
+    @PostMapping("/toggleFollow")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<String>> toggleFollow(@RequestParam("mineId") String mineId,
+            @RequestParam("yourId") String yourId,
+            @RequestParam("imageUrl") String imageUrl)
+            throws UserException {
+
+        String toggleFollowerMessage = userService.toggleFollower(mineId, yourId, imageUrl);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), toggleFollowerMessage, ""));
+    }
+
+    /**
      * Get followings of a user.
      *
      * @param yourId ID of the user whose followings are being retrieved
@@ -169,7 +190,7 @@ public class UserController {
         String authHeader = request.getHeader(HttpHeaders.AUTHORIZATION);
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);
-            userService.revokeAccessToken(token);
+            userService.logout(token);
             return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Logged out successfully", null));
         }
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)

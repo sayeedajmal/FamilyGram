@@ -1,15 +1,14 @@
-import { useNavigation } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import { useState } from "react";
 import {
-  Alert,
   ActivityIndicator,
+  Alert,
   TouchableOpacity,
   View,
   useColorScheme,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
-import { Colors } from "../constants/Colors";
 import loginSignup from "../api/loginSignup";
+import { Colors } from "../constants/Colors";
 
 const Settings = ({ setIsAuthenticated }) => {
   const theme = useColorScheme();

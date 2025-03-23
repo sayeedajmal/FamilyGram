@@ -4,6 +4,7 @@ import * as Linking from "expo-linking";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Rect } from "react-content-loader/native";
 import {
+  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -23,8 +24,9 @@ export const UsersProfile = () => {
   const [userPosts, setUserPosts] = useState([]);
   const [fetch, setFetch] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeEdit, setActiveEdit] = useState(false);
   const [activeTab, setActiveTab] = useState("Posts");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
 
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
@@ -36,7 +38,7 @@ export const UsersProfile = () => {
   const route = useRoute();
   const userId = route.params?.userId;
   const username = route.params?.username;
-  const thumbnailId = route.params?.thumbnailId;
+  const thumbnailUrl = route.params?.thumbnailUrl;
   const name = route.params?.name;
 
   const fetchMyProfile = async () => {
@@ -63,30 +65,64 @@ export const UsersProfile = () => {
       Alert.alert("Error", "Failed to fetch user profile");
     }
   };
+  const OpenFollw = () => {
+    navigation.navigate("Follow", { userProfile: userProfile });
+  };
+  const toggleFollow = async () => {
+    if (!userProfile?.id) return;
+
+    setIsLoading(true);
+
+    try {
+      const response = await loginSignup.toggleFollow(
+        userProfile.id,
+        myProfile.id,
+        thumbnailUrl,
+        myProfile.email
+      );
+
+      if (response.status) {
+        setIsFollowing(!isFollowing);
+        await fetchUserProfile();
+      } else {
+        Alert.alert("Error", response.message);
+      }
+    } catch (error) {
+      Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const FetchPosts = async () => {
     if (!userProfile?.id) return;
     setFetch(true);
+
     const response = await PostService.GetPostByUserId(userProfile.id);
     if (response?.status) {
       const posts = response.data.data;
       if (Array.isArray(posts) && posts.length > 0) {
         const updatedPosts = await Promise.all(
           posts.map(async (post) => {
-            let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
+            let postThumbnailUrl = "https://placehold.co/150x150?text=No+Image";
             if (post.thumbnailIds && post.thumbnailIds.length > 0) {
               try {
                 const thumbnailResponse = await PostService.getPostMedia(
                   post.thumbnailIds[0]
                 );
                 if (thumbnailResponse?.status) {
-                  thumbnailUrl = thumbnailResponse.data;
+                  postThumbnailUrl = thumbnailResponse.data;
                 }
               } catch (error) {
                 console.error("Error fetching thumbnail:", error);
               }
             }
-            return { ...post, thumbnailUrl };
+
+            return {
+              ...post,
+              postThumbnailUrl,
+              userThumbnailUrl: thumbnailUrl,
+            };
           })
         );
         setUserPosts(updatedPosts);
@@ -114,7 +150,9 @@ export const UsersProfile = () => {
     if (myProfile && userId) {
       fetchUserProfile();
     }
-  }, [myProfile, userId]);
+
+    setIsFollowing(myProfile?.following?.includes(userProfile?.id) || false);
+  }, [myProfile, userId, userProfile?.id]);
 
   useEffect(() => {
     if (userProfile) {
@@ -167,7 +205,7 @@ export const UsersProfile = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={{ uri: thumbnailId }}
+              source={{ uri: thumbnailUrl }}
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
@@ -181,18 +219,20 @@ export const UsersProfile = () => {
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
+                onPress={OpenFollw}
               >
                 <Text className="font-custom">
-                  {userProfile?.followerCount || "0"}
+                  {userProfile?.followers.length || "0"}
                 </Text>
                 {"\n"} followers
               </Text>
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
+                onPress={OpenFollw}
               >
                 <Text className="font-custom">
-                  {userProfile?.followingCount || "0"}
+                  {userProfile?.following.length || "0"}
                 </Text>
                 {"\n"} following
               </Text>
@@ -206,7 +246,7 @@ export const UsersProfile = () => {
               {name}
             </Text>
             <Text
-              className="text-start w-[90%] font-custom-italic"
+              className="text-start w-[90%] font-custom"
               style={{ color: textColor }}
             >
               {userProfile?.bio || "Bio"}
@@ -224,15 +264,33 @@ export const UsersProfile = () => {
           </View>
           <View className="w-full flex-row justify-between items-center">
             <TouchableOpacity
-              className="flex-1 bg-blue-500 py-1 rounded-md mx-[1%]"
-              onPress={() => setActiveEdit(true)}
+              className={`flex-1 py-1 rounded-md mx-[1%] ${
+                isFollowing
+                  ? `bg-${themeColors.tint} border`
+                  : "bg-blue-500 border-transparent "
+              }`}
+              onPress={toggleFollow}
+              disabled={isLoading}
             >
-              <Text className="text-center font-custom text-white">Follow</Text>
+              <Text
+                className="text-center font-custom"
+                style={{ color: isFollowing ? iconColor : "white" }}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : isFollowing ? (
+                  "Following"
+                ) : myProfile?.isPrivate ? (
+                  "Request Follow"
+                ) : (
+                  "Follow"
+                )}
+              </Text>
             </TouchableOpacity>
+
             <TouchableOpacity
               className="flex-1 border py-1 rounded-md mx-[1%]"
               style={{ borderColor: themeColors.text }}
-              onPress={() => setActiveEdit(true)}
             >
               <Text
                 className="text-center font-custom"
@@ -287,7 +345,7 @@ export const UsersProfile = () => {
       onPress={() => openPost(item, index)}
     >
       <Image
-        source={{ uri: item.thumbnailUrl }}
+        source={{ uri: item.postThumbnailUrl }}
         style={{ width: "100%", height: "100%" }}
         className="border border-gray-400"
         resizeMode="cover"

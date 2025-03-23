@@ -53,8 +53,8 @@ const Search = () => {
               } catch (error) {
                 console.error("Error fetching profile image:", error);
               }
-            }
-            return { ...item, thumbnailId: thumbnailUrl };
+            }            
+            return { ...item, thumbnailUrl };
           })
         );
         setMediaData(updatedMedia);
@@ -63,12 +63,12 @@ const Search = () => {
       }
 
       setIsLoading(false); // Stop loading
-    }, 500);
+    }, 1000);
 
     return () => clearTimeout(delay);
   }, [searchQuery]);
 
-  const renderProfile = ({ item }) => (
+  const renderProfile = ({ item }) => (    
     <TouchableOpacity
       className="flex flex-row items-center px-2 rounded-2xl my-1"
       style={{ backgroundColor: bg }}
@@ -77,13 +77,13 @@ const Search = () => {
           userId: item.id,
           username: item.username,
           name: item.name,
-          thumbnailId: item.thumbnailId,
+          thumbnailUrl: item.thumbnailUrl,
         })
       }
     >
       {/* Profile Image */}
       <Image
-        source={{ uri: item.thumbnailId }}
+        source={{ uri: item.thumbnailUrl }}
         style={{ width: 40, height: 40, borderRadius: 20 }}
       />
 

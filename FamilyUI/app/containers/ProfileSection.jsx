@@ -35,53 +35,43 @@ export const ProfileSection = () => {
   const fetchUserProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
-      let imageUrl = require("../../assets/images/profile.png");
-      if (profile.thumbnailId) {
-        try {
-          const response = await loginSignup.getProfileImage(
-            profile.thumbnailId
-          );
-          imageUrl = response.data;
-        } catch (error) {
-          console.log("Error fetching profile image:", error);
-        }
-      }
-      setMyProfile({
-        ...profile,
-        thumbnailId:
-          typeof imageUrl === "string" ? { uri: imageUrl } : imageUrl,
-      });
+      setMyProfile(profile);
     }
     setRefreshing(false);
   };
 
+  //FETCH POSTS
   const fetchMyPosts = async () => {
     if (!myProfile?.id) return;
     setFetch(true);
     const response = await PostService.GetPostByUserId(myProfile.id);
-    console.log("BUDY: "+response.status);
-    
+
     if (response?.status) {
       const posts = response.data.data;
       if (Array.isArray(posts) && posts.length > 0) {
         const updatedPosts = await Promise.all(
           posts.map(async (post) => {
-            let thumbnailUrl = "https://placehold.co/150x150?text=No+Image";
+            let postThumbnailUrl = "https://placehold.co/150x150?text=No+Image";
             if (post.thumbnailIds && post.thumbnailIds.length > 0) {
               try {
                 const thumbnailResponse = await PostService.getPostMedia(
                   post.thumbnailIds[0]
                 );
                 if (thumbnailResponse?.status) {
-                  thumbnailUrl = thumbnailResponse.data;
+                  postThumbnailUrl = thumbnailResponse.data;
                 }
               } catch (error) {
                 console.error("Error fetching thumbnail:", error);
               }
             }
-            return { ...post, thumbnailUrl };
+            return {
+              ...post,
+              postThumbnailUrl,
+              userThumbnailUrl: myProfile.thumbnailUrl,
+            };
           })
         );
+
         setMyPosts(updatedPosts);
         setFetch(false);
       } else {
@@ -138,8 +128,9 @@ export const ProfileSection = () => {
   };
 
   const OpenFollw = () => {
-    navigation.navigate("Follow");
+    navigation.navigate("Follow", { userProfile: myProfile });
   };
+
   const openPost = (post, index) => {
     navigation.navigate("Posts", {
       selectedPost: post,
@@ -171,7 +162,7 @@ export const ProfileSection = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={myProfile.thumbnailId}
+              source={{ uri: myProfile.thumbnailUrl }}
               style={{ width: 96, height: 96, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
@@ -187,7 +178,9 @@ export const ProfileSection = () => {
                 style={{ color: textColor }}
                 onPress={OpenFollw}
               >
-                <Text className="font-custom">{myProfile.followerCount}</Text>
+                <Text className="font-custom">
+                  {myProfile.followers.length || "0"}
+                </Text>
                 {"\n"} followers
               </Text>
               <Text
@@ -195,7 +188,9 @@ export const ProfileSection = () => {
                 style={{ color: textColor }}
                 onPress={OpenFollw}
               >
-                <Text className="font-custom">{myProfile.followingCount}</Text>
+                <Text className="font-custom">
+                  {myProfile.following.length || "0"}
+                </Text>
                 {"\n"} following
               </Text>
             </View>
@@ -279,7 +274,7 @@ export const ProfileSection = () => {
       onPress={() => openPost(item, index)}
     >
       <Image
-        source={{ uri: item.thumbnailUrl }}
+        source={{ uri: item.postThumbnailUrl }}
         style={{ width: "100%", height: "100%" }}
         className="border border-gray-400"
         resizeMode="cover"

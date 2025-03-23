@@ -3,8 +3,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-//const AUTH_API_URL = "http://192.168.31.218:8082";
-const AUTH_API_URL = "https://familygram.onrender.com";
+const AUTH_API_URL = "http://192.168.31.218:8082";
+//const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {
@@ -184,6 +184,7 @@ class ApiService {
     }
 
     async fetchUserProfileByEmail(email) {
+
         const response = await this.request(`${AUTH_API_URL}/user/email?email=${encodeURIComponent(email)}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -192,16 +193,39 @@ class ApiService {
         if (response.status) {
             const userProfile = response.data.data;
 
+            let thumbnailUrl = require("../../assets/images/profile.png");
+            if (userProfile.thumbnailId) {
+                const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
+                if (imageResponse.status) {
+                    thumbnailUrl = imageResponse.data;
+                }
+            }
+
+
+            if (thumbnailUrl) {
+                userProfile.thumbnailUrl = thumbnailUrl;
+            }
+
 
             await Storage.setItem("userProfile", JSON.stringify(userProfile));
 
 
-            return { status: true, message: "User profile fetched and stored", data: userProfile };
+            return {
+                status: true,
+                message: "User profile fetched and stored",
+                data: userProfile,
+            };
         } else {
-            return { status: false, message: response.message || "Failed to fetch user profile", data: null };
+
+            return {
+                status: false,
+                message: response.message || "Failed to fetch user profile",
+                data: null,
+            };
         }
 
     }
+
 
     async getLiteUser(userId) {
         const response = await this.request(`${AUTH_API_URL}/user/liteUser?userId=${encodeURIComponent(userId)}`, {
@@ -234,8 +258,18 @@ class ApiService {
         }
 
     }
+    async toggleFollow(userId, mineId, imageUrl, email) {
+        const response = await this.request(`${AUTH_API_URL}/user/toggleFollow?mineId=${mineId}&yourId=${userId}&imageUrl=${imageUrl}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+        if (response.status) {
+            await this.fetchUserProfileByEmail(email);
+        }
+        return response;
+    }
 
-    async updateUserProfile(userData, file, thumbnail) {
+    async updateUserProfile(userData, file) {
         const formData = new FormData();
         formData.append("user", JSON.stringify(userData));
         if (file) {
@@ -268,7 +302,34 @@ class ApiService {
 
 
         if (response.status) {
-            await Storage.setItem("userProfile", JSON.stringify(response.data.data));
+            const userProfile = response.data.data;
+
+            let thumbnailUrl = require("../../assets/images/profile.png");
+
+            if (userProfile.thumbnailId) {
+                const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
+                if (imageResponse.status) {
+                    thumbnailUrl = imageResponse.data;
+                }
+            }
+
+            userProfile.thumbnailUrl = thumbnailUrl;
+
+            await Storage.setItem("userProfile", JSON.stringify(userProfile));
+
+
+            return {
+                status: true,
+                message: "User profile fetched and stored",
+                data: userProfile,
+            };
+        } else {
+
+            return {
+                status: false,
+                message: response.message || "Failed to fetch user profile",
+                data: null,
+            };
         }
 
         return response;

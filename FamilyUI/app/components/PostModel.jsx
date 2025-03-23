@@ -10,18 +10,18 @@ import {
   Image,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   Text,
   TextInput,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   useColorScheme,
   View,
+  ScrollView,
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
-import postService, { default as PostService } from "../api/postHandle";
+import postService from "../api/postHandle";
 import { Colors } from "../constants/Colors";
 import CommentModel from "./CommentsModal";
 const mediaContentCache = new Map();
@@ -60,6 +60,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }
   };
 
+  //COUNT LIKES ON POST
   useEffect(() => {
     if (post) {
       setPostLikesCount((prev) => ({
@@ -101,7 +102,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               return mediaContentCache.get(mediaId);
             }
             try {
-              const response = await PostService.getPostMedia(mediaId);
+              const response = await postService.getPostMedia(mediaId);
               if (!response?.status) return null;
               const type = response?.type?.startsWith("video")
                 ? "video"
@@ -153,6 +154,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       username: myProf?.username,
       thumbnailId: myProf?.thumbnailId,
     }));
+
     fetchMediaUrls();
   }, [post?.mediaIds]);
 
@@ -162,6 +164,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }
   }, [videoRef.current]);
 
+  //FETCH COMMENTS
   const fetchComments = async () => {
     const response = await postService.showCommentByPostId(post?.id);
     if (response.status) {
@@ -181,8 +184,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
             }
           }
 
-          // Convert Java LocalDateTime to a readable format
-          const postDate = moment(item.createdAt); // Assuming createdAt is in ISO format
+          const postDate = moment(item.createdAt);
           const now = moment();
           const diffInMinutes = now.diff(postDate, "minutes");
           const diffInHours = now.diff(postDate, "hours");
@@ -204,42 +206,33 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
           return {
             ...item,
             thumbnailId: thumbnailUrl,
-            createdAt: formattedTime, // Add formatted time
+            createdAt: formattedTime,
           };
         })
       );
 
+      updatedComments.sort((a, b) =>
+        moment(b.createdAt).isBefore(moment(a.createdAt)) ? 1 : -1
+      );
       setAllComments(updatedComments);
     } else {
       Alert.alert("Error", response.message);
     }
   };
 
-  useEffect(() => {
-    fetchComments();
-  }, [post]);
-
+  //ADD COMMENTS
   const AddComment = async () => {
-    if (
-      !myComment.postId ||
-      !myComment.userId ||
-      !myComment.username ||
-      !myComment.thumbnailId ||
-      !myComment.text?.trim()
-    )
-      return;
+    if (!myComment.text?.trim()) return;
+
+    const updatedComment = {
+      ...myComment,
+      postId: post?.id,
+      userId: myProf?.id,
+      username: myProf?.username,
+      thumbnailId: myProf?.thumbnailId,
+    };
 
     setIsCommenting(true);
-
-    let updatedComment = { ...myComment };
-
-    const parsedThumbnailId = myComment.thumbnailId?.uri
-      ? myComment.thumbnailId.uri.split("/").pop()
-      : myComment.thumbnailId.includes("/")
-      ? myComment.thumbnailId.split("/").pop()
-      : myComment.thumbnailId;
-
-    updatedComment.thumbnailId = parsedThumbnailId;
 
     try {
       const response = await postService.addComment(updatedComment);
@@ -381,7 +374,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               }}
             >
               <Image
-                source={{ uri: userProf?.imageUrl }}
+                source={{ uri: post?.userThumbnailUrl }}
                 style={{ width: 32, height: 32, borderRadius: 16 }}
               />
               <View style={{ marginLeft: 8 }}>
@@ -411,34 +404,46 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                 >
                   {/* Main media placeholder */}
                   <Rect x="0" y="0" rx="8" ry="8" width="100%" height="100%" />
-
                   {/* Play button icon effect */}
                   <Circle cx="50%" cy="50%" r="24" />
                 </ContentLoader>
               ) : mediaUrls.length > 0 ? (
-                mediaType === "video" ? (
-                  <Video
-                    ref={videoRef}
-                    source={{ uri: mediaUrls[0] }}
-                    style={{
-                      width: "100%",
-                      aspectRatio: 1,
-                      borderRadius: 8,
-                    }}
-                    resizeMode="contain"
-                    isLooping
-                  />
-                ) : (
-                  <Image
-                    source={{ uri: mediaUrls[0] }}
-                    style={{
-                      width: "100%",
-                      aspectRatio: 1,
-                      borderRadius: 8,
-                    }}
-                    resizeMode="cover"
-                  />
-                )
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false} // Hide scroll indicator
+                  contentContainerStyle={{
+                    flexDirection: "row",
+                    alignItems: "center", // Optional, aligns the media to the center
+                  }}
+                >
+                  {mediaUrls.map((url, index) => (
+                    <View key={index} style={{ marginRight: 10 }}>
+                      {mediaType === "video" ? (
+                        <Video
+                          ref={videoRef}
+                          source={{ uri: url }}
+                          style={{
+                            width: 200, // Adjust width as needed
+                            aspectRatio: 1,
+                            borderRadius: 8,
+                          }}
+                          resizeMode="contain"
+                          isLooping
+                        />
+                      ) : (
+                        <Image
+                          source={{ uri: url }}
+                          style={{
+                            width: "350",
+                            aspectRatio: 1,
+                            borderRadius: 8,
+                          }}
+                          resizeMode="cover"
+                        />
+                      )}
+                    </View>
+                  ))}
+                </ScrollView>
               ) : (
                 <Text>No media available</Text>
               )}
@@ -464,7 +469,10 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => setActiveComment(true)}
+                  onPress={() => {
+                    setActiveComment(true);
+                    fetchComments();
+                  }}
                   style={{ marginRight: 16 }}
                 >
                   <Ionicons
@@ -594,136 +602,129 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
           avoidKeyboard
           style={{ margin: 0 }}
         >
-          <TouchableWithoutFeedback onPress={() => setActiveComment(false)}>
+          <View
+            style={{
+              height: "60%", // Increased height for the comment section
+              backgroundColor: themeColors.tint,
+              position: "absolute",
+              bottom: 0,
+              width: "100%",
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              overflow: "hidden", // Keep rounded corners
+              paddingBottom: 16,
+            }}
+          >
             <View
               style={{
-                flex: 1,
-                backgroundColor: "rgba(0,0,0,0.5)", // Add overlay like cardOverlayEnabled
-                justifyContent: "flex-end", // Keeps modal at bottom
+                width: "100%",
+                alignItems: "center",
+                paddingTop: 12,
+                paddingBottom: 8,
               }}
             >
-              <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                <View
+              <View
+                style={{
+                  width: 40,
+                  height: 5,
+                  borderRadius: 2.5,
+                  backgroundColor: "#DDDDDD",
+                }}
+              />
+            </View>
+
+            <Text
+              className="font-custom pl-4 text-2xl m-4"
+              style={{ color: textColor }}
+            >
+              Comments
+            </Text>
+
+            <FlatList
+              data={allComments}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => <CommentModel item={item} />}
+              contentContainerStyle={{
+                paddingHorizontal: 16,
+                paddingVertical: 10,
+                paddingBottom: 60, // Make room for input box
+              }}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            />
+
+            <View
+              style={{
+                position: "absolute",
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: bg,
+                borderTopWidth: 1,
+                borderTopColor: "#e5e7eb",
+                paddingTop: 8,
+                paddingBottom: 12,
+                paddingHorizontal: 16,
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                <Image
+                  source={myProf.userThumbnailUrl}
                   style={{
-                    height: "60%",
-                    backgroundColor: bg,
-                    borderTopLeftRadius: 20,
-                    borderTopRightRadius: 20,
-                    overflow: "hidden", // Like in cardStyle
-                    paddingBottom: 20,
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    marginRight: 6,
                   }}
+                />
+                <TextInput
+                  placeholder="Add a comment..."
+                  placeholderTextColor="#aaa"
+                  value={myComment.text}
+                  onChangeText={(text) =>
+                    setMyComment((prev) => ({ ...prev, text }))
+                  }
+                  style={{
+                    flex: 1,
+                    padding: 12,
+                    borderRadius: 20, // Rounded corners
+                    fontSize: 14,
+                    color: textColor,
+                    backgroundColor: themeColors.tint,
+                    marginRight: 5, // Slight margin between input and button
+                  }}
+                />
+                <TouchableOpacity
+                  style={{
+                    opacity: isCommenting ? 0.6 : 1,
+                    padding: 6,
+                  }}
+                  onPress={() => AddComment()}
+                  disabled={isCommenting}
                 >
-                  {/* Add a drag handle for gestureEnabled feel */}
-                  <View
-                    style={{
-                      width: "100%",
-                      alignItems: "center",
-                      paddingTop: 12,
-                      paddingBottom: 8,
-                    }}
-                  >
-                    <View
+                  {isCommenting ? (
+                    <ActivityIndicator size="small" color="#3B82F6" />
+                  ) : (
+                    <Text
+                      className="font-custom-bold"
                       style={{
-                        width: 40,
-                        height: 5,
-                        borderRadius: 2.5,
-                        backgroundColor: "#DDDDDD",
-                      }}
-                    />
-                  </View>
-
-                  <Text
-                    className="font-custom pl-4 text-2xl m-4"
-                    style={{ color: textColor }}
-                  >
-                    Comments
-                  </Text>
-
-                  {/* Scrollable Comments Section */}
-                  <FlatList
-                    data={allComments}
-                    keyExtractor={(item) => item.id}
-                    renderItem={({ item }) => <CommentModel item={item} />}
-                    contentContainerStyle={{
-                      paddingHorizontal: 16,
-                      paddingVertical: 10,
-                      paddingBottom: 60, // Make room for input box
-                    }}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                  />
-
-                  {/* Fixed Input Box at the Bottom */}
-                  <View
-                    style={{
-                      position: "absolute",
-                      bottom: 0,
-                      left: 0,
-                      right: 0,
-                      backgroundColor: bg,
-                      borderTopWidth: 1,
-                      borderTopColor: "#e5e7eb",
-                      paddingTop: 8,
-                      paddingBottom: 16,
-                      paddingHorizontal: 16,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
+                        color: "#3B82F6",
+                        fontSize: 14,
+                        fontWeight: "bold",
                       }}
                     >
-                      <Image
-                        source={myProf.thumbnailId}
-                        style={{
-                          width: 36,
-                          height: 36,
-                          borderRadius: 18,
-                          marginRight: 12,
-                        }}
-                      />
-                      <TextInput
-                        placeholder="Add a comment..."
-                        placeholderTextColor="#aaa"
-                        value={myComment.text}
-                        onChangeText={(text) =>
-                          setMyComment((prev) => ({ ...prev, text }))
-                        }
-                        style={{
-                          flex: 1,
-                          padding: 12,
-                          borderRadius: 9999,
-                          fontSize: 14,
-                          color: textColor,
-                          backgroundColor: themeColors.tint,
-                        }}
-                      />
-                      <TouchableOpacity
-                        style={{
-                          marginLeft: 10,
-                          opacity: isCommenting ? 0.6 : 1,
-                        }}
-                        onPress={() => AddComment()}
-                        disabled={isCommenting}
-                      >
-                        {isCommenting ? (
-                          <ActivityIndicator size="small" color="#3B82F6" />
-                        ) : (
-                          <Text
-                            className="font-custom-bold"
-                            style={{ color: "#3B82F6", fontSize: 14 }}
-                          >
-                            POST
-                          </Text>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                </View>
-              </TouchableWithoutFeedback>
+                      POST
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              </View>
             </View>
-          </TouchableWithoutFeedback>
+          </View>
         </Modal>
       </KeyboardAwareScrollView>
     </KeyboardAvoidingView>

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import React from "react";
+import { useNavigation } from "@react-navigation/native";
 import {
   Image,
   Text,
@@ -9,7 +10,15 @@ import {
 } from "react-native";
 import { Colors } from "../constants/Colors";
 
-const FollowModel = ({ thumbnailId, userId, username, name, followStatus }) => {
+const FollowModel = ({
+  userThumbnailUrl,
+  userId,
+  username,
+  name,
+  followStatus,
+}) => {
+  const navigation = useNavigation();
+
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.dark;
   const bg = themeColors.background;
@@ -22,9 +31,19 @@ const FollowModel = ({ thumbnailId, userId, username, name, followStatus }) => {
       style={{ backgroundColor: bg }}
     >
       {/* Profile Image & Info */}
-      <TouchableOpacity className="flex-row items-center">
+      <TouchableOpacity
+        className="flex-row items-center"
+        onPress={() =>
+          navigation.navigate("UsersProfile", {
+            userId: userId,
+            username: username,
+            name: name,
+            thumbnailUrl: userThumbnailUrl,
+          })
+        }
+      >
         <Image
-          source={{ uri: thumbnailId }}
+          source={{ uri: userThumbnailUrl }}
           className="w-12 h-12 rounded-full"
         />
         <View className="ml-3">

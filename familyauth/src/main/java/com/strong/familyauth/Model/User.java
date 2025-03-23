@@ -35,11 +35,10 @@ public class User implements UserDetails {
     private boolean accountNonLocked;
     private boolean enabled;
     private boolean isPrivate;
+    private Set<String> followRequests;
     private Set<String> followers;
     private Set<String> following;
-    private int followerCount;
     private String website;
-    private int followingCount;
     private Collection<? extends GrantedAuthority> authorities;
 
 }

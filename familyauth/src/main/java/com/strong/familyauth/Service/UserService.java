@@ -118,8 +118,6 @@ public class UserService implements UserDetailsService {
         user.setPrivate(false);
         user.setFollowers(new HashSet<>());
         user.setFollowing(new HashSet<>());
-        user.setFollowerCount(0);
-        user.setFollowingCount(0);
         user.setWebsite("");
 
         userRepo.save(user);
@@ -134,6 +132,50 @@ public class UserService implements UserDetailsService {
         tokens.put("refreshToken", refreshToken);
 
         return tokens;
+    }
+
+    // ADD FOLLOWER
+    public String toggleFollower(String mineId, String yourId, String imageUrl) throws UserException {
+        Optional<User> mineOptional = userRepo.findById(mineId);
+        Optional<User> yourOptional = userRepo.findById(yourId);
+
+        if (mineOptional.isEmpty() || yourOptional.isEmpty()) {
+            throw new UserException("User not found");
+        }
+
+        User mine = mineOptional.get();
+        User your = yourOptional.get();
+
+        // Check if the user is private
+        if (your.isPrivate()) {
+            if (!your.getFollowRequests().contains(mineId)) {
+                your.getFollowRequests().add(mineId);
+                userRepo.save(your);
+
+                emailService.sendFollowRequestEmail(your.getId(), mine.getId(), imageUrl);
+                return "Follow request sent successfully.";
+            } else {
+                throw new UserException("You have already sent a follow request to this user.");
+            }
+        }
+
+        // Handle following/unfollowing for non-private accounts
+        if (mine.getFollowing().contains(yourId)) {
+            // If already following, unfollow (remove from following and followers)
+            mine.getFollowing().remove(yourId);
+            your.getFollowers().remove(mineId);
+            userRepo.save(mine);
+            userRepo.save(your);
+            return "Unfollowed successfully.";
+        } else {
+            // If not following, follow (add to following and followers)
+            mine.getFollowing().add(yourId);
+            your.getFollowers().add(mineId);
+            // Saving the users
+            userRepo.save(mine);
+            userRepo.save(your);
+            return "Followed successfully.";
+        }
     }
 
     public Map<String, String> authenticate(String email, String password) throws UserException {
@@ -210,15 +252,13 @@ public class UserService implements UserDetailsService {
     public User getUserByUsername(String mineId, String username) throws UserException {
         User user = userRepo.findByUsername(username)
                 .orElseThrow(() -> new UserException("User not found"));
-        boolean canAccessProfile = canAccessProfile(mineId, user.getId());
-        if (canAccessProfile) {
-            user.setFollowers(user.getFollowers());
-            user.setFollowing(user.getFollowing());
-        }
-        user.setFollowers(new HashSet<>());
-        user.setFollowing(new HashSet<>());
-        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
+        user.setPassword(null);
+        return user;
+    }
+
+    public User getbyId(String userId) throws UserException {
+        User user = userRepo.findById(userId)
+                .orElseThrow(() -> new UserException("User not found"));
         user.setPassword(null);
         return user;
     }
@@ -227,15 +267,6 @@ public class UserService implements UserDetailsService {
     public User getUserByUserId(String mineId, String userId) throws UserException {
         User user = userRepo.findById(userId)
                 .orElseThrow(() -> new UserException("User not found"));
-        boolean canAccessProfile = canAccessProfile(mineId, userId);
-        if (canAccessProfile) {
-            user.setFollowers(user.getFollowers());
-            user.setFollowing(user.getFollowing());
-        }
-        user.setFollowers(new HashSet<>());
-        user.setFollowing(new HashSet<>());
-        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
         user.setPassword(null);
         return user;
     }
@@ -248,8 +279,6 @@ public class UserService implements UserDetailsService {
         }
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
-        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
         user.setPassword(null);
         return user;
     }
@@ -320,8 +349,6 @@ public class UserService implements UserDetailsService {
         }
 
         User user = userRepo.save(existingUser);
-        user.setFollowerCount(user.getFollowers() != null ? user.getFollowers().size() : 0);
-        user.setFollowingCount(user.getFollowing() != null ? user.getFollowing().size() : 0);
         user.setPassword(null);
         return user;
     }
@@ -378,6 +405,11 @@ public class UserService implements UserDetailsService {
         tokens.put("refreshToken", newRefreshToken);
 
         return tokens;
+    }
+
+    public void logout(String accessToken) {
+        Optional<Token> byAccessToken = tokenRepository.findByAccessToken(accessToken);
+        revokeAllTokens(byAccessToken.get().getUser());
     }
 
     public void revokeRefreshToken(String refreshToken) throws UserException {

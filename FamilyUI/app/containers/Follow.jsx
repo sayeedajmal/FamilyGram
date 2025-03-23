@@ -5,7 +5,6 @@ import {
   Animated,
   Dimensions,
   FlatList,
-  Image,
   ScrollView,
   Text,
   TextInput,
@@ -19,7 +18,7 @@ import { Colors } from "../constants/Colors";
 
 const { width } = Dimensions.get("window");
 
-const Follow = () => {
+const Follow = ({ route }) => {
   const navigation = useNavigation();
   const [searchQuery, setSearchQuery] = useState("");
   const [followers, setFollowers] = useState([]);
@@ -33,16 +32,53 @@ const Follow = () => {
   const bg = themeColors.background;
   const iconColor = themeColors.icon;
   const textColor = themeColors.text;
+  const { userProfile } = route.params;
 
   useEffect(() => {
-    const fetchData = async () => {
-      const followersResponse = await loginSignup.getFollowers();
-      const followingResponse = await loginSignup.getFollowing();
-      if (followersResponse.status) setFollowers(followersResponse.data);
-      if (followingResponse.status) setFollowing(followingResponse.data);
+    const fetchFollowers = async () => {
+      if (userProfile?.followers && userProfile?.followers.length > 0) {
+        const followersData = await Promise.all(
+          userProfile?.followers.map(async (followerId) => {
+            const response = await loginSignup.getLiteUser(followerId);
+
+            const imageResponse = await loginSignup.getProfileImage(
+              response.data?.thumbnailId
+            );
+            return {
+              ...response.data,
+              userThumbnailUrl: imageResponse.data,
+            };
+          })
+        );
+        setFollowers(followersData);
+      }
     };
-    fetchData();
+    fetchFollowers();
   }, []);
+
+  useEffect(() => {
+    const fetchFollowing = async () => {
+      if (userProfile?.following && userProfile?.following.length > 0) {
+        const followingData = await Promise.all(
+          userProfile?.following.map(async (followingId) => {
+            const response = await loginSignup.getLiteUser(followingId);
+
+            const imageResponse = await loginSignup.getProfileImage(
+              response.data?.thumbnailId
+            );
+            return {
+              ...response.data,
+              userThumbnailUrl: imageResponse.data,
+            };
+          })
+        );
+        setFollowing(followingData);
+      }
+    };
+
+    fetchFollowing();
+  }, []);
+
   const dummyUsers = [
     {
       id: "1",
@@ -88,7 +124,7 @@ const Follow = () => {
           <Ionicons name="arrow-back" size={24} color={themeColors.icon} />
         </TouchableOpacity>
         <Text className="text-lg font-custom" style={{ color: textColor }}>
-          sayeed__ajmal
+          {userProfile?.username}
         </Text>
         <View className="w-6" />
       </View>
@@ -105,7 +141,7 @@ const Follow = () => {
             }`}
             style={{ color: activeTab === 0 ? "#0278ae" : textColor }}
           >
-            Followers
+            Following
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -118,7 +154,7 @@ const Follow = () => {
             }`}
             style={{ color: activeTab === 1 ? "#0278ae" : textColor }}
           >
-            Following
+            Followers
           </Text>
         </TouchableOpacity>
         <Animated.View
@@ -177,35 +213,35 @@ const Follow = () => {
           }).start();
         }}
       >
-        {/* Followers List */}
+        {/* Following List */}
         <View style={{ width }}>
           <FlatList
-            data={followers.length > 0 ? followers : dummyUsers}
+            data={following.length > 0 ? following : []}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <FollowModel
-                thumbnailId={item.thumbnailId}
-                userId={item.userId}
+                userThumbnailUrl={item.userThumbnailUrl}
+                userId={item.id}
                 username={item.username}
                 name={item.name}
-                followStatus={item.followStatus}
+                followStatus="Following"
               />
             )}
           />
         </View>
 
-        {/* Following List */}
+        {/* Followers List */}
         <View style={{ width }}>
           <FlatList
-            data={followers.length > 0 ? followers : dummyUsers}
+            data={followers.length > 0 ? followers : []}
             keyExtractor={(item) => item.id}
             renderItem={({ item }) => (
               <FollowModel
-                thumbnailId={item.thumbnailId}
-                userId={item.userId}
+                userThumbnailUrl={item.userThumbnailUrl}
+                userId={item.id}
                 username={item.username}
                 name={item.name}
-                followStatus={item.followStatus}
+                followStatus="Follow Back"
               />
             )}
           />
