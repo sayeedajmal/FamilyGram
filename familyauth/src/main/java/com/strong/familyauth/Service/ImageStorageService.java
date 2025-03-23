@@ -75,7 +75,7 @@ public class ImageStorageService {
 
         // Upload the image
         GridFSUploadOptions options = new GridFSUploadOptions()
-                .chunkSizeBytes(1024)
+                .chunkSizeBytes(1024 * 1024)
                 .metadata(new org.bson.Document("type", "image/jpeg"));
         ObjectId fileId = gridFSBucket.uploadFromStream(fileName, inputStream, options);
 

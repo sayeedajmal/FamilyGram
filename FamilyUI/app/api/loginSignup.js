@@ -3,8 +3,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const AUTH_API_URL = "http://192.168.31.218:8082";
-//const AUTH_API_URL = "https://familygram.onrender.com";
+//const AUTH_API_URL = "http://192.168.31.218:8082";
+const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {
@@ -272,16 +272,24 @@ class ApiService {
     async updateUserProfile(userData, file) {
         const formData = new FormData();
         formData.append("user", JSON.stringify(userData));
+
         if (file) {
+            const originalImage = await ImageManipulator.manipulateAsync(
+                file.uri,
+                [],
+                { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
+            );
+
             formData.append("file", {
-                uri: file.uri,
+                uri: originalImage.uri,
                 name: file.name || "image.jpg",
                 type: file.type || "image/jpeg"
             });
 
+            // Compress the thumbnail (as before)
             const resizedImage = await ImageManipulator.manipulateAsync(
                 file.uri,
-                [{ resize: { width: 300 } }],
+                [],
                 { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
             );
 
@@ -300,7 +308,6 @@ class ApiService {
             }
         });
 
-
         if (response.status) {
             const userProfile = response.data.data;
 
@@ -314,9 +321,7 @@ class ApiService {
             }
 
             userProfile.thumbnailUrl = thumbnailUrl;
-
             await Storage.setItem("userProfile", JSON.stringify(userProfile));
-
 
             return {
                 status: true,
@@ -324,16 +329,14 @@ class ApiService {
                 data: userProfile,
             };
         } else {
-
             return {
                 status: false,
                 message: response.message || "Failed to fetch user profile",
                 data: null,
             };
         }
-
-        return response;
     }
+
 
     async checkUsernameAvailability(username) {
         if (!username) return null;

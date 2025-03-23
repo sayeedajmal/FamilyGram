@@ -64,7 +64,7 @@ public class StorageService {
                 String fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.') + 1);
                 String mediaFileName = postId + "_" + System.currentTimeMillis() + "." + fileExtension;
                 GridFSUploadOptions mediaOptions = new GridFSUploadOptions()
-                        .chunkSizeBytes(256 * 1024)
+                        .chunkSizeBytes(1024 * 1024)
                         .metadata(new org.bson.Document("type", contentType));
 
                 ObjectId mediaId = gridFSBucket.uploadFromStream(mediaFileName, file.getInputStream(), mediaOptions);
