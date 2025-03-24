@@ -1,16 +1,20 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   FlatList,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
   useColorScheme,
 } from "react-native";
-import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import loginSignup from "../api/loginSignup";
 import { Colors } from "../constants/Colors";
 
@@ -53,7 +57,7 @@ const Search = () => {
               } catch (error) {
                 console.error("Error fetching profile image:", error);
               }
-            }            
+            }
             return { ...item, thumbnailUrl };
           })
         );
@@ -68,7 +72,7 @@ const Search = () => {
     return () => clearTimeout(delay);
   }, [searchQuery]);
 
-  const renderProfile = ({ item }) => (    
+  const renderProfile = ({ item }) => (
     <TouchableOpacity
       className="flex flex-row items-center px-2 rounded-2xl my-1"
       style={{ backgroundColor: bg }}
@@ -100,76 +104,87 @@ const Search = () => {
   );
 
   return (
-    <View className="h-screen w-screen" style={{ backgroundColor: bg }}>
-      {/* Search Bar */}
-      <View className="p-4">
-        <View>
-          <TextInput
-            placeholder="Search"
-            placeholderTextColor="#aaa"
-            style={{ backgroundColor: themeColors.tint, color: textColor }}
-            className="pl-8 rounded-2xl font-custom"
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-          />
-          <TouchableOpacity
-            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
-            onPress={() => setSearchQuery("")}
-          >
-            <Ionicons
-              name="close-circle-outline"
-              color={themeColors.icon}
-              size={25}
-            />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Recent section */}
-      <View className="px-4">
-        <View className="flex-row justify-between items-center mb-4">
-          <Text className="text-sm font-custom" style={{ color: textColor }}>
-            Recent
-          </Text>
-          <TouchableOpacity>
-            <Text
-              className="text-sm font-custom"
-              style={{ color: themeColors.icon }}
-            >
-              Clear all
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Show Skeleton Loader when loading */}
-        {isLoading ? (
-          <View>
-            {[1, 2, 3, 4, 5].map((index) => (
-              <ContentLoader
-                key={index}
-                speed={2}
-                width={400}
-                height={60}
-                viewBox="0 0 400 60"
-                backgroundColor={themeColors.skeletonBg}
-                foregroundColor={themeColors.skeletonFg}
+    <KeyboardAvoidingView
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      className="h-screen w-screen"
+      style={{ backgroundColor: bg }}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View className="flex-1">
+          {/* Search Bar */}
+          <View className="p-4">
+            <View>
+              <TextInput
+                placeholder="Search"
+                placeholderTextColor="#aaa"
+                style={{ backgroundColor: themeColors.tint, color: textColor }}
+                className="pl-8 rounded-2xl py-2 font-custom"
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+              />
+              <TouchableOpacity
+                className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer"
+                onPress={() => setSearchQuery("")}
               >
-                <Circle cx="30" cy="30" r="20" />
-                <Rect x="60" y="20" rx="5" ry="5" width="200" height="10" />
-                <Rect x="60" y="40" rx="5" ry="5" width="150" height="10" />
-              </ContentLoader>
-            ))}
+                <Ionicons
+                  name="close-circle-outline"
+                  color={themeColors.icon}
+                  size={25}
+                />
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : (
-          // Show real search results
-          <FlatList
-            data={mediaData}
-            renderItem={renderProfile}
-            keyExtractor={(item) => item.id}
-          />
-        )}
-      </View>
-    </View>
+
+          {/* Recent section */}
+          <View className="px-4 flex-1">
+            <View className="flex-row justify-between items-center mb-4">
+              <Text
+                className="text-sm font-custom"
+                style={{ color: textColor }}
+              >
+                Recent
+              </Text>
+              <TouchableOpacity>
+                <Text
+                  className="text-sm font-custom"
+                  style={{ color: themeColors.icon }}
+                >
+                  Clear all
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Show Skeleton Loader when loading */}
+            {isLoading ? (
+              <View>
+                {[1, 2, 3, 4, 5].map((index) => (
+                  <ContentLoader
+                    key={index}
+                    speed={2}
+                    width={400}
+                    height={60}
+                    viewBox="0 0 400 60"
+                    backgroundColor={themeColors.skeletonBg}
+                    foregroundColor={themeColors.skeletonFg}
+                  >
+                    <Circle cx="30" cy="30" r="20" />
+                    <Rect x="60" y="20" rx="5" ry="5" width="200" height="10" />
+                    <Rect x="60" y="40" rx="5" ry="5" width="150" height="10" />
+                  </ContentLoader>
+                ))}
+              </View>
+            ) : (
+              <FlatList
+                data={mediaData}
+                renderItem={renderProfile}
+                keyExtractor={(item) => item.id}
+                keyboardShouldPersistTaps="handled" // Allows taps outside input to dismiss keyboard
+              />
+            )}
+          </View>
+        </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 

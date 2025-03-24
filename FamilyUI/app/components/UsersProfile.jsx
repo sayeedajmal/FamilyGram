@@ -65,11 +65,12 @@ export const UsersProfile = () => {
       Alert.alert("Error", "Failed to fetch user profile");
     }
   };
+  
   const OpenFollw = () => {
     navigation.navigate("Follow", { userProfile: userProfile });
   };
   const toggleFollow = async () => {
-    if (!userProfile?.id) return;
+    if (!userProfile?.id || myProfile?.id == userProfile?.id) return;
 
     setIsLoading(true);
 

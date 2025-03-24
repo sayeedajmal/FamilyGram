@@ -60,7 +60,7 @@ const FollowModel = ({
       {/* Follow / Message Button */}
       <View className="flex-row items-center space-x-2">
         <TouchableOpacity
-          className={`px-4 py-1 w-[25vw] rounded-lg mr-2 ${
+          className={`px-4 py-1 rounded-lg mr-2 ${
             followStatus === "Message" ? "bg-gray-300" : "bg-blue-500"
           }`}
         >

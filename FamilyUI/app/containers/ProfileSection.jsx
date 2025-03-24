@@ -10,9 +10,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
   useColorScheme,
 } from "react-native";
-import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
 import { default as PostService } from "../api/postHandle";
 import ProfileEdit from "../components/ProfileEdit";
@@ -47,8 +47,14 @@ export const ProfileSection = () => {
     const response = await PostService.GetPostByUserId(myProfile.id);
 
     if (response?.status) {
-      const posts = response.data.data;
+      let posts = response.data.data;
+
       if (Array.isArray(posts) && posts.length > 0) {
+        // Sort posts by `createdAt` in descending order (latest first)
+        posts = posts.sort(
+          (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+        );
+
         const updatedPosts = await Promise.all(
           posts.map(async (post) => {
             let postThumbnailUrl = "https://placehold.co/150x150?text=No+Image";
@@ -73,17 +79,15 @@ export const ProfileSection = () => {
         );
 
         setMyPosts(updatedPosts);
-        setFetch(false);
       } else {
         setMyPosts([]);
-        setFetch(false);
       }
     }
+    setFetch(false);
   };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchUserProfile();
     await fetchMyPosts();
     setRefreshing(false);
   };
@@ -276,7 +280,7 @@ export const ProfileSection = () => {
       <Image
         source={{ uri: item.postThumbnailUrl }}
         style={{ width: "100%", height: "100%" }}
-        className="border border-gray-400"
+        className="p-[1%] rounded-sm"
         resizeMode="cover"
       />
     </TouchableOpacity>
@@ -384,7 +388,6 @@ export const ProfileSection = () => {
         transparent
         statusBarTranslucent
         onRequestClose={() => setActiveEdit(false)}
-        onSwipeComplete={() => setActiveEdit(false)}
       >
         <View className="flex-1 justify-end bg-#0278ae/40">
           <View className="h-[90%] rounded-t-2xl shadow-lg">

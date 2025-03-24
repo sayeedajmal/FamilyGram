@@ -15,11 +15,11 @@ import Search from "./components/Search";
 import SignupScreen from "./components/SignupScreen";
 import UsersProfile from "./components/UsersProfile";
 import { Colors } from "./constants/Colors";
+import Follow from "./containers/Follow";
 import HomePage from "./containers/HomePage";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
-import Follow from "./containers/Follow"
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -93,8 +93,8 @@ export default function App() {
           return;
         }
         setProfileImage(userProfile.thumbnailUrl);
-        //const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        setIsAuthenticated(true);
+        const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
+        setIsAuthenticated(profile.status);
       } catch (error) {
         console.error("Authentication check failed:", error);
         loginSignup.clearTokens();
@@ -104,6 +104,7 @@ export default function App() {
 
     // const fetchUserProfile = async () => {
     //   const profile = await loginSignup.getStoredUserProfile();
+
     //   if (profile?.thumbnailId) {
     //     const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
     //     setProfileImage(imageUrl.data);
@@ -125,8 +126,7 @@ export default function App() {
                 : "dark-content"
               : "dark-content"
           }
-          animated={true}
-          showHideTransition="fade"
+          animated={false}
           backgroundColor={themeColors.background}
         />
         <ContentLoader
@@ -164,13 +164,16 @@ export default function App() {
       {isAuthenticated ? (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="MainTabs">
-            {(props) => (
+            {() => (
               <Tab.Navigator
                 screenOptions={({ route }) => ({
                   tabBarStyle: {
                     backgroundColor: themeColors.background,
                     height: Platform.OS === "ios" ? 0 : 50,
+                    padding: 0,
+                    margin: 0
                   },
+                  keyboardHidesTabBar: true,
                   headerShown: false,
                   tabBarIcon: ({ focused, color, size }) => {
                     if (route.name === "Profile") {

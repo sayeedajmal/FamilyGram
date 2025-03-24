@@ -15,6 +15,7 @@ import {
 import loginSignup from "../api/loginSignup";
 import FollowModel from "../components/FollowModel";
 import { Colors } from "../constants/Colors";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 
 const { width } = Dimensions.get("window");
 
@@ -23,6 +24,8 @@ const Follow = ({ route }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(true);
+  const [loadingFollowing, setLoadingFollowing] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
   const scrollRef = useRef(null);
   const tabIndicator = useRef(new Animated.Value(0)).current;
@@ -30,81 +33,46 @@ const Follow = ({ route }) => {
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.dark;
   const bg = themeColors.background;
-  const iconColor = themeColors.icon;
   const textColor = themeColors.text;
   const { userProfile } = route.params;
 
   useEffect(() => {
     const fetchFollowers = async () => {
-      if (userProfile?.followers && userProfile?.followers.length > 0) {
+      if (userProfile?.followers?.length > 0) {
         const followersData = await Promise.all(
-          userProfile?.followers.map(async (followerId) => {
+          userProfile.followers.map(async (followerId) => {
             const response = await loginSignup.getLiteUser(followerId);
-
             const imageResponse = await loginSignup.getProfileImage(
               response.data?.thumbnailId
             );
-            return {
-              ...response.data,
-              userThumbnailUrl: imageResponse.data,
-            };
+            return { ...response.data, userThumbnailUrl: imageResponse.data };
           })
         );
         setFollowers(followersData);
       }
+      setLoadingFollowers(false);
     };
     fetchFollowers();
   }, []);
 
   useEffect(() => {
     const fetchFollowing = async () => {
-      if (userProfile?.following && userProfile?.following.length > 0) {
+      if (userProfile?.following?.length > 0) {
         const followingData = await Promise.all(
-          userProfile?.following.map(async (followingId) => {
+          userProfile.following.map(async (followingId) => {
             const response = await loginSignup.getLiteUser(followingId);
-
             const imageResponse = await loginSignup.getProfileImage(
               response.data?.thumbnailId
             );
-            return {
-              ...response.data,
-              userThumbnailUrl: imageResponse.data,
-            };
+            return { ...response.data, userThumbnailUrl: imageResponse.data };
           })
         );
         setFollowing(followingData);
       }
+      setLoadingFollowing(false);
     };
-
     fetchFollowing();
   }, []);
-
-  const dummyUsers = [
-    {
-      id: "1",
-      thumbnailId: "https://randomuser.me/api/portraits/men/1.jpg",
-      userId: "user_1",
-      username: "john_doe",
-      name: "John Doe",
-      followStatus: "Follow",
-    },
-    {
-      id: "2",
-      thumbnailId: "https://randomuser.me/api/portraits/women/2.jpg",
-      userId: "user_2",
-      username: "emma_watson",
-      name: "Emma Watson",
-      followStatus: "Follow Back",
-    },
-    {
-      id: "3",
-      thumbnailId: "https://randomuser.me/api/portraits/men/3.jpg",
-      userId: "user_3",
-      username: "michael_smith",
-      name: "Michael Smith",
-      followStatus: "Message",
-    },
-  ];
 
   const switchTab = (index) => {
     setActiveTab(index);
@@ -115,6 +83,22 @@ const Follow = ({ route }) => {
     }).start();
     scrollRef.current.scrollTo({ x: index * width, animated: true });
   };
+
+  const UserCardLoader = () => (
+    <ContentLoader
+      speed={2}
+      width={width - 32}
+      height={70}
+      viewBox={`0 0 ${width - 32} 70`}
+      backgroundColor="#f3f3f3"
+      foregroundColor="#ecebeb"
+    >
+      <Circle cx="35" cy="35" r="30" />
+      <Rect x="80" y="20" rx="5" ry="5" width="150" height="15" />
+      <Rect x="80" y="45" rx="5" ry="5" width="100" height="10" />
+      <Rect x={width - 110} y="20" rx="5" ry="5" width="80" height="30" />
+    </ContentLoader>
+  );
 
   return (
     <View className="flex-1" style={{ backgroundColor: bg }}>
@@ -164,7 +148,7 @@ const Follow = ({ route }) => {
             left: 0,
             width: width / 2,
             height: 3,
-            backgroundColor: { iconColor },
+            backgroundColor: themeColors.icon,
             transform: [{ translateX: tabIndicator }],
           }}
         />
@@ -181,7 +165,6 @@ const Follow = ({ route }) => {
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
-
           <TouchableOpacity
             className="absolute right-3 top-1/2 -translate-y-1/2"
             onPress={() => setSearchQuery("")}
@@ -215,36 +198,50 @@ const Follow = ({ route }) => {
       >
         {/* Following List */}
         <View style={{ width }}>
-          <FlatList
-            data={following.length > 0 ? following : []}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <FollowModel
-                userThumbnailUrl={item.userThumbnailUrl}
-                userId={item.id}
-                username={item.username}
-                name={item.name}
-                followStatus="Following"
-              />
-            )}
-          />
+          {loadingFollowing ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <View key={index}>{UserCardLoader()}</View>
+            ))
+          ) : (
+            <FlatList
+              data={following}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <FollowModel
+                  key={item.id}
+                  userThumbnailUrl={item.userThumbnailUrl}
+                  userId={item.id}
+                  username={item.username}
+                  name={item.name}
+                  followStatus="Following"
+                />
+              )}
+            />
+          )}
         </View>
 
         {/* Followers List */}
         <View style={{ width }}>
-          <FlatList
-            data={followers.length > 0 ? followers : []}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <FollowModel
-                userThumbnailUrl={item.userThumbnailUrl}
-                userId={item.id}
-                username={item.username}
-                name={item.name}
-                followStatus="Follow Back"
-              />
-            )}
-          />
+          {loadingFollowers ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <View key={index}>{UserCardLoader()}</View>
+            ))
+          ) : (
+            <FlatList
+              data={followers}
+              keyExtractor={(item) => item.id}
+              renderItem={({ item }) => (
+                <FollowModel
+                  key={item.id}
+                  userThumbnailUrl={item.userThumbnailUrl}
+                  userId={item.id}
+                  username={item.username}
+                  name={item.name}
+                  followStatus="Follow Back"
+                />
+              )}
+            />
+          )}
         </View>
       </ScrollView>
     </View>

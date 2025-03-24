@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
-import { Platform } from "react-native";
+import { Image, Platform } from "react-native";
 
 //const AUTH_API_URL = "http://192.168.31.218:8082";
 const AUTH_API_URL = "https://familygram.onrender.com";
@@ -193,22 +193,19 @@ class ApiService {
         if (response.status) {
             const userProfile = response.data.data;
 
-            let thumbnailUrl = require("../../assets/images/profile.png");
-            if (userProfile.thumbnailId) {
+            let defaultThumbnail = Image.resolveAssetSource(require("../../assets/images/profile.png")).uri;
+            let thumbnailUrl = defaultThumbnail;
+
+            if (userProfile.thumbnailId && typeof userProfile.thumbnailId === "string") {
                 const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
                 if (imageResponse.status) {
                     thumbnailUrl = imageResponse.data;
                 }
             }
 
-
-            if (thumbnailUrl) {
-                userProfile.thumbnailUrl = thumbnailUrl;
-            }
-
+            userProfile.thumbnailUrl = thumbnailUrl || defaultThumbnail;
 
             await Storage.setItem("userProfile", JSON.stringify(userProfile));
-
 
             return {
                 status: true,
@@ -216,7 +213,6 @@ class ApiService {
                 data: userProfile,
             };
         } else {
-
             return {
                 status: false,
                 message: response.message || "Failed to fetch user profile",
@@ -270,72 +266,78 @@ class ApiService {
     }
 
     async updateUserProfile(userData, file) {
-        const formData = new FormData();
-        formData.append("user", JSON.stringify(userData));
+        try {
+            const formData = new FormData();
+            formData.append("user", JSON.stringify(userData));
 
-        if (file) {
-            const originalImage = await ImageManipulator.manipulateAsync(
-                file.uri,
-                [],
-                { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
-            );
+            if (file) {
+                const originalImage = await ImageManipulator.manipulateAsync(
+                    file.uri,
+                    [],
+                    { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
+                );
 
-            formData.append("file", {
-                uri: originalImage.uri,
-                name: file.name || "image.jpg",
-                type: file.type || "image/jpeg"
-            });
+                formData.append("file", {
+                    uri: originalImage.uri,
+                    name: file.fileName || "image.jpg",
+                    type: file.mimeType || "image/jpeg",
+                });
 
-            // Compress the thumbnail (as before)
-            const resizedImage = await ImageManipulator.manipulateAsync(
-                file.uri,
-                [],
-                { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
-            );
+                const resizedImage = await ImageManipulator.manipulateAsync(
+                    file.uri,
+                    [{ resize: { width: 100, height: 100 } }],
+                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                );
 
-            formData.append("thumbnail", {
-                uri: resizedImage.uri,
-                name: resizedImage.name || "thumbnail.jpg",
-                type: resizedImage.type || "image/jpeg"
-            });
-        }
-
-        const response = await this.request(`${AUTH_API_URL}/user/update`, {
-            method: "POST",
-            body: formData,
-            headers: {
-                "Content-Type": "multipart/form-data"
+                formData.append("thumbnail", {
+                    uri: resizedImage.uri,
+                    name: "thumbnail.jpg",
+                    type: "image/jpeg",
+                });
             }
-        });
 
-        if (response.status) {
-            const userProfile = response.data.data;
 
-            let thumbnailUrl = require("../../assets/images/profile.png");
-
-            if (userProfile.thumbnailId) {
-                const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
-                if (imageResponse.status) {
-                    thumbnailUrl = imageResponse.data;
+            const response = await this.request(`${AUTH_API_URL}/user/update`, {
+                method: "POST",
+                body: formData,
+                headers: {
+                    "Content-Type": "multipart/form-data",
+                    "Accept": "application/json",
                 }
+            });
+
+            if (response.status) {
+                const userProfile = response.data.data;
+                let thumbnailUrl = require("../../assets/images/profile.png");
+
+                if (userProfile.thumbnailId) {
+                    const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
+                    if (imageResponse.status) {
+                        thumbnailUrl = imageResponse.data;
+                    }
+                }
+
+                userProfile.thumbnailUrl = thumbnailUrl;
+                await Storage.setItem("userProfile", JSON.stringify(userProfile));
+
+                return {
+                    status: true,
+                    message: "User profile updated successfully!",
+                    data: userProfile,
+                };
+            } else {
+                throw new Error(response.message || "Profile update failed!");
             }
-
-            userProfile.thumbnailUrl = thumbnailUrl;
-            await Storage.setItem("userProfile", JSON.stringify(userProfile));
-
-            return {
-                status: true,
-                message: "User profile fetched and stored",
-                data: userProfile,
-            };
-        } else {
+        } catch (error) {
+            console.error("Profile update error:", error);
             return {
                 status: false,
-                message: response.message || "Failed to fetch user profile",
+                message: error.message || "Something went wrong!",
                 data: null,
             };
         }
     }
+
 
 
     async checkUsernameAvailability(username) {
