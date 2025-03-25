@@ -77,7 +77,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of("https://familygram.web.app","http://localhost:8081")); // Allow frontend
+        config.setAllowedOrigins(
+                List.of("https://familygram.web.app", "http://localhost:8081", "https://familyfeed.onrender.com"));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
