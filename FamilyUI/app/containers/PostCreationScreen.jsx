@@ -202,6 +202,9 @@ const PostCreationScreen = () => {
 
         {/* Caption Input */}
         <TextInput
+          autoCorrect={true}
+          returnKeyType="done"
+          spellCheck={true}
           style={{
             color: textColor,
             borderBottomWidth: 1,
@@ -219,6 +222,7 @@ const PostCreationScreen = () => {
         {/* Location Input */}
         <View className="flex-row justify-between items-center my-6">
           <TextInput
+            autoCorrect={true}
             style={{ color: textColor, flex: 1 }}
             placeholder="Add location"
             value={location}

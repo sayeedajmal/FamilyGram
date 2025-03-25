@@ -45,7 +45,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const [allComments, setAllComments] = useState({});
   const [activeComment, setActiveComment] = useState(false);
   const { width } = Dimensions.get("window");
-  const [activeIndex, setActiveIndex] = useState(0); // ✅ Track active index
+  const [activeIndex, setActiveIndex] = useState(0);
 
   const [isCommenting, setIsCommenting] = useState(false);
   const [myComment, setMyComment] = useState({
@@ -99,49 +99,45 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     const fetchMediaUrls = async () => {
       if (!post?.mediaIds?.length) return;
       setIsMediaLoading(true);
-      try {
-        const mediaDataArray = await Promise.all(
-          post.mediaIds.map(async (mediaId) => {
-            if (mediaContentCache.has(mediaId)) {
-              return mediaContentCache.get(mediaId);
-            }
-            try {
-              const response = await postService.getPostMedia(mediaId);
-              if (!response?.status) return null;
-              const type = response?.type?.startsWith("video")
-                ? "video"
-                : "image";
-              const mediaResponse = await fetch(response.data);
-              if (!mediaResponse.ok) return null;
-              const blob = await mediaResponse.blob();
-              const reader = new FileReader();
-              reader.readAsDataURL(blob);
-              return new Promise((resolve) => {
-                reader.onloadend = () => {
-                  if (reader.result) {
-                    const base64Data = reader.result;
-                    mediaContentCache.set(mediaId, {
-                      content: base64Data,
-                      type,
-                    });
-                    manageCacheSize();
-                    resolve({ content: base64Data, type });
-                  } else {
-                    resolve(null);
-                  }
-                };
-              });
-            } catch (error) {
-              console.log(`Error processing mediaId ${mediaId}:`, error);
-              return null;
-            }
-          })
-        );
 
-        const validMediaData = mediaDataArray.filter((data) => data !== null);
-        if (validMediaData.length > 0) {
-          setMediaType(validMediaData[0].type);
-          setMediaUrls(validMediaData.map((data) => data.content));
+      try {
+        const validMediaData = [];
+
+        for (const mediaId of post.mediaIds) {
+          try {
+            const response = await postService.getPostMedia(mediaId);
+
+            if (!response?.status) continue;
+
+            const type = response?.type?.startsWith("video")
+              ? "video"
+              : "image";
+
+            const mediaResponse = await fetch(response.data);
+            if (!mediaResponse.ok) continue;
+
+            const blob = await mediaResponse.blob();
+            const reader = new FileReader();
+
+            // Convert blob to Base64
+            reader.readAsDataURL(blob);
+
+            await new Promise((resolve) => {
+              reader.onloadend = () => {
+                if (reader.result) {
+                  validMediaData.push({ content: reader.result, type });
+
+                  // Update state immediately with new media
+                  setMediaUrls((prev) => [...prev, reader.result]);
+                  setMediaType(type); // Update type for the latest fetched media
+
+                  resolve();
+                }
+              };
+            });
+          } catch (error) {
+            console.log(`Error processing mediaId ${mediaId}:`, error);
+          }
         }
       } catch (error) {
         console.log("Error in fetchMediaUrls:", error);
@@ -378,19 +374,24 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               }}
             >
               <Image
-                source={{ uri: post?.userThumbnailUrl }}
+                source={
+                  post?.userThumbnailUrl
+                    ? { uri: post.userThumbnailUrl }
+                    : require("../../assets/images/profile.png")
+                }
+                defaultSource={require("../../assets/images/profile.png")}
                 style={{ width: 32, height: 32, borderRadius: 16 }}
               />
               <View style={{ marginLeft: 8 }}>
                 <Text className="font-custom-bold" style={{ color: textColor }}>
                   {userProf?.username}
                 </Text>
-                {post.location && (
+                {post?.location && (
                   <Text
                     className="font-custom"
                     style={{ color: textColor, fontSize: 12 }}
                   >
-                    {post.location}
+                    {post?.location}
                   </Text>
                 )}
               </View>
@@ -432,7 +433,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                             style={{
                               width: width - 25,
                               height: 300,
-                              aspectRatio: 1,
+                              aspectRatio: 4 / 5,
                               borderRadius: 8,
                             }}
                             resizeMode="contain"
@@ -443,10 +444,10 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                             source={{ uri: url }}
                             style={{
                               width: width - 25,
-                              aspectRatio: 1,
+                              aspectRatio: 4 / 5,
                               borderRadius: 8,
                             }}
-                            resizeMode="cover"
+                            resizeMode="contain"
                           />
                         )}
                       </View>
@@ -541,8 +542,8 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               {postLikesCount[post.id] || post?.likes?.length} likes
             </Text>
             <Text className="font-custom" style={{ color: textColor }}>
-              <Text className="font-custom-bold">{post.username}</Text>
-              {post.caption}
+              <Text className="font-custom-bold">{post?.username}</Text>{" "}
+              {post?.caption}
             </Text>
             <View
               style={{

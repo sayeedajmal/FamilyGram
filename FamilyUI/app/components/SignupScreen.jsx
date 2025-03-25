@@ -190,7 +190,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   }, [username]);
 
   const handleUsernameChange = (text) => {
-    const sanitizedText = text.replace(/[^a-z0-9-_]/g, "");
+    const sanitizedText = input1.replace(/[^a-zA-Z0-9-_]/g, "");
     setUsername(sanitizedText);
     setUsernameError(false);
   };
@@ -314,6 +314,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
                 <TextInput
                   style={{ color: textColor }}
                   value={username}
+                  autoCapitalize="none"
                   placeholderTextColor="#aaa"
                   className={`w-full px-4 font-custom py-3 border ${
                     usernameError ? "border-red-500" : "border-gray-300"

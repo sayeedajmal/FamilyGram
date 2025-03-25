@@ -247,8 +247,9 @@ public class PostService {
      * @throws PostException if the post cannot be found or if there's an error
      *                       processing the like
      */
-    public int toggleLike(String postId, String userId, String token) throws PostException {
-        Post post = getPostById(userId, postId, token);
+    public int toggleLike(String postId, String userId) throws PostException {
+        Post post = postRepo.findById(postId)
+                .orElseThrow(() -> new PostException("No Post with postId: " + postId));
         Set<String> likes = post.getLikes();
 
         if (likes == null) {

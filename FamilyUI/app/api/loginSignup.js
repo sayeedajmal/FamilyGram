@@ -3,8 +3,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Image, Platform } from "react-native";
 
-//const AUTH_API_URL = "http://192.168.31.218:8082";
-const AUTH_API_URL = "https://familygram.onrender.com";
+const AUTH_API_URL = "http://192.168.31.218:8082";
+//const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {

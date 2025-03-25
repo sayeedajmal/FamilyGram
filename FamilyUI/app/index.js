@@ -37,7 +37,7 @@ const Storage = {
 };
 
 export default function App() {
-  const [isAuthenticated, setIsAuthenticated] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [profileImage, setProfileImage] = useState("");
   const fadeAnim = new Animated.Value(0);
   const scaleAnim = new Animated.Value(1);
@@ -46,7 +46,6 @@ export default function App() {
   const themeColors = Colors[theme];
 
 
-  const [fontsLoaded, setFontsLoaded] = useState(false);
 
   const [fonts] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
@@ -54,12 +53,6 @@ export default function App() {
     SpaceItalic: require("../assets/fonts/SpaceMono-Italic.ttf"),
 
   });
-
-  useEffect(() => {
-    if (fonts) {
-      setFontsLoaded(true);
-    }
-  }, [fonts]);
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -76,7 +69,6 @@ export default function App() {
       easing: Easing.ease,
       useNativeDriver: true,
     }).start();
-
     const checkAuth = async () => {
       try {
         const token = await Storage.getItem("accessToken");
@@ -114,40 +106,6 @@ export default function App() {
     checkAuth();
     //fetchUserProfile();
   }, []);
-
-  if (!fontsLoaded || isAuthenticated === null) {
-    return (
-      <View style={{ flex: 1, backgroundColor: themeColors.background, justifyContent: "center", alignItems: "center" }}>
-        <StatusBar
-          barStyle={
-            theme === "dark"
-              ? Platform.OS === "ios"
-                ? "light-content"
-                : "dark-content"
-              : "dark-content"
-          }
-          animated={false}
-          backgroundColor={themeColors.background}
-        />
-        <ContentLoader
-          speed={2}
-          width={400}
-          height={500}
-          viewBox="0 0 400 500"
-          backgroundColor="#f3f3f3"
-          foregroundColor={themeColors.skeletonFg}
-        >
-          <Circle cx="50" cy="40" r="30" />
-          <Rect x="90" y="20" rx="5" ry="5" width="200" height="10" />
-          <Rect x="90" y="40" rx="5" ry="5" width="150" height="10" />
-          <Rect x="0" y="80" rx="5" ry="5" width="400" height="200" />
-          <Rect x="0" y="300" rx="5" ry="5" width="300" height="10" />
-          <Rect x="0" y="320" rx="5" ry="5" width="250" height="10" />
-          <Rect x="0" y="340" rx="5" ry="5" width="280" height="10" />
-        </ContentLoader>
-      </View>
-    );
-  }
 
   return (
     <View style={{ flex: 1 }}>

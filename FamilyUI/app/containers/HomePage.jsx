@@ -8,6 +8,9 @@ import {
   View,
   useColorScheme,
 } from "react-native";
+import loginSignup from "../api/loginSignup";
+import postHandle from "../api/postHandle";
+import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
 
 const HomePage = () => {
@@ -18,26 +21,77 @@ const HomePage = () => {
   const textColor = themeColors.text;
 
   const [posts, setPosts] = useState([]);
+  const [myProfile, setMyProfile] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
 
-  // Fetch posts from all users (or a default user for now)
+  // Fetch User Profile
+  const fetchUserProfile = async () => {
+    try {
+      const profile = await loginSignup.getStoredUserProfile();
+      if (profile) {
+        setMyProfile(profile);
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Fetch Posts
   const fetchPosts = async () => {
-    // try {
-    //   const response = await PostService.GetAllPosts();
-    //   if (response?.status) {
-    //     setPosts(response.data.data || []);
-    //   }
-    // } catch (error) {
-    //   console.error("Error fetching posts:", error);
-    //   setPosts([]);
-    // }
+    if (!myProfile?.id) return;
+
+    setRefreshing(true); // ✅ Start refresh indicator
+
+    try {
+      const response = await postHandle.getFeed(myProfile.id);
+      if (response?.status && response.data?.data) {
+        const postsWithThumbnails = await Promise.all(
+          response.data.data.map(async (post) => {
+            let userThumbnailUrl = null;
+            if (post?.thumbnailId) {
+              const profileImageResponse = await loginSignup.getProfileImage(
+                post?.thumbnailId
+              );
+              if (profileImageResponse.status) {
+                userThumbnailUrl = profileImageResponse.data;
+              }
+            }
+            return { ...post, userThumbnailUrl };
+          })
+        );
+
+        setPosts(postsWithThumbnails);
+      } else {
+        setPosts([]);
+      }
+    } catch (error) {
+      console.error("Error fetching posts:", error);
+    } finally {
+      setRefreshing(false); // ✅ Stop refresh indicator
+    }
   };
 
   useEffect(() => {
-    fetchPosts();
+    fetchUserProfile();
   }, []);
 
+  useEffect(() => {
+    if (myProfile?.id) {
+      fetchPosts();
+    }
+  }, [myProfile]);
+
+  // Handle pull-to-refresh
+  const onRefresh = () => {
+    setPosts([]);
+    fetchPosts();
+  };
+
+  // Auto-play videos when visible
   const onViewableItemsChanged = ({ viewableItems }) => {
     const visiblePostIds = new Set(viewableItems.map((item) => item.item.id));
     Object.keys(videoRefs.current).forEach((id) => {
@@ -58,7 +112,7 @@ const HomePage = () => {
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
-      {/* Header (Fixed) */}
+      {/* Header */}
       <View className="flex-row justify-between items-center px-4 py-1">
         <Image
           source={require("../../assets/images/logo.png")}
@@ -80,11 +134,11 @@ const HomePage = () => {
         </View>
       </View>
 
-      {/* Combined Scrollable List (Stories + Posts) */}
+      {/* Scrollable List (Stories + Posts) */}
       <FlatList
         ref={flatListRef}
-        data={[{ type: "stories" }, ...posts]} // Adding a "stories" item at the top
-        keyExtractor={(item, index) =>
+        data={[{ type: "stories" }, ...posts]} // ✅ First item is "stories"
+        keyExtractor={(item) =>
           item.type === "stories" ? "stories" : item.id.toString()
         }
         renderItem={({ item }) => {
@@ -95,23 +149,6 @@ const HomePage = () => {
                   horizontal
                   className="px-2"
                   showsHorizontalScrollIndicator={false}
-                  data={[
-                    {
-                      id: "your_story",
-                      username: "Your Story",
-                      image: "https://placekitten.com/100/100",
-                    },
-                    {
-                      id: "john_doe",
-                      username: "john_doe",
-                      image: "https://placekitten.com/101/101",
-                    },
-                    {
-                      id: "jane_doe",
-                      username: "jane_doe",
-                      image: "https://placekitten.com/102/102",
-                    },
-                  ]}
                   keyExtractor={(story) => story.id}
                   renderItem={({ item }) => (
                     <View className="ml-4 items-center">
@@ -138,7 +175,13 @@ const HomePage = () => {
           }
 
           return (
-            <PostModel post={item} loading={false} videoRefs={videoRefs} />
+            <PostModel
+              post={item}
+              loading={refreshing}
+              videoRefs={videoRefs}
+              myProf={myProfile}
+              userProf={{ username: item.username }}
+            />
           );
         }}
         initialNumToRender={5}
@@ -148,6 +191,8 @@ const HomePage = () => {
             <Text className="text-gray-500 text-lg">No posts available</Text>
           </View>
         }
+        refreshing={refreshing} // ✅ Enable pull-to-refresh
+        onRefresh={onRefresh} // ✅ Assign refresh function
       />
     </View>
   );

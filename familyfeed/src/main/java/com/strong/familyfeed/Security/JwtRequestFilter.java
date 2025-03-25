@@ -36,7 +36,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         String path = request.getRequestURI();
-        if (path.matches("/posts/media/.*")) {
+        if (path.matches("/feeds/media/.*")) {
             chain.doFilter(request, response);
             return;
         }

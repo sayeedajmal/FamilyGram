@@ -196,10 +196,9 @@ public class PostController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Integer>> toggleLike(
             @PathVariable String postId,
-            @RequestParam("userId") String userId,
-            @RequestHeader("Authorization") String token) {
+            @RequestParam("userId") String userId) {
         try {
-            int totalLikes = postService.toggleLike(postId, userId, token);
+            int totalLikes = postService.toggleLike(postId, userId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
         } catch (PostException e) {
             return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));
