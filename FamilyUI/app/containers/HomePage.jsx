@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
   useColorScheme,
 } from "react-native";
 import loginSignup from "../api/loginSignup";
@@ -23,6 +24,8 @@ const HomePage = () => {
   const [posts, setPosts] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const MAX_POSTS_COUNT = 12;
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
 
@@ -40,16 +43,15 @@ const HomePage = () => {
     }
   };
 
-  // Fetch Posts
-  const fetchPosts = async () => {
+  // Fetch Posts (append option)
+  const fetchPosts = async (append = false) => {
     if (!myProfile?.id) return;
-
-    setRefreshing(true); // ✅ Start refresh indicator
+    append ? setLoadingMore(true) : setRefreshing(true);
 
     try {
-      const response = await postHandle.getFeed(myProfile.id);
+      const response = await postHandle.getFeed(myProfile.id, 10);
       if (response?.status && response.data?.data) {
-        const postsWithThumbnails = await Promise.all(
+        const fetchedPosts = await Promise.all(
           response.data.data.map(async (post) => {
             let userThumbnailUrl = null;
             if (post?.thumbnailId) {
@@ -64,14 +66,29 @@ const HomePage = () => {
           })
         );
 
-        setPosts(postsWithThumbnails);
-      } else {
-        setPosts([]);
+        setPosts((prev) => {
+          // Merge without duplicates
+          const combined = append
+            ? [
+                ...prev,
+                ...fetchedPosts.filter(
+                  (p) => !prev.find((existing) => existing.id === p.id)
+                ),
+              ]
+            : fetchedPosts;
+
+          // If more than MAX_POSTS_COUNT, remove the oldest 6 posts
+          if (combined.length > MAX_POSTS_COUNT) {
+            return combined.slice(6);
+          }
+
+          return combined;
+        });
       }
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
-      setRefreshing(false); // ✅ Stop refresh indicator
+      append ? setLoadingMore(false) : setRefreshing(false);
     }
   };
 
@@ -81,14 +98,14 @@ const HomePage = () => {
 
   useEffect(() => {
     if (myProfile?.id) {
-      fetchPosts();
+      fetchPosts(false);
     }
   }, [myProfile]);
 
   // Handle pull-to-refresh
   const onRefresh = () => {
     setPosts([]);
-    fetchPosts();
+    fetchPosts(false);
   };
 
   // Auto-play videos when visible
@@ -109,6 +126,15 @@ const HomePage = () => {
   const viewabilityConfigCallbackPairs = useRef([
     { onViewableItemsChanged, viewabilityConfig },
   ]);
+
+  const renderFooter = () => {
+    if (!loadingMore) return null;
+    return (
+      <View className="py-4">
+        <ActivityIndicator size="small" color={iconColor} />
+      </View>
+    );
+  };
 
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
@@ -137,7 +163,7 @@ const HomePage = () => {
       {/* Scrollable List (Stories + Posts) */}
       <FlatList
         ref={flatListRef}
-        data={[{ type: "stories" }, ...posts]} // ✅ First item is "stories"
+        data={[{ type: "stories" }, ...posts]}
         keyExtractor={(item) =>
           item.type === "stories" ? "stories" : item.id.toString()
         }
@@ -191,8 +217,11 @@ const HomePage = () => {
             <Text className="text-gray-500 text-lg">No posts available</Text>
           </View>
         }
-        refreshing={refreshing} // ✅ Enable pull-to-refresh
-        onRefresh={onRefresh} // ✅ Assign refresh function
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        onEndReached={() => fetchPosts(true)}
+        onEndReachedThreshold={0.5}
+        ListFooterComponent={renderFooter}
       />
     </View>
   );

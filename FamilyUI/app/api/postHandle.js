@@ -4,7 +4,8 @@ import Platform from "react-native";
 import loginSignup from "./loginSignup";
 //const POST_API_URL = "http://192.168.31.218:8083";
 const POST_API_URL = "https://familypost.onrender.com";
-const FEED_API_URL = "http://192.168.31.218:8084";
+//const FEED_API_URL = "http://192.168.31.218:8084";
+const FEED_API_URL = "https://familyfeed.onrender.com";
 
 class PostService {
     async createPost(post, file) {
@@ -131,9 +132,12 @@ class PostService {
             throw new Error("UserID is required");
         }
 
-        const response = await loginSignup.request(`http://192.168.31.218:8084/feeds/random-feed?mineId=67de6e850829c84b1c1de72a`, {
+        const response = await loginSignup.request(`${FEED_API_URL}/feeds/random-feed?mineId=${mineId}`, {
             method: "GET",
         });
+
+        console.log("HEY: ",response.data);
+        
         return response;
     }
 
