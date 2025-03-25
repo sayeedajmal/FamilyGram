@@ -8,7 +8,13 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
+import org.springframework.data.mongodb.core.aggregation.AggregationOperationContext;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -21,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.strong.familyauth.Model.LiteUser;
 import com.strong.familyauth.Model.Token;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Repository.TokenRepository;
@@ -54,6 +61,9 @@ public class UserService implements UserDetailsService {
 
     @Autowired
     private TokenRepository tokenRepository;
+
+    @Autowired
+    private MongoTemplate mongoTemplate;
 
     public boolean canAccessProfile(String mineId, String yourId) {
         Optional<User> userOptional = userRepo.findById(yourId);
@@ -231,9 +241,63 @@ public class UserService implements UserDetailsService {
         return result;
     }
 
-    public Map<String, Object> liteUser(String userId) {
-        Optional<User> userOptional = userRepo.findById(userId);
+    public List<LiteUser> findRandomFeedUsers(String mineId, int limit) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.facet()
+                        .and(
+                                Aggregation.match(
+                                        Criteria.where("isPrivate").is(false)
+                                                .and("_id").ne(mineId)),
+                                Aggregation.sample(limit),
+                                Aggregation.project()
+                                        .and("_id").as("id")
+                                        .andInclude("username", "name", "thumbnailId"))
+                        .as("publicUsers")
+                        .and(
+                                Aggregation.lookup("followers", "_id", "followed", "followers"),
+                                Aggregation.match(
+                                        Criteria.where("isPrivate").is(true)
+                                                .and("followers.follower").is(mineId)),
+                                Aggregation.sample(limit),
+                                Aggregation.project()
+                                        .and("_id").as("id")
+                                        .andInclude("username", "name", "thumbnailId"))
+                        .as("privateUsers"),
+                // Correctly use $concatArrays in a raw projection
+                new AggregationOperation() {
+                    @SuppressWarnings("null")
+                    @Override
+                    public Document toDocument(AggregationOperationContext context) {
+                        return new Document("$project",
+                                new Document("users",
+                                        new Document("$concatArrays",
+                                                List.of("$publicUsers", "$privateUsers"))));
+                    }
+                },
+                Aggregation.unwind("users"),
+                Aggregation.replaceRoot("users"));
 
+        return mongoTemplate.aggregate(aggregation, "users", LiteUser.class).getMappedResults();
+    }
+
+    public Optional<LiteUser> findLiteUserById(String userId) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("_id").is(userId)),
+                Aggregation.project()
+                        .and("_id").as("id")
+                        .andInclude("username", "name", "thumbnailId"));
+
+        List<LiteUser> users = mongoTemplate.aggregate(aggregation, "users", LiteUser.class).getMappedResults();
+        return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
+    }
+
+    // FOR POST
+    public Map<String, Object> userForPost(String yourId, String mineId) {
+        if (!canAccessProfile(mineId, yourId)) {
+            return null;
+        }
+
+        Optional<User> userOptional = userRepo.findById(yourId);
         if (userOptional.isEmpty()) {
             return null;
         }

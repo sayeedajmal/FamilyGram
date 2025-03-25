@@ -1,12 +1,16 @@
 package com.strong.familypost.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -15,11 +19,14 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.strong.familypost.Model.LiteUser;
 import com.strong.familypost.Model.Post;
+import com.strong.familypost.Model.PostWithUser;
 import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Repository.PostRepo;
 import com.strong.familypost.Util.PostException;
+import com.strong.familypost.Util.ResponseWrapper;
 
 /**
  * Service class responsible for managing Post-related operations.
@@ -44,6 +51,42 @@ public class PostService {
 
     @Autowired
     private UserServiceClient client;
+
+    @SuppressWarnings("null")
+    public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
+        ResponseEntity<ResponseWrapper<List<LiteUser>>> response = client.getRandomFeedUsers(mineId, userLimit, token);
+
+        if (response.getBody() == null || response.getBody().getData() == null) {
+            return List.of();
+        }
+
+        List<LiteUser> users = response.getBody().getData();
+
+        Pageable pageable = PageRequest.of(0, 2);
+
+        return users.stream()
+                .flatMap(user -> {
+                    List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
+
+                    return posts.stream()
+                            .filter(post -> post != null && post.getUserId() != null)
+                            .map(post -> {
+                                return new PostWithUser(
+                                        user.getUsername(),
+                                        user.getName(),
+                                        user.getThumbnailId(),
+                                        post.getId(),
+                                        post.getUserId(),
+                                        post.getCaption(),
+                                        post.getMediaIds() != null ? post.getMediaIds() : List.of(),
+                                        post.getLocation(),
+                                        post.getLikes() != null ? post.getLikes() : new HashSet<>(),
+                                        post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now());
+                            });
+                })
+                .collect(Collectors.toList());
+
+    }
 
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();

@@ -10,6 +10,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.strong.familyauth.Model.LiteUser;
 import com.strong.familyauth.Model.ResponseWrapper;
 import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Service.UserService;
@@ -90,13 +92,22 @@ public class UserController {
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profiles retrieved", users));
     }
 
-    @PostMapping("/liteUser")
+    @GetMapping("/random-feed-users")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Map<String, Object>>> getLiteUser(
-            @RequestParam("userId") String userId)
-            throws UserException {
-        Map<String, Object> profile = userService.liteUser(userId);
-        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
+    public ResponseEntity<ResponseWrapper<List<LiteUser>>> getRandomFeedUsers(
+            @RequestParam String mineId,
+            @RequestParam(defaultValue = "10") int limit) {
+        List<LiteUser> users = userService.findRandomFeedUsers(mineId, limit);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Random feed users retrieved", users));
+    }
+
+    @GetMapping("/{userId}/lite")
+    public ResponseEntity<ResponseWrapper<LiteUser>> getLiteUserById(@PathVariable String userId) {
+        return userService.findLiteUserById(userId)
+                .map(user -> ResponseEntity
+                        .ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", user)))
+                .orElse(ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(new ResponseWrapper<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
     }
 
     @PostMapping("/byId")
