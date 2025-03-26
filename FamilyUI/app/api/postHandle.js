@@ -113,14 +113,27 @@ class PostService {
 
         return response;
     }
-    async getPostById(postId) {
+    async getPostById(postId, userId) {
 
         if (!postId) {
             throw new Error("Post ID is required");
         }
 
-        const response = await loginSignup.request(`${POST_API_URL}/posts/myposts/${postId}?userId=${postId}`, {
+        const response = await loginSignup.request(`${POST_API_URL}/posts/myposts/${postId}?userId=${userId}`, {
             method: "GET",
+        });
+
+        return response;
+    }
+
+    async DeletePostById(postId) {
+
+        if (!postId) {
+            throw new Error("Post ID is required");
+        }
+
+        const response = await loginSignup.request(`${POST_API_URL}/posts/${postId}`, {
+            method: "DELETE",
         });
 
         return response;
@@ -136,8 +149,6 @@ class PostService {
             method: "GET",
         });
 
-        console.log("HEY: ",response.data);
-        
         return response;
     }
 

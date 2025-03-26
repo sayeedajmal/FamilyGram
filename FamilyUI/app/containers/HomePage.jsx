@@ -161,8 +161,31 @@ const HomePage = () => {
       </View>
 
       {/* Scrollable List (Stories + Posts) */}
+      {posts.length === 0 && (
+        <View className="flex-1 justify-center items-center px-6 py-10">
+          <Image
+            source={require("../../assets/images/profile.png")}
+            style={{ width: 150, height: 150, marginBottom: 10 }}
+            resizeMode="contain"
+          />
+          <Text className="text-gray-500 text-lg text-center">
+            Your feed is empty! Follow people to see their posts.
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate("Search")}
+            className="mt-4 px-4 py-2 bg-blue-500 rounded-lg"
+          >
+            <Text className="text-white font-medium">
+              Find People to Follow
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <FlatList
         ref={flatListRef}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         data={[{ type: "stories" }, ...posts]}
         keyExtractor={(item) =>
           item.type === "stories" ? "stories" : item.id.toString()
@@ -212,11 +235,6 @@ const HomePage = () => {
         }}
         initialNumToRender={5}
         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
-        ListEmptyComponent={
-          <View className="flex-1 justify-center items-center">
-            <Text className="text-gray-500 text-lg">No posts available</Text>
-          </View>
-        }
         refreshing={refreshing}
         onRefresh={onRefresh}
         onEndReached={() => fetchPosts(true)}

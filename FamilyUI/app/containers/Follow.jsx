@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useRef, useState } from "react";
+import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   Animated,
   Dimensions,
@@ -15,7 +16,6 @@ import {
 import loginSignup from "../api/loginSignup";
 import FollowModel from "../components/FollowModel";
 import { Colors } from "../constants/Colors";
-import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 
 const { width } = Dimensions.get("window");
 
@@ -24,6 +24,7 @@ const Follow = ({ route }) => {
   const [searchQuery, setSearchQuery] = useState("");
   const [followers, setFollowers] = useState([]);
   const [following, setFollowing] = useState([]);
+  const [requested, setRequested] = useState([]);
   const [loadingFollowers, setLoadingFollowers] = useState(true);
   const [loadingFollowing, setLoadingFollowing] = useState(true);
   const [activeTab, setActiveTab] = useState(0);
@@ -56,6 +57,25 @@ const Follow = ({ route }) => {
   }, []);
 
   useEffect(() => {
+    const fetchRequested = async () => {
+      if (userProfile?.followRequests?.length > 0) {
+        const requestedData = await Promise.all(
+          userProfile.followRequests.map(async (followerId) => {
+            const response = await loginSignup.getLiteUser(followerId);
+            const imageResponse = await loginSignup.getProfileImage(
+              response.data?.thumbnailId
+            );
+            return { ...response.data, userThumbnailUrl: imageResponse.data };
+          })
+        );
+        setRequested(requestedData);
+      }
+      setLoadingFollowers(false);
+    };
+    fetchRequested();
+  }, []);
+
+  useEffect(() => {
     const fetchFollowing = async () => {
       if (userProfile?.following?.length > 0) {
         const followingData = await Promise.all(
@@ -77,13 +97,12 @@ const Follow = ({ route }) => {
   const switchTab = (index) => {
     setActiveTab(index);
     Animated.timing(tabIndicator, {
-      toValue: index * (width / 2),
+      toValue: index * (width / 3),
       duration: 200,
       useNativeDriver: false,
     }).start();
     scrollRef.current.scrollTo({ x: index * width, animated: true });
   };
-
   const UserCardLoader = () => (
     <ContentLoader
       speed={2}
@@ -141,12 +160,27 @@ const Follow = ({ route }) => {
             Followers
           </Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={{ flex: 1, paddingVertical: 10 }}
+          onPress={() => switchTab(2)} // ✅ Corrected Requested tab
+        >
+          <Text
+            className={`text-center font-custom ${
+              activeTab === 2 ? "font-custom-bold" : ""
+            }`}
+            style={{ color: activeTab === 2 ? "#0278ae" : textColor }}
+          >
+            Requested
+          </Text>
+        </TouchableOpacity>
+
+        {/* Tab Indicator Animation */}
         <Animated.View
           style={{
             position: "absolute",
             bottom: 0,
             left: 0,
-            width: width / 2,
+            width: width / 3, // ✅ Fixed for 3 tabs
             height: 3,
             backgroundColor: themeColors.icon,
             transform: [{ translateX: tabIndicator }],
@@ -190,7 +224,7 @@ const Follow = ({ route }) => {
           );
           setActiveTab(pageIndex);
           Animated.timing(tabIndicator, {
-            toValue: pageIndex * (width / 2),
+            toValue: pageIndex * (width / 3),
             duration: 200,
             useNativeDriver: false,
           }).start();
@@ -205,15 +239,19 @@ const Follow = ({ route }) => {
           ) : (
             <FlatList
               data={following}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => `following-${item.id}`}
               renderItem={({ item }) => (
                 <FollowModel
-                  key={item.id}
+                  key={`following-${item.id}`}
                   userThumbnailUrl={item.userThumbnailUrl}
                   userId={item.id}
+                  mineId={userProfile.id}
                   username={item.username}
                   name={item.name}
                   followStatus="Following"
+                  setRequested={setRequested}
+                  setFollowing={setFollowing}
+                  setFollowers={setFollowers}
                 />
               )}
             />
@@ -229,15 +267,47 @@ const Follow = ({ route }) => {
           ) : (
             <FlatList
               data={followers}
-              keyExtractor={(item) => item.id}
+              keyExtractor={(item) => `followers-${item.id}`}
               renderItem={({ item }) => (
                 <FollowModel
-                  key={item.id}
+                  key={`followers-${item.id}`}
                   userThumbnailUrl={item.userThumbnailUrl}
                   userId={item.id}
+                  mineId={userProfile.id}
                   username={item.username}
                   name={item.name}
                   followStatus="Follow Back"
+                  setRequested={setRequested}
+                  setFollowers={setFollowers}
+                  setFollowing={setFollowers}
+                />
+              )}
+            />
+          )}
+        </View>
+
+        {/* Requested List */}
+        <View style={{ width }}>
+          {loadingFollowers ? (
+            Array.from({ length: 5 }).map((_, index) => (
+              <View key={index}>{UserCardLoader()}</View>
+            ))
+          ) : (
+            <FlatList
+              data={requested}
+              keyExtractor={(item) => `followers-${item.id}`}
+              renderItem={({ item }) => (
+                <FollowModel
+                  key={`requested-${item.id}`}
+                  userThumbnailUrl={item.userThumbnailUrl}
+                  userId={item.id}
+                  mineId={userProfile.id}
+                  username={item.username}
+                  name={item.name}
+                  followStatus="Requested"
+                  setRequested={setRequested}
+                  setFollowers={setFollowers}
+                  setFollowing={setFollowers}
                 />
               )}
             />

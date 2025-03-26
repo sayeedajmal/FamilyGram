@@ -219,13 +219,12 @@ class ApiService {
                 data: null,
             };
         }
-
     }
 
 
     async getLiteUser(userId) {
-        const response = await this.request(`${AUTH_API_URL}/user/liteUser?userId=${encodeURIComponent(userId)}`, {
-            method: "POST",
+        const response = await this.request(`${AUTH_API_URL}/user/${encodeURIComponent(userId)}/lite`, {
+            method: "GET",
         });
 
         if (response.status) {
@@ -238,6 +237,16 @@ class ApiService {
         }
 
     }
+
+    async updatePrivacy(userId, isPrivate) {
+        const response = await this.request(`${AUTH_API_URL}/user/updatePrivacy?userId=${userId}&isPrivate=${isPrivate}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+
+        return response;
+    }
+
     async getSecondProfile(userId, mineId) {
         const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}&mineId=${mineId}`, {
             method: "POST",
@@ -261,6 +270,28 @@ class ApiService {
         });
         if (response.status) {
             await this.fetchUserProfileByEmail(email);
+        }
+        return response;
+    }
+
+    async acceptRequest(userId, mineId) {
+        const response = await this.request(`${AUTH_API_URL}/user/accept?mineId=${mineId}&userId=${userId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+        if (response.status) {
+            await this.fetchUserProfileByEmail(this.getStoredUserProfile?.email);
+        }
+        return response;
+    }
+
+    async removeFollow(userId, mineId) {
+        const response = await this.request(`${AUTH_API_URL}/user/removeFollow?mineId=${mineId}&yourId=${userId}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+        });
+        if (response.status) {
+            await this.fetchUserProfileByEmail(this.getStoredUserProfile?.email);
         }
         return response;
     }

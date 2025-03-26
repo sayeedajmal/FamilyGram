@@ -144,6 +144,35 @@ public class UserService implements UserDetailsService {
         return tokens;
     }
 
+    public boolean acceptFollowRequest(String mineId, String userId) {
+        Optional<User> mineUserOpt = userRepo.findById(mineId);
+        Optional<User> userOpt = userRepo.findById(userId);
+
+        if (mineUserOpt.isPresent() && userOpt.isPresent()) {
+            User mineUser = mineUserOpt.get();
+            User user = userOpt.get();
+
+            // Check if userId is in mineUser's followRequests
+            if (mineUser.getFollowRequests().contains(userId)) {
+                // Remove from followRequests
+                mineUser.getFollowRequests().remove(userId);
+
+                // Add userId to mineUser's followers
+                mineUser.getFollowers().add(userId);
+
+                // Add mineId to user's following list
+                user.getFollowing().add(mineId);
+
+                // Save both users
+                userRepo.save(mineUser);
+                userRepo.save(user);
+
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ADD FOLLOWER
     public String toggleFollower(String mineId, String yourId, String imageUrl) throws UserException {
         Optional<User> mineOptional = userRepo.findById(mineId);
@@ -158,15 +187,22 @@ public class UserService implements UserDetailsService {
 
         // Check if the user is private
         if (your.isPrivate()) {
-            if (!your.getFollowRequests().contains(mineId)) {
-                your.getFollowRequests().add(mineId);
-                userRepo.save(your);
-
-                emailService.sendFollowRequestEmail(your.getId(), mine.getId(), imageUrl);
-                return "Follow request sent successfully.";
-            } else {
-                throw new UserException("You have already sent a follow request to this user.");
+            if (your.getFollowRequests() == null) {
+                your.setFollowRequests(new HashSet<>());
             }
+
+            // If already requested, remove the request (toggle behavior)
+            if (your.getFollowRequests().contains(mineId)) {
+                your.getFollowRequests().remove(mineId);
+                userRepo.save(your);
+                return "Follow request removed.";
+            }
+
+            // Else, send a new follow request
+            emailService.sendFollowRequestEmail(your.getEmail(), mine.getEmail(), imageUrl);
+            your.getFollowRequests().add(mineId);
+            userRepo.save(your);
+            return "Follow request sent successfully.";
         }
 
         // Handle following/unfollowing for non-private accounts
@@ -244,38 +280,43 @@ public class UserService implements UserDetailsService {
     public List<LiteUser> findRandomFeedUsers(String mineId, int limit) {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.facet()
+                        // Step 1: Fetch users I follow or who follow me (private or public)
                         .and(
                                 Aggregation.match(
-                                        Criteria.where("isPrivate").is(false)
-                                                .and("_id").ne(mineId)),
+                                        new Criteria().orOperator(
+                                                Criteria.where("following").in(mineId),
+                                                Criteria.where("followers").in(mineId))),
+                                Aggregation.project()
+                                        .and("_id").as("id")
+                                        .andInclude("username", "name", "thumbnailId"),
+                                Aggregation.sample(limit))
+                        .as("followedUsers")
+
+                        // Step 2: Fetch random public users (excluding self)
+                        .and(
+                                Aggregation.match(
+                                        new Criteria().and("_id").ne(mineId)
+                                                .and("isPrivate").is(false)),
                                 Aggregation.sample(limit),
                                 Aggregation.project()
                                         .and("_id").as("id")
                                         .andInclude("username", "name", "thumbnailId"))
-                        .as("publicUsers")
-                        .and(
-                                Aggregation.lookup("followers", "_id", "followed", "followers"),
-                                Aggregation.match(
-                                        Criteria.where("isPrivate").is(true)
-                                                .and("followers.follower").is(mineId)),
-                                Aggregation.sample(limit),
-                                Aggregation.project()
-                                        .and("_id").as("id")
-                                        .andInclude("username", "name", "thumbnailId"))
-                        .as("privateUsers"),
-                // Correctly use $concatArrays in a raw projection
+                        .as("publicUsers"),
+
+                // Step 3: Merge the results from both facets
                 new AggregationOperation() {
-                    @SuppressWarnings("null")
                     @Override
                     public Document toDocument(AggregationOperationContext context) {
                         return new Document("$project",
                                 new Document("users",
                                         new Document("$concatArrays",
-                                                List.of("$publicUsers", "$privateUsers"))));
+                                                List.of("$followedUsers", "$publicUsers"))));
                     }
                 },
+
                 Aggregation.unwind("users"),
-                Aggregation.replaceRoot("users"));
+                Aggregation.replaceRoot("users"),
+                Aggregation.limit(limit));
 
         return mongoTemplate.aggregate(aggregation, "users", LiteUser.class).getMappedResults();
     }
@@ -377,6 +418,47 @@ public class UserService implements UserDetailsService {
         existingUser.setPhone(phone);
         User savedUser = userRepo.save(existingUser);
         return savedUser.getPhone();
+    }
+
+    public String removeFollow(String mineId, String yourId) {
+        Optional<User> mineOptional = userRepo.findById(mineId);
+        Optional<User> yourOptional = userRepo.findById(yourId);
+
+        if (mineOptional.isEmpty() || yourOptional.isEmpty()) {
+            return "User not found";
+        }
+
+        User mine = mineOptional.get();
+        User your = yourOptional.get();
+        // Case 1: Reject follow request (if exists)
+        if (mine.getFollowRequests().contains(yourId)) {
+            mine.getFollowRequests().remove(yourId);
+            userRepo.save(mine);
+            return "Follow request rejected.";
+        }
+        // Check if mine is following yourId
+        if (mine.getFollowing().contains(yourId)) {
+            // Remove yourId from mine's following list
+            mine.getFollowing().remove(yourId);
+            userRepo.save(mine);
+
+            // Remove mineId from your's followers list
+            your.getFollowers().remove(mineId);
+            userRepo.save(your);
+
+            return "Unfollowed successfully.";
+        } else {
+            return "You are not following this user.";
+        }
+    }
+
+    // Update Privacy
+    public boolean UpdatePrivacy(Boolean isPrivate, String id) throws UserException {
+        User existingUser = userRepo.findById(id)
+                .orElseThrow(() -> new UserException("User not found"));
+        existingUser.setPrivate(isPrivate);
+        User savedUser = userRepo.save(existingUser);
+        return savedUser.isPrivate();
     }
 
     public User updateUser(MultipartFile file, User updatedUser, MultipartFile thumbnail) throws UserException {

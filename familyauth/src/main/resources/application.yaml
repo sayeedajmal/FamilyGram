@@ -21,11 +21,14 @@ spring:
     password: ${EmailPassword}
     properties.mail.smtp.auth: true
     properties.mail.smtp.starttls.enable: true
-
+  jackson:
+    time-zone: UTC
+  jpa:
+    properties:
+      hibernate.jdbc.time_zone: UTC
 
 server:
   port: 8082
-
 
 jwt:
   secret: ${JWT_SECRET}
@@ -42,7 +45,7 @@ jwt:
 #     web: OFF
 #     org.springframework.web: ERROR
 #     feign: ERROR
-    
+
 management:
   endpoints:
     web:
@@ -52,4 +55,3 @@ management:
     export:
       prometheus:
         enabled: true
-

@@ -6,12 +6,12 @@ import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   FlatList,
   Image,
+  Modal,
   RefreshControl,
   Text,
   TouchableOpacity,
-  View,
-  Modal,
   useColorScheme,
+  View,
 } from "react-native";
 import loginSignup from "../api/loginSignup";
 import { default as PostService } from "../api/postHandle";
@@ -35,7 +35,10 @@ export const ProfileSection = () => {
   const fetchUserProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
-      setMyProfile(profile);
+      const resposne = await loginSignup.fetchUserProfileByEmail(
+        profile?.email
+      );
+      setMyProfile(resposne.data);
     }
     setRefreshing(false);
   };
@@ -88,6 +91,7 @@ export const ProfileSection = () => {
 
   const onRefresh = async () => {
     setRefreshing(true);
+    fetchUserProfile();
     await fetchMyPosts();
     setRefreshing(false);
   };
@@ -167,14 +171,14 @@ export const ProfileSection = () => {
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
               source={{ uri: myProfile.thumbnailUrl }}
-              style={{ width: 96, height: 96, borderRadius: 48 }}
+              style={{ width: 85, height: 85, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">
               <Text
                 className="text-center font-custom"
                 style={{ color: textColor }}
               >
-                <Text className="font-custom">0</Text>
+                <Text className="font-custom">{myPosts?.length ?? 0}</Text>
                 {"\n"} posts
               </Text>
               <Text
@@ -295,7 +299,7 @@ export const ProfileSection = () => {
 
             {fetch ? (
               <FlatList
-                data={Array(9).fill(0)} // Fake data for loader
+                data={Array(6).fill(0)} // Fake data for loader
                 keyExtractor={(_, index) => index.toString()}
                 numColumns={3}
                 renderItem={() => (
@@ -303,18 +307,11 @@ export const ProfileSection = () => {
                     <ContentLoader
                       speed={2}
                       height={110}
-                      viewBox="0 0 110 110"
+                      viewBox="0 0 100 100"
                       backgroundColor="#e0e0e0"
                       foregroundColor="#d6d6d6"
                     >
-                      <Rect
-                        x="0"
-                        y="0"
-                        rx="8"
-                        ry="8"
-                        width="100%"
-                        height="110"
-                      />
+                      <Rect x="0" y="0" rx="8" ry="8" width="95%" height="90" />
                     </ContentLoader>
                   </View>
                 )}

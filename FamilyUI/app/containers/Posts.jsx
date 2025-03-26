@@ -79,7 +79,7 @@ const Posts = () => {
   };
 
   useEffect(() => {
-    //fetchUserPosts();    
+    //fetchUserPosts();
   }, [selectedPost?.userId]);
 
   // Handle video play/pause based on visibility
@@ -102,7 +102,7 @@ const Posts = () => {
   ]);
 
   return (
-    <View style={{ flex: 1, backgroundColor: bg }}>
+    <View style={{ flex: 1, backgroundColor: bg }} >
       {/* Header */}
       <View className="flex-row items-center p-4">
         <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -122,6 +122,8 @@ const Posts = () => {
         ref={flatListRef}
         data={posts}
         keyExtractor={(item) => item.id.toString()}
+        showsVerticalScrollIndicator={false}
+        showsHorizontalScrollIndicator={false}
         initialNumToRender={5}
         renderItem={({ item }) => (
           <PostModel

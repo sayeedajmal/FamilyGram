@@ -65,34 +65,29 @@ export const UsersProfile = () => {
       Alert.alert("Error", "Failed to fetch user profile");
     }
   };
-  
+
   const OpenFollw = () => {
     navigation.navigate("Follow", { userProfile: userProfile });
   };
   const toggleFollow = async () => {
-    if (!userProfile?.id || myProfile?.id == userProfile?.id) return;
+    if (!userProfile?.id || myProfile?.id === userProfile?.id) return;
 
     setIsLoading(true);
 
-    try {
-      const response = await loginSignup.toggleFollow(
-        userProfile.id,
-        myProfile.id,
-        thumbnailUrl,
-        myProfile.email
-      );
+    const response = await loginSignup.toggleFollow(
+      userProfile.id,
+      myProfile.id,
+      thumbnailUrl,
+      myProfile.email
+    );
 
-      if (response.status) {
-        setIsFollowing(!isFollowing);
-        await fetchUserProfile();
-      } else {
-        Alert.alert("Error", response.message);
-      }
-    } catch (error) {
-      Alert.alert("Error", "Something went wrong. Please try again.");
-    } finally {
-      setIsLoading(false);
+    if (response.status) {
+      await fetchUserProfile();
+    } else {
+      Alert.alert("Error", response.message);
     }
+
+    setIsLoading(false);
   };
 
   const FetchPosts = async () => {
@@ -101,8 +96,12 @@ export const UsersProfile = () => {
 
     const response = await PostService.GetPostByUserId(userProfile.id);
     if (response?.status) {
-      const posts = response.data.data;
+      let posts = response.data.data;
+
       if (Array.isArray(posts) && posts.length > 0) {
+        // Sort posts by createdAt (newest first)
+        posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
         const updatedPosts = await Promise.all(
           posts.map(async (post) => {
             let postThumbnailUrl = "https://placehold.co/150x150?text=No+Image";
@@ -126,13 +125,14 @@ export const UsersProfile = () => {
             };
           })
         );
+
         setUserPosts(updatedPosts);
-        setFetch(false);
       } else {
         setUserPosts([]);
-        setFetch(false);
       }
     }
+
+    setFetch(false);
   };
 
   const onRefresh = async () => {
@@ -214,7 +214,7 @@ export const UsersProfile = () => {
                 className="text-center font-custom"
                 style={{ color: textColor }}
               >
-                <Text className="font-custom">0</Text>
+                <Text className="font-custom">{userPosts?.length ?? 0}</Text>
                 {"\n"} posts
               </Text>
               <Text
@@ -267,8 +267,8 @@ export const UsersProfile = () => {
             <TouchableOpacity
               className={`flex-1 py-1 rounded-md mx-[1%] ${
                 isFollowing
-                  ? `bg-${themeColors.tint} border`
-                  : "bg-blue-500 border-transparent "
+                  ? `bg-${themeColors.tint} border border-black dark:border-white`
+                  : "bg-blue-500 border-black dark:border-white"
               }`}
               onPress={toggleFollow}
               disabled={isLoading}
@@ -281,8 +281,10 @@ export const UsersProfile = () => {
                   <ActivityIndicator size="small" color="white" />
                 ) : isFollowing ? (
                   "Following"
-                ) : myProfile?.isPrivate ? (
-                  "Request Follow"
+                ) : userProfile?.followRequests?.includes(myProfile?.id) ? (
+                  "Requested"
+                ) : userProfile?.private ? (
+                  "Request"
                 ) : (
                   "Follow"
                 )}

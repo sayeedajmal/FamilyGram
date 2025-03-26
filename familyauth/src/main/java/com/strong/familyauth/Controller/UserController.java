@@ -53,6 +53,15 @@ public class UserController {
                         updatedProfile));
     }
 
+    @PostMapping("/updatePrivacy")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<Boolean>> updatePrivacy(@RequestParam("userId") String userId,
+            @RequestParam("isPrivate") boolean isPrivate) throws UserException {
+        boolean updatedProfile = userService.UpdatePrivacy(isPrivate, userId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Privacy updated successfully",
+                updatedProfile));
+    }
+
     @GetMapping("/privacy")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<String> privacy(@RequestParam String mineId, @RequestParam String yourId) {
@@ -178,6 +187,39 @@ public class UserController {
 
         String toggleFollowerMessage = userService.toggleFollower(mineId, yourId, imageUrl);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), toggleFollowerMessage, ""));
+    }
+
+    /**
+     * @param mineId   ID of the authenticated user (the one performing the
+     *                 follow/unfollow action)
+     * @param yourId   ID of the user to be followed or unfollowed
+     * @param imageUrl The image URL used for follow request emails (if applicable)
+     * @return A ResponseEntity containing a ResponseWrapper with the result message
+     *         and the updated user data (including following/followers lists)
+     * @throws UserException if either of the users cannot be found or any other
+     *                       user-related error occurs
+     */
+    @PostMapping("/removeFollow")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<String>> removeFollow(@RequestParam("mineId") String mineId,
+            @RequestParam("yourId") String yourId)
+            throws UserException {
+        String removed = userService.removeFollow(mineId, yourId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), removed, ""));
+    }
+
+    @PostMapping("/accept")
+    public ResponseEntity<ResponseWrapper<Boolean>> acceptFollowRequest(
+            @RequestParam String mineId, @RequestParam String userId) {
+
+        boolean success = userService.acceptFollowRequest(mineId, userId);
+
+        if (success) {
+            return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Accepted", true));
+        } else {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(new ResponseWrapper<>(HttpStatus.FORBIDDEN.value(), "ERROR", false));
+        }
     }
 
     /**

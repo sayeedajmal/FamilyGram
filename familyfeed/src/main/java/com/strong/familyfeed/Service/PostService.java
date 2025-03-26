@@ -1,7 +1,10 @@
 package com.strong.familyfeed.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -30,7 +33,7 @@ import com.strong.familyfeed.Util.ResponseWrapper;
 public class PostService {
 
     @Autowired
-    private PostRepo PostRepo;
+    private PostRepo postRepo;
 
     @Autowired
     private UserServiceClient client;
@@ -45,29 +48,32 @@ public class PostService {
 
         List<LiteUser> users = response.getBody().getData();
 
-        Pageable pageable = PageRequest.of(0, 2);
+        Pageable pageable = PageRequest.of(0, 5);
 
         return users.stream()
                 .flatMap(user -> {
-                    List<Post> Posts = PostRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
-
-                    return Posts.stream()
-                            .filter(Post -> Post != null && Post.getUserId() != null)
-                            .map(Post -> {
-                                return new PostWithUser(
-                                        user.getUsername(),
-                                        user.getName(),
-                                        user.getThumbnailId(),
-                                        Post.getId(),
-                                        Post.getUserId(),
-                                        Post.getCaption(),
-                                        Post.getMediaIds() != null ? Post.getMediaIds() : List.of(),
-                                        Post.getLocation(),
-                                        Post.getLikes() != null ? Post.getLikes() : new HashSet<>(),
-                                        Post.getCreatedAt() != null ? Post.getCreatedAt() : LocalDateTime.now());
-                            });
+                    List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
+                    return posts.stream()
+                            .filter(post -> post != null && post.getUserId() != null)
+                            .map(post -> new PostWithUser(
+                                    user.getUsername(),
+                                    user.getName(),
+                                    user.getThumbnailId(),
+                                    post.getId(),
+                                    post.getUserId(),
+                                    post.getCaption(),
+                                    post.getMediaIds() != null ? post.getMediaIds() : List.of(),
+                                    post.getLocation(),
+                                    post.getLikes() != null ? post.getLikes() : new HashSet<>(),
+                                    post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now()));
                 })
-                .collect(Collectors.toList());
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toCollection(() -> new LinkedHashSet<>()), // 🔥 Removes duplicates
+                        list -> {
+                            List<PostWithUser> finalList = new ArrayList<>(list);
+                            Collections.shuffle(finalList); // 🔀 Shuffle to randomize the feed
+                            return finalList;
+                        }));
 
     }
 

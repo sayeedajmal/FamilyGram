@@ -41,6 +41,8 @@
     "expo-updates": "~0.27.3",
     "expo-video-thumbnails": "~9.0.3",
     "expo-web-browser": "~14.0.2",
+    "lottie-ios": "^4.5.1",
+    "lottie-react-native": "^7.2.2",
     "moment": "^2.30.1",
     "nativewind": "^4.1.23",
     "postinstall-postinstall": "^2.1.0",

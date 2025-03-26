@@ -1,11 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { Video } from "expo-av";
+import LottieView from "lottie-react-native";
 import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   FlatList,
   Image,
   Keyboard,
@@ -15,13 +17,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   useColorScheme,
   View,
-  Dimensions,
 } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
-import Modal from "react-native-modal"; // Use react-native-modal
+import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
 import postService from "../api/postHandle";
 import { Colors } from "../constants/Colors";
@@ -46,6 +48,9 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const [activeComment, setActiveComment] = useState(false);
   const { width } = Dimensions.get("window");
   const [activeIndex, setActiveIndex] = useState(0);
+  const lastTap = useRef(null);
+  const lottieRef = useRef(null);
+  const [isLikeAnimating, setIsLikeAnimating] = useState(false);
 
   const [isCommenting, setIsCommenting] = useState(false);
   const [myComment, setMyComment] = useState({
@@ -74,16 +79,21 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }
   }, [post]);
 
-  //Date of Post
+  // Date of Post
   useEffect(() => {
-    const postDate = moment(post?.createdAt);
+    if (!post?.createdAt) return;
+
+    const postDate = moment.utc(post.createdAt).local();
     const now = moment();
+    const diffInMinutes = now.diff(postDate, "minutes");
     const diffInHours = now.diff(postDate, "hours");
     const diffInDays = now.diff(postDate, "days");
 
     let formattedTime;
-    if (diffInHours < 1) {
+    if (diffInMinutes < 1) {
       formattedTime = "Just now";
+    } else if (diffInMinutes < 60) {
+      formattedTime = `${diffInMinutes} MINUTES AGO`;
     } else if (diffInHours < 24) {
       formattedTime = `${diffInHours} HOURS AGO`;
     } else if (diffInDays < 7) {
@@ -91,6 +101,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     } else {
       formattedTime = postDate.format("MMM D, YYYY");
     }
+
     setTimeAgo(formattedTime);
   }, [post?.createdAt]);
 
@@ -99,7 +110,8 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     const fetchMediaUrls = async () => {
       if (!post?.mediaIds?.length) return;
       setIsMediaLoading(true);
-
+      setMediaUrls([]); // Clear previous media
+      setMediaType(null);
       try {
         const validMediaData = [];
 
@@ -156,7 +168,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }));
 
     fetchMediaUrls();
-  }, [post?.mediaIds]);
+  }, [post]);
 
   useEffect(() => {
     if (videoRef.current) {
@@ -184,11 +196,11 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
             }
           }
 
-          const postDate = moment(item.createdAt);
+          const commentDate = moment.utc(item.createdAt).local();
           const now = moment();
-          const diffInMinutes = now.diff(postDate, "minutes");
-          const diffInHours = now.diff(postDate, "hours");
-          const diffInDays = now.diff(postDate, "days");
+          const diffInMinutes = now.diff(commentDate, "minutes");
+          const diffInHours = now.diff(commentDate, "hours");
+          const diffInDays = now.diff(commentDate, "days");
 
           let formattedTime;
           if (diffInMinutes < 1) {
@@ -200,7 +212,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
           } else if (diffInDays < 7) {
             formattedTime = `${diffInDays} DAYS AGO`;
           } else {
-            formattedTime = postDate.format("MMM D, YYYY");
+            formattedTime = commentDate.format("MMM D, YYYY");
           }
 
           return {
@@ -266,6 +278,52 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }
   }, [myProf, post]);
 
+  const handleDoubleTap = () => {
+    const now = Date.now();
+
+    if (lastTap.current && now - lastTap.current < 300) {
+      toggleLike(post?.id);
+
+      // Trigger heart animation
+      setIsLikeAnimating(true);
+
+      // Platform-specific animation handling
+      if (Platform.OS === "ios") {
+        // For iOS, use a more explicit animation reset
+        requestAnimationFrame(() => {
+          if (lottieRef.current) {
+            // Reset the animation completely
+            lottieRef.current.reset();
+
+            // Slight delay to ensure reset
+            setTimeout(() => {
+              lottieRef.current.play(0, 50);
+            }, 50);
+          }
+
+          // Hide animation with a consistent timeout
+          setTimeout(() => {
+            setIsLikeAnimating(false);
+          }, 800);
+        });
+      } else {
+        // Existing Android logic
+        setTimeout(() => {
+          if (lottieRef.current) {
+            lottieRef.current.play(0, 50);
+          }
+
+          setTimeout(() => {
+            setIsLikeAnimating(false);
+          }, 700);
+        }, 50);
+      }
+    }
+
+    lastTap.current = now;
+  };
+
+  // Toggle Like Function
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
 
@@ -342,18 +400,9 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                 <Rect x="50" y="20" rx="4" ry="4" width="120" height="10" />
                 <Rect x="0" y="50" rx="8" ry="8" width="100%" height="200" />
                 <Rect x="0" y="260" rx="4" ry="4" width="80" height="10" />
-                <Rect x="0" y="280" rx="4" ry="4" width="150" height="10" />
+                <Rect x="0" y="280" rx="4" ry="4" width="200" height="10" />
               </ContentLoader>
             ))}
-          </View>
-        ) : !post ? (
-          <View style={{ padding: 20, alignItems: "center" }}>
-            <Text
-              style={{ color: textColor, fontSize: 16 }}
-              className="font-custom"
-            >
-              No posts available
-            </Text>
           </View>
         ) : (
           <View
@@ -421,35 +470,68 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                       const pageIndex = Math.round(
                         event.nativeEvent.contentOffset.x / width
                       );
-                      setActiveIndex(pageIndex); // ✅ Update dot index
+                      setActiveIndex(pageIndex);
                     }}
-                    scrollEventThrottle={16} // Smooth scrolling updates
+                    scrollEventThrottle={16}
                   >
                     {mediaUrls.map((url, index) => (
                       <View key={index} style={{ padding: 5 }}>
-                        {mediaType === "video" ? (
-                          <Video
-                            source={{ uri: url }}
+                        <TouchableWithoutFeedback onPress={handleDoubleTap}>
+                          <View
                             style={{
-                              width: width - 25,
-                              height: 300,
-                              aspectRatio: 4 / 5,
-                              borderRadius: 8,
+                              alignItems: "center",
+                              justifyContent: "center",
                             }}
-                            resizeMode="contain"
-                            isLooping
-                          />
-                        ) : (
-                          <Image
-                            source={{ uri: url }}
-                            style={{
-                              width: width - 25,
-                              aspectRatio: 4 / 5,
-                              borderRadius: 8,
-                            }}
-                            resizeMode="contain"
-                          />
-                        )}
+                          >
+                            {mediaType === "video" ? (
+                              <Video
+                                source={{ uri: url }}
+                                style={{
+                                  width: width - 25,
+                                  height: 300,
+                                  aspectRatio: 4 / 5,
+                                  borderRadius: 8,
+                                }}
+                                resizeMode="contain"
+                                isLooping
+                              />
+                            ) : (
+                              <Image
+                                source={{ uri: url }}
+                                style={{
+                                  width: width - 25,
+                                  aspectRatio: 4 / 5,
+                                  borderRadius: 8,
+                                }}
+                                resizeMode="contain"
+                              />
+                            )}
+                            {isLikeAnimating && (
+                              <View
+                                style={{
+                                  position: "absolute",
+                                  top: "50%",
+                                  left: "50%",
+                                  transform: [
+                                    { translateX: -150 },
+                                    { translateY: -150 },
+                                  ],
+                                  width: 300,
+                                  height: 300,
+                                  zIndex: 999,
+                                }}
+                              >
+                                <LottieView
+                                  ref={lottieRef}
+                                  source={require("../../assets/images/heart.json")}
+                                  autoPlay={false}
+                                  loop={false}
+                                  style={{ width: 300, height: 300 }}
+                                />
+                              </View>
+                            )}
+                          </View>
+                        </TouchableWithoutFeedback>
                       </View>
                     ))}
                   </ScrollView>
@@ -495,12 +577,12 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               <View style={{ flexDirection: "row" }}>
                 <TouchableOpacity
                   style={{ marginRight: 16 }}
-                  onPress={() => toggleLike(post.id)}
+                  onPress={() => toggleLike(post?.id)}
                 >
                   <Ionicons
-                    name={likedPosts[post.id] ? "heart" : "heart-outline"}
+                    name={likedPosts[post?.id] ? "heart" : "heart-outline"}
                     size={26}
-                    color={likedPosts[post.id] ? "red" : iconColor}
+                    color={likedPosts[post?.id] ? "red" : iconColor}
                   />
                 </TouchableOpacity>
                 <TouchableOpacity
