@@ -13,7 +13,7 @@ import com.strong.familyfeed.Model.LiteUser;
 import com.strong.familyfeed.Util.ResponseWrapper;
 
 //http://localhost:8082 https://familygram.onrender.com
-@FeignClient(name = "user-service", url = "http://familyauth:8081")
+@FeignClient(name = "user-service", url = "https://familygram.onrender.com")
 @Service
 public interface UserServiceClient {
 
