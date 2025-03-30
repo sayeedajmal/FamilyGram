@@ -15,7 +15,7 @@ spring:
       hibernate.jdbc.time_zone: UTC
 
   kafka:
-    bootstrap.servers: kafka.railway.internal:9092
+    bootstrap-servers: nozomi.proxy.rlwy.net:10199
     consumer:
       group-id: notification-group
       auto-offset-reset: latest
