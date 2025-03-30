@@ -5,7 +5,6 @@ import { CardStyleInterpolators, createStackNavigator } from "@react-navigation/
 import { useFonts } from "expo-font";
 import * as SecureStore from "expo-secure-store";
 import React, { useEffect, useState } from "react";
-import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import { Animated, Appearance, Easing, Image, Platform, StatusBar, View } from "react-native";
 import Settings from "../app/containers/Settings";
 import "../global.css";
@@ -17,10 +16,11 @@ import UsersProfile from "./components/UsersProfile";
 import { Colors } from "./constants/Colors";
 import Follow from "./containers/Follow";
 import HomePage from "./containers/HomePage";
+import InAppNotification from "./containers/InAppNotification";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
-
+import SendNotification from "./containers/SendNotification";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -45,6 +45,9 @@ export default function App() {
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
 
+
+
+  const [notifications, setNotifications] = useState([]);
 
 
   const [fonts] = useFonts({
@@ -183,7 +186,7 @@ export default function App() {
                 <Tab.Screen name="Home" component={HomePage} />
                 <Tab.Screen name="Search" component={Search} />
                 <Tab.Screen name="Add" component={PostCreationScreen} />
-                <Tab.Screen name="Play" component={HomePage} />
+                <Tab.Screen name="Play" component={InAppNotification} />
                 <Tab.Screen name="Profile" component={ProfileSection} />
               </Tab.Navigator>
             )}
@@ -206,6 +209,20 @@ export default function App() {
             },
             overlayEnabled: true,
           }} component={Follow} />
+
+          <Stack.Screen name="Notification" options={{
+            presentation: "card",
+            gestureEnabled: true,
+            gestureDirection: "horizontal",
+            cardStyleInterpolator: CardStyleInterpolators.forHorizontalIOS,
+            headerShown: false,
+            cardOverlayEnabled: true,
+            detachPreviousScreen: false,
+            cardStyle: {
+              overflow: "hidden",
+            },
+            overlayEnabled: true,
+          }} component={InAppNotification} />
 
           <Stack.Screen
             name="Settings"

@@ -19,6 +19,7 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
 import { Colors } from "../constants/Colors";
+import NotificationSocket from "../api/NotificationSocket";
 
 const PostCreationScreen = () => {
   const [caption, setCaption] = useState("");
@@ -99,7 +100,23 @@ const PostCreationScreen = () => {
 
     if (response.status) {
       setIsUpdating(false);
+      const data = response.data.data;
       Alert.alert("Success", "Post Created Successfully!");
+
+      const postId = data?.id;
+      const postThumbId = data?.thumbnailIds?.[0];
+
+      // Trigger Notification for all followers
+      await NotificationSocket.sendNotificationsBulk(
+        "POST",
+        "Posted a new post",
+        userProfile?.username,
+        userProfile?.followers,
+        userProfile?.thumbnailId,
+        postId,
+        postThumbId
+      );
+
       navigation.reset({ index: 0, routes: [{ name: "Home" }] });
     } else {
       setIsUpdating(false);

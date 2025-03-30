@@ -190,7 +190,7 @@ export default function SignupScreen({ navigation, setAuthenticated }) {
   }, [username]);
 
   const handleUsernameChange = (text) => {
-    const sanitizedText = input1.replace(/[^a-zA-Z0-9-_]/g, "");
+    const sanitizedText = text.replace(/[^a-zA-Z0-9-_]/g, "");
     setUsername(sanitizedText);
     setUsernameError(false);
   };

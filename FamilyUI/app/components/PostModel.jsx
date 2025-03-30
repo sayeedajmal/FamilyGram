@@ -25,9 +25,11 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import Modal from "react-native-modal";
 import loginSignup from "../api/loginSignup";
+import NotificationSocket from "../api/NotificationSocket";
 import postService from "../api/postHandle";
 import { Colors } from "../constants/Colors";
 import CommentModel from "./CommentsModal";
+
 const mediaContentCache = new Map();
 
 const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
@@ -79,6 +81,17 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     }
   }, [post]);
 
+  const triggerNotifcation = async (type, message) => {
+    await NotificationSocket.sendNotificationsBulk(
+      type,
+      message,
+      myProf?.username,
+      myProf?.followers,
+      myProf?.thumbnailId,
+      post?.id,
+      post?.mediaIds?.[0]
+    );
+  };
   // Date of Post
   useEffect(() => {
     if (!post?.createdAt) return;
@@ -236,6 +249,8 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const AddComment = async () => {
     if (!myComment.text?.trim()) return;
 
+    const commentText = myComment.text.trim(); // Store trimmed text
+
     const updatedComment = {
       ...myComment,
       postId: post?.id,
@@ -248,8 +263,14 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
 
     try {
       const response = await postService.addComment(updatedComment);
-
       if (response.status) {
+        if (commentText) {
+          triggerNotifcation(
+            "COMMENT",
+            `Commented on your Post - ${commentText}`
+          );
+        }
+
         setMyComment((prev) => ({
           ...prev,
           text: "",
@@ -262,7 +283,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
         Alert.alert("Error", response.message);
       }
     } catch (error) {
-      console.error("Unexpected error:", error);
       Alert.alert("Error", "Something went wrong.");
     } finally {
       setIsCommenting(false); // Stop loader
@@ -327,11 +347,25 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
 
+    if (!isCurrentlyLiked) {
+      await NotificationSocket.sendNotificationsBulk(
+        "LIKE",
+        "liked your post 💙",
+        myProf?.username,
+        myProf?.followers,
+        myProf?.thumbnailId,
+        post?.id,
+        post?.mediaIds?.[0]
+      );
+    }
+
+    // Toggle the like state
     setLikedPosts((prev) => ({
       ...prev,
       [postId]: !isCurrentlyLiked,
     }));
 
+    // Update the like count
     setPostLikesCount((prev) => ({
       ...prev,
       [postId]: prev[postId] + (isCurrentlyLiked ? -1 : 1),
@@ -341,6 +375,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       const response = await postService.toggleLike(myProf.id, postId);
 
       if (!response.status) {
+        // Revert state if API call fails
         setLikedPosts((prev) => ({
           ...prev,
           [postId]: isCurrentlyLiked,
@@ -354,7 +389,9 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
         Alert.alert("Error", "Failed to toggle like. Please try again.");
       }
     } catch (error) {
+      // Revert state if there's an error
       Alert.alert("Error", "Failed Like " + error);
+
       setLikedPosts((prev) => ({
         ...prev,
         [postId]: isCurrentlyLiked,

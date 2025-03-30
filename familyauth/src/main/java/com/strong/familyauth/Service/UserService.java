@@ -305,6 +305,7 @@ public class UserService implements UserDetailsService {
 
                 // Step 3: Merge the results from both facets
                 new AggregationOperation() {
+                    @SuppressWarnings("null")
                     @Override
                     public Document toDocument(AggregationOperationContext context) {
                         return new Document("$project",

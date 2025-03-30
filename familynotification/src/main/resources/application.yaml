@@ -1,0 +1,50 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: FamilyNotificaton
+  data:
+    mongodb:
+      uri: ${BlogDBUrl}
+      database: ${BlogDBName}
+  jackson:
+    time-zone: UTC
+  jpa:
+    properties:
+      hibernate.jdbc.time_zone: UTC
+
+  kafka:
+    bootstrap-servers: kafka:9092
+    consumer:
+      group-id: notification-group
+      auto-offset-reset: latest
+    listener:
+      ack-mode: manual
+
+  redis:
+    user: ${REDIS_USER}
+    host: ${REDIS_HOST}
+    port: 6379
+    password: ${REDIS_PASSWORD}
+
+# Auth:
+#   Cors:
+#     Url: ${CORS_URL}
+#     Methods: ${CORS_METHODS}
+
+# logging:
+#   level:
+#     web: OFF
+#     org.springframework.web: ERROR
+#     feign: ERROR
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, prometheus
+  metrics:
+    export:
+      prometheus:
+        enabled: true

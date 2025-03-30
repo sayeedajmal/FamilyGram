@@ -17,7 +17,7 @@ FROM eclipse-temurin:17-jdk
 WORKDIR /app
 
 # Copy the built JAR of familyauth module
-COPY --from=build /app/familypost/target/*.jar app.jar
+COPY --from=build /app/familynotification/target/*.jar app.jar
 
 # Expose the application port
 EXPOSE 8080

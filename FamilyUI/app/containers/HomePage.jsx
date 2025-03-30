@@ -1,18 +1,19 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   Text,
   TouchableOpacity,
-  View,
-  ActivityIndicator,
   useColorScheme,
+  View,
 } from "react-native";
 import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 const HomePage = () => {
   const theme = useColorScheme();
@@ -20,6 +21,7 @@ const HomePage = () => {
   const iconColor = themeColors.icon;
   const bg = themeColors.background;
   const textColor = themeColors.text;
+  const navigation = useNavigation();
 
   const [posts, setPosts] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
@@ -135,7 +137,9 @@ const HomePage = () => {
       </View>
     );
   };
-
+  const openNotif = () => {
+    navigation.navigate("Notification");
+  };
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}
@@ -146,7 +150,7 @@ const HomePage = () => {
           style={{ height: 30, width: 180, marginLeft: -15 }}
         />
         <View className="flex-row">
-          <TouchableOpacity>
+          <TouchableOpacity onPress={openNotif}>
             <Ionicons
               name="heart-sharp"
               size={30}

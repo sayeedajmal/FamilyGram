@@ -1,0 +1,32 @@
+type Notification {
+  id: ID!
+  type: String!
+  message: String!
+  senderUsername: String!
+  postId: String
+  postThumbId: String
+  thumbnailId: String!
+  receiverId: String!
+  createdAt: String
+  read: Boolean!
+}
+
+input NotificationInput {
+  type: String!
+  message: String!
+  senderUsername: String!
+  postThumbId: String
+  thumbnailId: String!
+  receiverId: String!
+  postId: String
+}
+
+type Query {
+  getUserNotifications(receiverId: String!): [Notification]
+}
+
+type Mutation {
+  createNotifications(dtos: [NotificationInput!]!): [Notification]
+  markNotificationAsRead(notifId: String!): Notification
+  deleteNotification(notifId: String!): Boolean
+}
