@@ -13,11 +13,11 @@ RUN apt-get update && apt-get install -y maven
 # Run Maven clean install to build all modules and package the JAR
 RUN mvn clean install -DskipTests
 
-# Now, copy the generated JAR file from the target folder
-COPY familypost/target/*.jar app.jar
+
+COPY target/*.jar /app/app.jar
 
 # Expose the application port
 EXPOSE 8083
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
