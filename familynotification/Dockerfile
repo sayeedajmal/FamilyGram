@@ -1,6 +1,8 @@
 # Build stage
 FROM maven:3.8-openjdk-17 AS build
 
+RUN git clone https://github.com/sayeedajmal/Familgram.git /app
+
 # Set working directory
 WORKDIR /app
 
