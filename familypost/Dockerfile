@@ -1,10 +1,20 @@
 # Use a minimal JDK image
-FROM eclipse-temurin:17-jdk
+FROM eclipse-temurin:17-jdk AS build
 
+# Set the working directory inside the container
 WORKDIR /app
 
-# Copy only the pre-built JAR file (ensure JAR exists before building the image)
-COPY familypost/target/familypost-1.0.0.jar app.jar
+# Copy the entire project into the container (assuming the parent pom.xml exists)
+COPY . /app
+
+# Install Maven (if not already installed in the base image)
+RUN apt-get update && apt-get install -y maven
+
+# Run Maven clean install to build all modules and package the JAR
+RUN mvn clean install -DskipTests
+
+# Now, copy the generated JAR file from the target folder
+COPY familypost/target/*.jar app.jar
 
 # Expose the application port
 EXPOSE 8083
