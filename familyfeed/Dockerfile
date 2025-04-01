@@ -11,7 +11,8 @@ COPY pom.xml /app/
 COPY familyfeed /app/familyfeed/
 
 # Build the application with Maven
-RUN mvn clean install -DskipTests
+WORKDIR /app
+RUN mvn clean package -pl familyfeed -am -DskipTests
 
 # Runtime stage
 FROM openjdk:17-jdk-slim
@@ -19,11 +20,11 @@ FROM openjdk:17-jdk-slim
 # Set working directory
 WORKDIR /app
 
-# Copy the built JAR from the build stage
-COPY --from=build /app/familyfeed/target/*.jar /app/
+# Find and copy the JAR file (handles varying JAR names)
+COPY --from=build /app/familyfeed/target/*.jar /app/app.jar
 
 # Expose port
 EXPOSE 8084
 
 # Run the application
-CMD ["java", "-jar", "familyfeed.jar"]
+CMD ["java", "-jar", "app.jar"]

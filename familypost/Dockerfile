@@ -8,10 +8,11 @@ WORKDIR /app
 COPY pom.xml /app/
 
 # Copy the service module
-COPY familypost /app/familypost/
+COPY familynotification /app/familynotification/
 
 # Build the application with Maven
-RUN mvn clean install -DskipTests
+WORKDIR /app
+RUN mvn clean package -pl familynotification -am -DskipTests
 
 # Runtime stage
 FROM openjdk:17-jdk-slim
@@ -19,11 +20,11 @@ FROM openjdk:17-jdk-slim
 # Set working directory
 WORKDIR /app
 
-# Copy the built JAR from the build stage
-COPY --from=build /app/familypost/target/*.jar /app/
+# Find and copy the JAR file (handles varying JAR names)
+COPY --from=build /app/familynotification/target/*.jar /app/app.jar
 
 # Expose port
-EXPOSE 8083
+EXPOSE 8085
 
 # Run the application
-CMD ["java", "-jar", "familypost.jar"]
+CMD ["java", "-jar", "app.jar"]
