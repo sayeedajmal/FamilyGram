@@ -7,8 +7,6 @@ WORKDIR /app
 # Copy the entire project into the container (assuming the parent pom.xml exists)
 COPY . /app
 
-# Install Maven (if not already installed in the base image)
-RUN apt-get update && apt-get install -y maven
 
 # Run Maven clean install to build all modules and package the JAR
 RUN mvn clean install -DskipTests
