@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useNavigation } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
@@ -13,7 +14,9 @@ import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import NotificationSocket from "../api/NotificationSocket";
+import Toast from "react-native-toast-message";
+import NotificationService from "../api/NotificationService";
 
 const HomePage = () => {
   const theme = useColorScheme();
@@ -22,6 +25,7 @@ const HomePage = () => {
   const bg = themeColors.background;
   const textColor = themeColors.text;
   const navigation = useNavigation();
+  const [unreadCount, setUnreadCount] = useState(0);
 
   const [posts, setPosts] = useState([]);
   const [myProfile, setMyProfile] = useState(null);
@@ -44,6 +48,10 @@ const HomePage = () => {
       setRefreshing(false);
     }
   };
+
+  useEffect(() => {
+    NotificationService.registerForPushNotificationsAsync();
+  }, []);
 
   // Fetch Posts (append option)
   const fetchPosts = async (append = false) => {
@@ -107,7 +115,7 @@ const HomePage = () => {
   // Handle pull-to-refresh
   const onRefresh = () => {
     setPosts([]);
-    fetchPosts(false);
+     fetchPosts(false);
   };
 
   // Auto-play videos when visible
@@ -138,6 +146,7 @@ const HomePage = () => {
     );
   };
   const openNotif = () => {
+    setUnreadCount(0);
     navigation.navigate("Notification");
   };
   return (
@@ -150,14 +159,31 @@ const HomePage = () => {
           style={{ height: 30, width: 180, marginLeft: -15 }}
         />
         <View className="flex-row">
-          <TouchableOpacity onPress={openNotif}>
+          <TouchableOpacity
+            onPress={openNotif}
+            style={{ position: "relative" }}
+          >
             <Ionicons
               name="heart-sharp"
               size={30}
               color={iconColor}
               className="mx-4"
             />
+            {unreadCount > 0 && (
+              <View
+                style={{
+                  position: "absolute",
+                  top: 6,
+                  right: 12,
+                  backgroundColor: "red",
+                  borderRadius: 10,
+                  width: 10,
+                  height: 10,
+                }}
+              />
+            )}
           </TouchableOpacity>
+
           <TouchableOpacity>
             <Ionicons name="chatbubble-outline" size={30} color={iconColor} />
           </TouchableOpacity>
@@ -165,7 +191,7 @@ const HomePage = () => {
       </View>
 
       {/* Scrollable List (Stories + Posts) */}
-      {posts.length === 0 && (
+      {/* {posts.length === 0 && (
         <View className="flex-1 justify-center items-center px-6 py-10">
           <Image
             source={require("../../assets/images/profile.png")}
@@ -184,7 +210,7 @@ const HomePage = () => {
             </Text>
           </TouchableOpacity>
         </View>
-      )}
+      )} */}
 
       <FlatList
         ref={flatListRef}

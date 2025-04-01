@@ -12,8 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.strong.familypost.Model.LiteUser;
 import com.strong.familypost.Util.ResponseWrapper;
 
-//http://localhost:8082 https://familygram.onrender.com
-@FeignClient(name = "user-service", url = "https://familygram.onrender.com")
+@FeignClient(name = "user-service", url = "${feign.client-url}")
 @Service
 public interface UserServiceClient {
 

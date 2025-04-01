@@ -3,7 +3,7 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Image, Platform } from "react-native";
 
-const AUTH_API_URL = "http://192.168.31.218:8081";
+const AUTH_API_URL = "http://192.168.31.218:8082";
 //const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
@@ -127,27 +127,32 @@ class ApiService {
 
 
     async loginUser(userData) {
-        const response = await fetch(`${AUTH_API_URL}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(userData),
-        });
+        try {
+            const response = await fetch(`${AUTH_API_URL}/auth/login`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(userData),
+            });
 
-        const responseData = await response.json();
+            const responseData = await response.json();
+            
+            if (response.ok) {
+                const { accessToken, refreshToken } = responseData.data || {};
+                if (accessToken && refreshToken) {
+                    await this.saveTokens(accessToken, refreshToken);
+                }
 
-        if (response.ok) {
-            const { accessToken, refreshToken } = responseData.data || {};
-            if (accessToken && refreshToken) {
-                await this.saveTokens(accessToken, refreshToken);
+                const profileResponse = await this.fetchUserProfileByEmail(userData.email);
+                if (profileResponse.status) {
+                    return { status: true, message: "Login successful", data: profileResponse.data };
+                }
             }
 
-            const profileResponse = await this.fetchUserProfileByEmail(userData.email);
-            if (profileResponse.status) {
-                return { status: true, message: "Login successful", data: profileResponse.data };
-            }
+            return { status: false, message: responseData.message || "Login failed", data: null };
+        } catch (error) {
+            console.error("Login error:", error);
+            return { status: false, message: "An error occurred during login", data: null };
         }
-
-        return { status: false, message: responseData.message || "Login failed", data: null };
     }
 
 

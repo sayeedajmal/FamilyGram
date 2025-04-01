@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useReducer, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -15,37 +15,58 @@ import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
 import NotificationSocket from "../api/NotificationSocket";
 
-const NotificationItem = ({ item, bg, textColor, markAsRead }) => {
+// Reducer function for notification state
+const notificationReducer = (state, action) => {
+  switch (action.type) {
+    case "SET_NOTIFICATIONS":
+      return action.payload;
+    case "ADD_NOTIFICATION":
+      return state.some((n) => n.id === action.payload.id)
+        ? state
+        : [action.payload, ...state];
+    case "MARK_AS_READ":
+      return state.map((notif) =>
+        notif.id === action.payload ? { ...notif, read: true } : notif
+      );
+    default:
+      return state;
+  }
+};
+
+const NotificationItem = ({ item, bg, textColor, markAsRead, tint }) => {
   return (
     <TouchableOpacity
       activeOpacity={0.8}
-      className="flex-row items-center py-3 px-2"
-      style={{ backgroundColor: bg }}
+      className="flex-row items-center py-3 px-2 mb-1 rounded-lg"
+      style={{
+        backgroundColor: item.read ? bg : tint, // Light blue for unread
+      }}
       onPress={() => markAsRead(item.id)}
     >
       {/* User Avatar */}
-      <View className="flex-row">
-        <Image
-          source={{ uri: item.thumbnailId }}
-          className="w-10 h-10 rounded-full border border-[#0278ae]"
-        />
-      </View>
+      <Image
+        source={{ uri: item.thumbnailId }}
+        className="w-10 h-10 rounded-full border border-[#0278ae]"
+      />
 
       {/* Notification Text */}
       <View className="flex-1 ml-4">
         <Text
-          className={`text-sm ${item?.read ? "font-custom" : "font-custom"}`}
-          style={{ color: textColor }}
+          className="text-sm font-custom"
+          style={{
+            color: textColor,
+            fontWeight: item.read ? "normal" : "bold",
+          }}
         >
-          <Text className="font-custom-bold">@{item?.senderUsername}</Text>{" "}
-          {item?.message} {item?.comment ? ` "${item?.comment}"` : ""}
+          <Text className="font-custom-bold">@{item.senderUsername}</Text>{" "}
+          {item.message} {item.comment ? ` "${item.comment}"` : ""}
         </Text>
         <Text className="text-xs font-custom text-gray-400">
           {item.createdAt}
         </Text>
       </View>
 
-      {/* Post Image*/}
+      {/* Post Image */}
       {item.postThumbId && (
         <Image
           source={{ uri: item.postThumbId }}
@@ -86,7 +107,8 @@ const InAppNotification = () => {
   const themeColors = Colors[theme] || Colors.light;
   const bg = themeColors.background;
   const textColor = themeColors.text;
-  const [notifications, setNotifications] = useState([]);
+
+  const [notifications, dispatch] = useReducer(notificationReducer, []);
   const [refreshing, setRefreshing] = useState(false);
   const [myProfile, setMyProfile] = useState(null);
 
@@ -102,21 +124,6 @@ const InAppNotification = () => {
     if (diffInHours < 24) return `${diffInHours} hr ago`;
     if (diffInDays < 7) return `${diffInDays} days ago`;
     return postDate.format("MMM D, YYYY");
-  };
-
-  const handleNewNotification = async (notification) => {
-    //Alert.alert("New notification", notification.message);
-    
-    // Process the notification properly before adding it to state
-    const processedNotification = await processNotification(notification);
-    
-    setNotifications((prev) => {
-      const exists = prev.some((n) => n.id === notification.id);
-      if (exists) {
-        return prev;
-      }
-      return [processedNotification, ...prev];
-    });
   };
 
   const processNotification = async (notification) => {
@@ -142,21 +149,24 @@ const InAppNotification = () => {
         }
       }
     } catch (error) {
-      // Silent error handling
+      console.error("Error processing notification:", error);
     }
 
     return {
       ...notification,
       thumbnailId: thumbnailUrl,
       postThumbId: postThumbUrl,
-      createdAt: formatTime(notification?.createdAt),
+      createdAt: formatTime(notification.createdAt),
     };
   };
 
+  const handleNewNotification = async (notification) => {
+    const processedNotification = await processNotification(notification);
+    dispatch({ type: "ADD_NOTIFICATION", payload: processedNotification });
+  };
+
   const handleFetchedNotifications = async (notificationsData) => {
-    if (!notificationsData || !Array.isArray(notificationsData)) {
-      return;
-    }
+    if (!notificationsData || !Array.isArray(notificationsData)) return;
 
     const sortedNotifications = notificationsData.sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -166,24 +176,15 @@ const InAppNotification = () => {
       sortedNotifications.map(processNotification)
     );
 
-    setNotifications(processedNotifications);
+    dispatch({ type: "SET_NOTIFICATIONS", payload: processedNotifications });
   };
 
   const setupNotificationSocket = (userId) => {
-    const onNotificationReceived = (notification) => {
-      handleNewNotification(notification);
-    };
-
-    const onFetchNotifications = (notifications) => {
-      handleFetchedNotifications(notifications);
-    };
-
     NotificationSocket.userId = userId;
-    NotificationSocket.onNotificationReceived = onNotificationReceived;
-    NotificationSocket.onFetchNotifications = onFetchNotifications;
+    NotificationSocket.onNotificationReceived = handleNewNotification;
+    NotificationSocket.onFetchNotifications = handleFetchedNotifications;
 
     NotificationSocket.connect();
-
     NotificationSocket.fetchNotifications(userId);
   };
 
@@ -192,7 +193,7 @@ const InAppNotification = () => {
       const profile = await loginSignup.getStoredUserProfile();
       if (profile) {
         setMyProfile(profile);
-        setupNotificationSocket(profile?.id);
+        setupNotificationSocket(profile.id);
       }
     };
 
@@ -206,20 +207,8 @@ const InAppNotification = () => {
   const markAsRead = async (notifId) => {
     const success = await NotificationSocket.markAsRead(notifId);
     if (success) {
-      setNotifications((prev) =>
-        prev.map((notif) =>
-          notif.id === notifId ? { ...notif, read: true } : notif
-        )
-      );
+      dispatch({ type: "MARK_AS_READ", payload: notifId });
     }
-  };
-
-  const acceptFollowRequest = (item) => {
-    // Implement follow request acceptance logic
-  };
-
-  const rejectFollowRequest = (item) => {
-    // Implement follow request rejection logic
   };
 
   const onRefresh = useCallback(() => {
@@ -231,7 +220,7 @@ const InAppNotification = () => {
   }, [myProfile?.id]);
 
   return (
-    <View className="flex-1 px-4" style={{ backgroundColor: bg }}>
+    <View className="flex-1 px-1" style={{ backgroundColor: bg }}>
       <Text className="text-2xl font-bold mb-4" style={{ color: textColor }}>
         Notifications
       </Text>
@@ -244,6 +233,7 @@ const InAppNotification = () => {
             bg={bg}
             textColor={textColor}
             markAsRead={markAsRead}
+            tint={themeColors.tint}
           />
         )}
         keyExtractor={(item) => item.id}
