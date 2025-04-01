@@ -1,21 +1,29 @@
-# Use a minimal JDK image
-FROM eclipse-temurin:17-jdk AS build
+# Build stage
+FROM maven:3.8-openjdk-17 AS build
 
-# Set the working directory inside the container
+# Set working directory
 WORKDIR /app
 
-# Copy the entire project into the container (assuming the parent pom.xml exists)
-COPY . /app
+# Copy the parent pom.xml
+COPY pom.xml /app/
 
+# Copy the service module
+COPY familypost /app/familypost/
 
-# Run Maven clean install to build all modules and package the JAR
+# Build the application with Maven
 RUN mvn clean install -DskipTests
 
+# Runtime stage
+FROM openjdk:17-jdk-slim
 
-COPY target/*.jar /app/app.jar
+# Set working directory
+WORKDIR /app
 
-# Expose the application port
+# Copy the built JAR from the build stage
+COPY --from=build /app/familypost/target/*.jar /app/
+
+# Expose port
 EXPOSE 8083
 
 # Run the application
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+CMD ["java", "-jar", "familypost.jar"]
