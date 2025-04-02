@@ -1,29 +1,13 @@
-# Build stage
-FROM maven:3.8-openjdk-17 AS build
+# Use a minimal JDK image
+FROM eclipse-temurin:17-jdk
 
-# Set working directory
-WORKDIR /build
-
-# Copy the parent pom.xml
-COPY pom.xml .
-
-# Copy the service module
-COPY familynotification/ ./familynotification/
-
-# Build the specific service
-RUN mvn clean package -pl familynotification -am -DskipTests
-
-# Runtime stage
-FROM openjdk:17-jdk-slim
-
-# Set working directory
 WORKDIR /app
 
-# Copy the built JAR from the build stage
-COPY --from=build /build/familynotification/target/*.jar /app/familynotification.jar
+# Copy only the pre-built JAR file (ensure JAR exists before building the image)
+COPY familynotification/target/*.jar app.jar
 
-# Expose port
+# Expose the application port
 EXPOSE 8085
 
 # Run the application
-CMD ["java", "-jar", "familynotification.jar"]
+ENTRYPOINT ["java", "-jar", "app.jar"]

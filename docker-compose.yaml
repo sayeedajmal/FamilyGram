@@ -1,10 +1,6 @@
-networks:
-  familygram-network:
-    driver: bridge
-
 services:
   familyauth:
-    build: 
+    build:
       context: .
       dockerfile: familyauth/Dockerfile
     container_name: familyauth
@@ -15,7 +11,7 @@ services:
       - familygram-network
 
   familyfeed:
-    build: 
+    build:
       context: .
       dockerfile: familyfeed/Dockerfile
     container_name: familyfeed
@@ -24,11 +20,12 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - redis
     networks:
       - familygram-network
 
   familypost:
-    build: 
+    build:
       context: .
       dockerfile: familypost/Dockerfile
     container_name: familypost
@@ -37,11 +34,12 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - redis
     networks:
       - familygram-network
 
   familynotification:
-    build: 
+    build:
       context: .
       dockerfile: familynotification/Dockerfile
     container_name: familynotification
@@ -50,6 +48,16 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - redis
+    networks:
+      - familygram-network
+
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - "6379:6379"
     networks:
       - familygram-network
 
@@ -72,3 +80,8 @@ services:
       KAFKA_DELETE_TOPIC_ENABLE: "true"
     networks:
       - familygram-network
+
+networks:
+  familygram-network:
+    name: familygram-network
+    driver: bridge

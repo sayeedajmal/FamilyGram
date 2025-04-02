@@ -22,12 +22,6 @@ spring:
     listener:
       ack-mode: manual
 
-  redis:
-    user: ${REDIS_USER}
-    host: ${REDIS_HOST}
-    port: 6379
-    password: ${REDIS_PASSWORD}
-
 # Auth:
 #   Cors:
 #     Url: ${CORS_URL}

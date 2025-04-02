@@ -6,11 +6,14 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
@@ -38,8 +41,22 @@ public class PostService {
     @Autowired
     private UserServiceClient client;
 
-    @SuppressWarnings("null")
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @SuppressWarnings({ "null", "unchecked" })
     public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
+        String cacheKey = "user_feed:" + mineId; // 🔑 Unique key per user
+
+        ValueOperations<String, Object> valueOps = redisTemplate.opsForValue();
+
+        // ✅ Step 1: Check if feed is cached in Redis
+        List<PostWithUser> cachedFeed = (List<PostWithUser>) valueOps.get(cacheKey);
+        if (cachedFeed != null) {
+            return cachedFeed;
+        }
+
+        // ✅ Step 2: If cache is empty, fetch from database
         ResponseEntity<ResponseWrapper<List<LiteUser>>> response = client.getRandomFeedUsers(mineId, userLimit, token);
 
         if (response.getBody() == null || response.getBody().getData() == null) {
@@ -50,7 +67,7 @@ public class PostService {
 
         Pageable pageable = PageRequest.of(0, 5);
 
-        return users.stream()
+        List<PostWithUser> freshFeed = users.stream()
                 .flatMap(user -> {
                     List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
                     return posts.stream()
@@ -75,6 +92,9 @@ public class PostService {
                             return finalList;
                         }));
 
+        // ✅ Step 3: Store in Redis cache (Expires in 10 minutes)
+        valueOps.set(cacheKey, freshFeed, 10, TimeUnit.MINUTES);
+        return freshFeed;
     }
 
 }

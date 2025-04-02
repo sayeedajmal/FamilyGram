@@ -1,5 +1,6 @@
 package com.strong.familypost.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -9,8 +10,11 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -51,6 +55,9 @@ public class PostService {
 
     @Autowired
     private UserServiceClient client;
+
+    @Autowired
+    private RedisTemplate<String, List<Post>> redisTemplate;
 
     @SuppressWarnings("null")
     public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
@@ -110,6 +117,7 @@ public class PostService {
      * @throws PostException If the post object is null or unauthorized
      */
     @Transactional
+    @CacheEvict(value = "posts", key = "#post.userId")
     public Post savePost(List<MultipartFile> files, List<MultipartFile> thumbnails, Post post) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
@@ -193,6 +201,7 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
+    @Cacheable(value = "posts", key = "'posts:' + #postId")
     public Post getPostById(String userId, String postId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
         try {
@@ -216,24 +225,44 @@ public class PostService {
      * 
      * @return A List containing all Post objects
      */
+    @Cacheable(value = "posts", key = "'posts:' + #userId")
     public List<Post> getUserPosts(String userId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
-        if (userId.equals(authenticatedUserId)) {
-            return postRepo.findByUserId(userId);
-        }
-        try {
-            // Call FamilyAuth Service to check privacy settings
-            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
 
+        // Cache Key
+        String cacheKey = "posts:" + userId;
+
+        // 1️⃣ Try to fetch from Redis first
+        List<Post> cachedPosts = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedPosts != null) {
+            return cachedPosts; // Return cached data
+        }
+
+        if (userId.equals(authenticatedUserId)) {
+            return fetchAndCachePosts(userId, cacheKey);
+        }
+
+        try {
+            // 2️⃣ Call FamilyAuth Service to check privacy settings
+            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
             if (response.getStatusCode().is2xxSuccessful()) {
-                return postRepo.findByUserId(userId);
+                return fetchAndCachePosts(userId, cacheKey);
             } else {
                 throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
             }
-
         } catch (Exception e) {
             throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
+    }
+
+    private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
+        // 3️⃣ Fetch posts from database
+        List<Post> posts = postRepo.findByUserId(userId);
+
+        // 4️⃣ Store result in Redis (set expiration of 10 minutes)
+        redisTemplate.opsForValue().set(cacheKey, posts, Duration.ofMinutes(20));
+
+        return posts;
     }
 
     /**

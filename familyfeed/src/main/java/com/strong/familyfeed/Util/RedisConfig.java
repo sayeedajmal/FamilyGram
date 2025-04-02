@@ -1,4 +1,4 @@
-package com.strong.familynotification.Util;
+package com.strong.familyfeed.Util;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

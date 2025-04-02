@@ -2,9 +2,9 @@ package com.strong.familynotification.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -35,32 +35,44 @@ public class NotificationService {
     // Save multiple notifications and publish events for each
     public List<Notification> saveAllNotifications(List<Notification> notifications)
             throws NotifException, JacksonException {
+
+        // 1️⃣ Save notifications in MongoDB
         List<Notification> savedNotifications = notifRepo.saveAll(notifications);
 
-        // Publish events for each notification
         for (Notification notif : savedNotifications) {
-            kafkaProdService.sendNotificationEvent(notif);
+            kafkaProdService.sendNotificationEvent(notif); // Publish Kafka event
+
+            // 2️⃣ Push new notification to Redis (store it at the top of the list)
+            String redisKey = "notifications:" + notif.getReceiverId();
+            redisTemplate.opsForList().leftPush(redisKey, notif);
+
+            // 3️⃣ Reset expiration time to keep it cached for 24 hours
+            redisTemplate.expire(redisKey, 24, TimeUnit.HOURS);
         }
 
         return savedNotifications;
     }
 
-    @SuppressWarnings("unchecked")
-    public List<Notification> fetchNotificationsFromKafka(String userId) {
-        String redisKey = "notifications:" + userId;
-        List<Object> notifications = redisTemplate.opsForList().range(redisKey, 0, -1);
-        return notifications != null ? (List<Notification>) (List<?>) notifications : new ArrayList<>();
-    }
-
     // Get notifications for a user with pagination
+    @SuppressWarnings("unchecked")
     public List<Notification> getUserNotifications(String userId) {
-        // Fetch from Redis first
-        // List<Notification> recentNotifs = fetchNotificationsFromKafka(userId);
+        String redisKey = "notifications:" + userId;
 
-        // Fetch unread notifications from MongoDB if needed
+        // 1️⃣ Check Redis first
+        List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, -1);
+        if (cachedNotifs != null && !cachedNotifs.isEmpty()) {
+            return (List<Notification>) (List<?>) cachedNotifs; // Return from Redis if available
+        }
+
+        // 2️⃣ If Redis is empty, fetch from MongoDB
         List<Notification> unreadNotif = notifRepo.findUnreadNotifications(userId);
 
-        // return Stream.concat(recentNotifs.stream(), unreadNotifs.stream()).toList();
+        // 3️⃣ Store in Redis for future use (cache for 24 hours)
+        if (!unreadNotif.isEmpty()) {
+            redisTemplate.opsForList().rightPushAll(redisKey, unreadNotif);
+            redisTemplate.expire(redisKey, 24, TimeUnit.HOURS);
+        }
+
         return unreadNotif;
     }
 
