@@ -46,23 +46,40 @@ const PostCreationScreen = () => {
     }, [])
   );
 
+  const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
+  const SUPPORTED_VIDEO_TYPES = ["video/mp4", "video/mkv", "video/quicktime"];
+
   // Open Image/Video Picker (Multiple Selection)
   const pickMedia = async () => {
     let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+      mediaTypes: ["images", "videos"],
       allowsMultipleSelection: true,
       quality: 1,
     });
 
     if (!result.canceled) {
-      const selectedFiles = result.assets.map((asset) => ({
+      // Filter only supported image and video types
+      const filteredAssets = result.assets.filter(
+        (asset) =>
+          SUPPORTED_IMAGE_TYPES.includes(asset.mimeType) ||
+          SUPPORTED_VIDEO_TYPES.includes(asset.mimeType)
+      );
+
+      // Map selected files to desired format
+      const selectedFiles = filteredAssets.map((asset) => ({
         uri: asset.uri,
         type:
           asset.mimeType ||
-          (asset.type.includes("video") ? "video/mp4" : "image/jpeg"),
+          (asset.type && asset.type.includes("video")
+            ? "video/mp4"
+            : "image/jpeg"),
         name: asset.fileName || `media_${Date.now()}`,
       }));
-      setMediaFiles([...mediaFiles, ...selectedFiles]);
+
+      // Update state only if there are valid files
+      if (selectedFiles.length > 0) {
+        setMediaFiles((prevFiles) => [...prevFiles, ...selectedFiles]);
+      }
     }
   };
 

@@ -527,6 +527,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                                   borderRadius: 8,
                                 }}
                                 resizeMode="contain"
+                                shouldPlay
                                 isLooping
                               />
                             ) : (

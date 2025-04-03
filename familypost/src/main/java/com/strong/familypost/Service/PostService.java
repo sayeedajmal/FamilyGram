@@ -153,6 +153,23 @@ public class PostService {
                 postRepo.save(savedPost);
             }
 
+            // 🛑 Step 5: Update Redis Cache Correctly (Append Instead of Replace)
+            String cacheKey = "posts:" + loggedId;
+
+            // Fetch existing cached posts
+            List<Post> cachedPosts = redisTemplate.opsForValue().get(cacheKey);
+
+            if (cachedPosts == null) {
+                // If cache doesn't exist, create it with just this post
+                cachedPosts = new ArrayList<>();
+            }
+
+            // Add the new post at the start (newest first)
+            cachedPosts.add(0, savedPost);
+
+            // Store updated list back into Redis
+            redisTemplate.opsForValue().set(cacheKey, cachedPosts, Duration.ofMinutes(20));
+
             return savedPost;
 
         } catch (PostException e) {
