@@ -3,8 +3,8 @@ spring:
     name: FamilyAuth
   data:
     mongodb:
-      uri: ${BlogDBUrl}
-      database: ${BlogDBName}
+      uri: ${DBURL}
+      database: ${DBNAME}
   servlet:
     multipart:
       enabled: ${MULTIPART_ENABLED}

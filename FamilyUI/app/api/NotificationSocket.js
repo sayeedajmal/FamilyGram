@@ -1,6 +1,7 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { Alert } from "react-native";
+import * as Notifications from "expo-notifications";
 
 class NotificationSocket {
     constructor(userId, onNotificationReceived, onFetchNotifications) {
@@ -11,7 +12,17 @@ class NotificationSocket {
         this.connected = false;
         this.serverUrl = "http://192.168.31.218:8085";
     }
-
+    async triggerSystemNotification(notification) {
+        await Notifications.scheduleNotificationAsync({
+            content: {
+                title: "🔔 New Notification",
+                body: notification.message || "You have a new notification!",
+                sound: true,  // ✅ Uses default system sound
+                priority: "high",
+            },
+            trigger: null,  // Show immediately
+        });
+    }
     // Connect to WebSocket
     connect() {
         if (!this.userId) return;
@@ -24,10 +35,15 @@ class NotificationSocket {
 
         this.client.onConnect = () => {
             this.connected = true;
-
             this.client.subscribe(`/user/${this.userId}/queue/notifications`, (message) => {
                 const notification = JSON.parse(message.body);
-                this.onNotificationReceived(notification);
+
+                // 🔔 Show notification & play default sound
+                this.triggerSystemNotification(notification);
+                Alert.alert("Notification", "Notificaton Recieved")
+                if (this.onNotificationReceived) {
+                    this.onNotificationReceived(notification);
+                }
             });
         };
 
@@ -97,7 +113,7 @@ class NotificationSocket {
 
             const defaultThumbnailId = "22343243243223";
             thumbnailId = thumbnailId || defaultThumbnailId;
-            
+
             if (type === "LIKE" && !postThumbId) {
                 console.error("LIKE notifications require postThumbId");
                 return;

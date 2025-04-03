@@ -94,8 +94,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   };
   // Date of Post
   useEffect(() => {
-    if (!post?.createdAt) return;
-
+    if (!post?.createdAt) return;    
     const postDate = moment.utc(post.createdAt).local();
     const now = moment();
     const diffInMinutes = now.diff(postDate, "minutes");
@@ -347,18 +346,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
 
-    if (!isCurrentlyLiked) {
-      await NotificationSocket.sendNotificationsBulk(
-        "LIKE",
-        "liked your post 💙",
-        myProf?.username,
-        myProf?.followers,
-        myProf?.thumbnailId,
-        post?.id,
-        post?.mediaIds?.[0]
-      );
-    }
-
     // Toggle the like state
     setLikedPosts((prev) => ({
       ...prev,
@@ -370,7 +357,17 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       ...prev,
       [postId]: prev[postId] + (isCurrentlyLiked ? -1 : 1),
     }));
-
+    if (!isCurrentlyLiked) {
+      await NotificationSocket.sendNotificationsBulk(
+        "LIKE",
+        "liked your post 💙",
+        myProf?.username,
+        myProf?.followers,
+        myProf?.thumbnailId,
+        post?.id,
+        post?.mediaIds?.[0]
+      );
+    }
     try {
       const response = await postService.toggleLike(myProf.id, postId);
 

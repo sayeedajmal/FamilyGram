@@ -5,6 +5,7 @@ import java.time.LocalDateTime;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mongodb.lang.NonNull;
 
 import lombok.Data;
@@ -40,12 +41,12 @@ public class Comment {
 
     @NonNull
     private String thumbnailId;
-    
+
     /** The actual content/text of the comment */
     @NonNull
     private String text;
 
     /** Timestamp when the comment was created */
-    @NonNull
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime createdAt = LocalDateTime.now();
 }

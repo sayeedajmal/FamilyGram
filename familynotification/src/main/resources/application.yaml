@@ -6,8 +6,8 @@ spring:
     name: FamilyNotificaton
   data:
     mongodb:
-      uri: ${BlogDBUrl}
-      database: ${BlogDBName}
+      uri: ${DBURL}
+      database: ${DBNAME}
   jackson:
     time-zone: UTC
   jpa:

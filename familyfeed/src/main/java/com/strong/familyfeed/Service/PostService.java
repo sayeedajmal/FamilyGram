@@ -1,6 +1,5 @@
 package com.strong.familyfeed.Service;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -82,7 +81,7 @@ public class PostService {
                                     post.getMediaIds() != null ? post.getMediaIds() : List.of(),
                                     post.getLocation(),
                                     post.getLikes() != null ? post.getLikes() : new HashSet<>(),
-                                    post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now()));
+                                    post.getCreatedAt()));
                 })
                 .collect(Collectors.collectingAndThen(
                         Collectors.toCollection(() -> new LinkedHashSet<>()), // 🔥 Removes duplicates

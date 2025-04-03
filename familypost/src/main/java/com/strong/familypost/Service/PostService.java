@@ -10,8 +10,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -117,7 +115,6 @@ public class PostService {
      * @throws PostException If the post object is null or unauthorized
      */
     @Transactional
-    @CacheEvict(value = "posts", key = "#post.userId")
     public Post savePost(List<MultipartFile> files, List<MultipartFile> thumbnails, Post post) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
@@ -201,7 +198,6 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    @Cacheable(value = "posts", key = "'posts:' + #postId")
     public Post getPostById(String userId, String postId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
         try {
@@ -225,7 +221,6 @@ public class PostService {
      * 
      * @return A List containing all Post objects
      */
-    @Cacheable(value = "posts", key = "'posts:' + #userId")
     public List<Post> getUserPosts(String userId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
 

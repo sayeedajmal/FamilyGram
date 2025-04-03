@@ -15,8 +15,6 @@ import postHandle from "../api/postHandle";
 import PostModel from "../components/PostModel";
 import { Colors } from "../constants/Colors";
 import NotificationSocket from "../api/NotificationSocket";
-import Toast from "react-native-toast-message";
-import NotificationService from "../api/NotificationService";
 
 const HomePage = () => {
   const theme = useColorScheme();
@@ -50,7 +48,16 @@ const HomePage = () => {
   };
 
   useEffect(() => {
-    NotificationService.registerForPushNotificationsAsync();
+    const handleNewNotification = (notification) => {
+      setUnreadCount((prev) => prev + 1);
+    };
+    
+    NotificationSocket.onNotificationReceived = handleNewNotification;
+    NotificationSocket.connect();
+
+    return () => {
+      NotificationSocket.disconnect();
+    };
   }, []);
 
   // Fetch Posts (append option)
