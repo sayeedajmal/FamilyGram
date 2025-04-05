@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,7 +24,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.gridfs.model.GridFSFile;
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Model.Post;
-import com.strong.familypost.Model.PostWithUser;
 import com.strong.familypost.Service.CommentService;
 import com.strong.familypost.Service.PostService;
 import com.strong.familypost.Service.StorageService;
@@ -133,20 +131,6 @@ public class PostController {
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }
 
-    @GetMapping("/random-feed")
-    public ResponseEntity<ResponseWrapper<List<PostWithUser>>> getRandomFeedPosts(
-            @RequestParam String mineId,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestHeader("Authorization") String token) {
-
-        List<PostWithUser> posts = postService.getRandomFeedPosts(mineId, limit, token);
-
-        return ResponseEntity.ok(new ResponseWrapper<>(
-                HttpStatus.OK.value(),
-                "Random feed posts retrieved successfully",
-                posts));
-    }
-
     /**
      * Retrieves a specific post by its ID.
      * 
@@ -156,11 +140,9 @@ public class PostController {
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Post>> getPostById(
-            @PathVariable String postId,
-            @RequestParam("userId") String userId,
-            @RequestHeader("Authorization") String token) {
+            @PathVariable String postId) {
         try {
-            Post post = postService.getPostById(userId, postId, token);
+            Post post = postService.getPostById(postId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
             return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));

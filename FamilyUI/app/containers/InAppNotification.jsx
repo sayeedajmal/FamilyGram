@@ -1,6 +1,6 @@
+import moment from "moment";
 import React, { useCallback, useEffect, useReducer, useState } from "react";
 import {
-  Alert,
   FlatList,
   Image,
   RefreshControl,
@@ -9,11 +9,10 @@ import {
   useColorScheme,
   View,
 } from "react-native";
-import moment from "moment";
-import { Colors } from "../constants/Colors";
 import loginSignup from "../api/loginSignup";
-import postHandle from "../api/postHandle";
 import NotificationSocket from "../api/NotificationSocket";
+import postHandle from "../api/postHandle";
+import { Colors } from "../constants/Colors";
 
 // Reducer function for notification state
 const notificationReducer = (state, action) => {
@@ -110,63 +109,14 @@ const InAppNotification = () => {
 
   const [notifications, dispatch] = useReducer(notificationReducer, []);
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(true); // Added loading state
   const [myProfile, setMyProfile] = useState(null);
 
-  const formatTime = (createdAt) => {
-    const postDate = moment.utc(createdAt).local();
-    const now = moment();
-    const diffInMinutes = now.diff(postDate, "minutes");
-    const diffInHours = now.diff(postDate, "hours");
-    const diffInDays = now.diff(postDate, "days");
-
-    if (diffInMinutes < 1) return "Just now";
-    if (diffInMinutes < 60) return `${diffInMinutes} min ago`;
-    if (diffInHours < 24) return `${diffInHours} hr ago`;
-    if (diffInDays < 7) return `${diffInDays} days ago`;
-    return postDate.format("MMM D, YYYY");
-  };
-
-  const processNotification = async (notification) => {
-    let thumbnailUrl = notification.thumbnailId;
-    let postThumbUrl = notification.postThumbId;
-
-    try {
-      if (notification.thumbnailId) {
-        const imageResponse = await loginSignup.getProfileImage(
-          notification.thumbnailId
-        );
-        if (imageResponse.status) {
-          thumbnailUrl = imageResponse.data;
-        }
-      }
-
-      if (notification.postThumbId) {
-        const postResponse = await postHandle.getPostMedia(
-          notification.postThumbId
-        );
-        if (postResponse.status) {
-          postThumbUrl = postResponse.data;
-        }
-      }
-    } catch (error) {
-      console.error("Error processing notification:", error);
-    }
-
-    return {
-      ...notification,
-      thumbnailId: thumbnailUrl,
-      postThumbId: postThumbUrl,
-      createdAt: formatTime(notification.createdAt),
-    };
-  };
-
-  const handleNewNotification = async (notification) => {
-    const processedNotification = await processNotification(notification);
-    dispatch({ type: "ADD_NOTIFICATION", payload: processedNotification });
-  };
-
   const handleFetchedNotifications = async (notificationsData) => {
-    if (!notificationsData || !Array.isArray(notificationsData)) return;
+    if (!notificationsData || !Array.isArray(notificationsData)) {
+      setLoading(false);
+      return;
+    }
 
     const sortedNotifications = notificationsData.sort(
       (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
@@ -177,6 +127,7 @@ const InAppNotification = () => {
     );
 
     dispatch({ type: "SET_NOTIFICATIONS", payload: processedNotifications });
+    setLoading(false); // Ensure loading stops after fetching
   };
 
   const setupNotificationSocket = (userId) => {
@@ -194,6 +145,8 @@ const InAppNotification = () => {
       if (profile) {
         setMyProfile(profile);
         setupNotificationSocket(profile.id);
+      } else {
+        setLoading(false); // Stop loading if user profile is not found
       }
     };
 
@@ -204,17 +157,10 @@ const InAppNotification = () => {
     };
   }, []);
 
-  const markAsRead = async (notifId) => {
-    const success = await NotificationSocket.markAsRead(notifId);
-    if (success) {
-      dispatch({ type: "MARK_AS_READ", payload: notifId });
-    }
-  };
-
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
     if (myProfile?.id) {
-      NotificationSocket.fetchNotifications(myProfile.id);
+      await NotificationSocket.fetchNotifications(myProfile.id);
     }
     setRefreshing(false);
   }, [myProfile?.id]);
@@ -224,28 +170,34 @@ const InAppNotification = () => {
       <Text className="text-2xl font-bold mb-4" style={{ color: textColor }}>
         Notifications
       </Text>
-      <FlatList
-        data={notifications}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <NotificationItem
-            item={item}
-            bg={bg}
-            textColor={textColor}
-            markAsRead={markAsRead}
-            tint={themeColors.tint}
-          />
-        )}
-        keyExtractor={(item) => item.id}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          <Text className="text-center py-8" style={{ color: textColor }}>
-            No notifications yet
-          </Text>
-        }
-      />
+
+      {loading ? (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={themeColors.tint} />
+        </View>
+      ) : notifications.length === 0 ? (
+        <Text className="text-center py-8" style={{ color: textColor }}>
+          No notifications yet
+        </Text>
+      ) : (
+        <FlatList
+          data={notifications}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => (
+            <NotificationItem
+              item={item}
+              bg={bg}
+              textColor={textColor}
+              markAsRead={markAsRead}
+              tint={themeColors.tint}
+            />
+          )}
+          keyExtractor={(item) => item.id}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        />
+      )}
     </View>
   );
 };

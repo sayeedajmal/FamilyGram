@@ -27,6 +27,6 @@ type Query {
 
 type Mutation {
   createNotifications(dtos: [NotificationInput!]!): [Notification]
-  markNotificationAsRead(notifId: String!): Notification
+  markNotificationAsRead(notifIds: [String!]!): [Notification]
   deleteNotification(notifId: String!): Boolean
 }

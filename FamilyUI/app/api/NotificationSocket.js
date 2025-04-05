@@ -40,7 +40,6 @@ class NotificationSocket {
 
                 // 🔔 Show notification & play default sound
                 this.triggerSystemNotification(notification);
-                Alert.alert("Notification", "Notificaton Recieved")
                 if (this.onNotificationReceived) {
                     this.onNotificationReceived(notification);
                 }

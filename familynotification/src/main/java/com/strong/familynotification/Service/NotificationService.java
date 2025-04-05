@@ -5,6 +5,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -12,6 +13,8 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.fasterxml.jackson.core.JacksonException;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.strong.familynotification.Model.Notification;
 import com.strong.familynotification.Repository.NotifRepo;
 import com.strong.familynotification.Util.NotifException;
@@ -25,6 +28,10 @@ public class NotificationService {
     private KafkaProdService kafkaProdService;
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
+    @Autowired
+    private ObjectMapper objectMapper; // Ensure JSON serialization
+
+    private static final long CACHE_EXPIRATION = 24; // Hours
 
     @Scheduled(cron = "0 0 3 * * ?")
     public void cleanupReadNotifications() {
@@ -36,69 +43,134 @@ public class NotificationService {
     public List<Notification> saveAllNotifications(List<Notification> notifications)
             throws NotifException, JacksonException {
 
-        // 1️⃣ Save notifications in MongoDB
         List<Notification> savedNotifications = notifRepo.saveAll(notifications);
 
         for (Notification notif : savedNotifications) {
             kafkaProdService.sendNotificationEvent(notif); // Publish Kafka event
 
-            // 2️⃣ Push new notification to Redis (store it at the top of the list)
             String redisKey = "notifications:" + notif.getReceiverId();
-            redisTemplate.opsForList().leftPush(redisKey, notif);
+            String jsonNotif = objectMapper.writeValueAsString(notif); // Serialize before saving
+            redisTemplate.opsForList().leftPush(redisKey, jsonNotif);
 
-            // 3️⃣ Reset expiration time to keep it cached for 24 hours
-            redisTemplate.expire(redisKey, 24, TimeUnit.HOURS);
+            redisTemplate.expire(redisKey, CACHE_EXPIRATION, TimeUnit.HOURS);
         }
 
         return savedNotifications;
     }
 
     // Get notifications for a user with pagination
-    @SuppressWarnings("unchecked")
     public List<Notification> getUserNotifications(String userId) {
         String redisKey = "notifications:" + userId;
 
-        // 1️⃣ Check Redis first
         List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, -1);
         if (cachedNotifs != null && !cachedNotifs.isEmpty()) {
-            return (List<Notification>) (List<?>) cachedNotifs; // Return from Redis if available
+            return cachedNotifs.stream()
+                    .map(obj -> {
+                        try {
+                            return objectMapper.readValue(obj.toString(), Notification.class);
+                        } catch (JsonProcessingException e) {
+                            return null;
+                        }
+                    })
+                    .filter(n -> n != null)
+                    .collect(Collectors.toList());
         }
 
-        // 2️⃣ If Redis is empty, fetch from MongoDB
         List<Notification> unreadNotif = notifRepo.findUnreadNotifications(userId);
 
-        // 3️⃣ Store in Redis for future use (cache for 24 hours)
         if (!unreadNotif.isEmpty()) {
-            redisTemplate.opsForList().rightPushAll(redisKey, unreadNotif);
-            redisTemplate.expire(redisKey, 24, TimeUnit.HOURS);
+            List<String> jsonNotifs = unreadNotif.stream()
+                    .map(notif -> {
+                        try {
+                            return objectMapper.writeValueAsString(notif);
+                        } catch (JsonProcessingException e) {
+                            return null;
+                        }
+                    })
+                    .filter(json -> json != null)
+                    .collect(Collectors.toList());
+
+            redisTemplate.opsForList().leftPushAll(redisKey, jsonNotifs);
+            redisTemplate.expire(redisKey, CACHE_EXPIRATION, TimeUnit.HOURS);
         }
 
         return unreadNotif;
     }
 
-    // Mark a notification as read
-    public Notification markAsRead(String notifId) throws NotifException {
-        return notifRepo.findById(notifId)
-                .map(notif -> {
-                    notif.setRead(true);
-                    notifRepo.delete(notif);
-                    return notifRepo.save(notif);
-                })
-                .orElseThrow(() -> new NotifException("Notification not found: " + notifId));
+    // Mark notifications as read and update Redis
+    public List<Notification> markAsRead(List<String> notifIds) throws NotifException {
+        List<Notification> notifications = notifRepo.findAllById(notifIds);
+
+        if (notifications.isEmpty()) {
+            throw new NotifException("No notifications found for the provided IDs.");
+        }
+
+        notifications.forEach(notif -> notif.setRead(true));
+        List<Notification> updatedNotifs = notifRepo.saveAll(notifications);
+
+        // Update Redis cache
+        String userId = notifications.get(0).getReceiverId();
+        String redisKey = "notifications:" + userId;
+
+        List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, -1);
+        if (cachedNotifs != null && !cachedNotifs.isEmpty()) {
+            List<String> updatedCache = cachedNotifs.stream()
+                    .map(obj -> {
+                        try {
+                            Notification n = objectMapper.readValue(obj.toString(), Notification.class);
+                            if (notifIds.contains(n.getId())) {
+                                n.setRead(true);
+                            }
+                            return objectMapper.writeValueAsString(n);
+                        } catch (JsonProcessingException e) {
+                            return null;
+                        }
+                    })
+                    .filter(json -> json != null)
+                    .collect(Collectors.toList());
+
+            redisTemplate.delete(redisKey);
+            redisTemplate.opsForList().leftPushAll(redisKey, updatedCache);
+            redisTemplate.expire(redisKey, CACHE_EXPIRATION, TimeUnit.HOURS);
+        }
+
+        return updatedNotifs;
     }
 
-    // Delete a single notification (handles not found case)
+    // Delete a notification and remove from Redis
     public void deleteNotification(String notifId) throws NotifException {
         Optional<Notification> notif = notifRepo.findById(notifId);
         if (notif.isPresent()) {
             notifRepo.deleteById(notifId);
+
+            // Remove from Redis
+            String redisKey = "notifications:" + notif.get().getReceiverId();
+            List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, -1);
+            if (cachedNotifs != null && !cachedNotifs.isEmpty()) {
+                List<String> updatedCache = cachedNotifs.stream()
+                        .map(obj -> {
+                            try {
+                                Notification n = objectMapper.readValue(obj.toString(), Notification.class);
+                                return !n.getId().equals(notifId) ? objectMapper.writeValueAsString(n) : null;
+                            } catch (JsonProcessingException e) {
+                                return null;
+                            }
+                        })
+                        .filter(json -> json != null)
+                        .collect(Collectors.toList());
+
+                redisTemplate.delete(redisKey);
+                redisTemplate.opsForList().leftPushAll(redisKey, updatedCache);
+                redisTemplate.expire(redisKey, CACHE_EXPIRATION, TimeUnit.HOURS);
+            }
         } else {
             throw new NotifException("Notification not found: " + notifId);
         }
     }
 
-    // Delete all notifications for a user
+    // Delete all notifications for a user and clear Redis cache
     public void deleteAllForUser(String userId) {
         notifRepo.deleteByReceiverId(userId);
+        redisTemplate.delete("notifications:" + userId);
     }
 }

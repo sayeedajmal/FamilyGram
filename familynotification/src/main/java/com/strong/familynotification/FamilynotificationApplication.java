@@ -83,6 +83,6 @@ public class FamilynotificationApplication implements WebSocketMessageBrokerConf
 
 	@Bean
 	public LettuceConnectionFactory redisConnectionFactory() {
-		return new LettuceConnectionFactory("redis", 6379);
+		return new LettuceConnectionFactory("localhost", 6379);
 	}
 }

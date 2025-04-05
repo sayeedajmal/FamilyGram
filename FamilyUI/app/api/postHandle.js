@@ -113,18 +113,6 @@ class PostService {
 
         return response;
     }
-    async getPostById(postId, userId) {
-
-        if (!postId) {
-            throw new Error("Post ID is required");
-        }
-
-        const response = await loginSignup.request(`${POST_API_URL}/posts/myposts/${postId}?userId=${userId}`, {
-            method: "GET",
-        });
-
-        return response;
-    }
 
     async DeletePostById(postId) {
 
@@ -157,9 +145,11 @@ class PostService {
             throw new Error("User ID, Post ID are required");
         }
 
-        return await loginSignup.request(`${POST_API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
+        const response= await loginSignup.request(`${POST_API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
             method: "POST",
         });
+        console.log("RESPONSE:",JSON.stringify(response))
+        return response;
     }
 
     async addComment(comment) {

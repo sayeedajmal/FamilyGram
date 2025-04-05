@@ -1,7 +1,6 @@
 package com.strong.familypost.Service;
 
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -10,8 +9,6 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -21,14 +18,11 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.strong.familypost.Model.LiteUser;
 import com.strong.familypost.Model.Post;
-import com.strong.familypost.Model.PostWithUser;
 import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Repository.PostRepo;
 import com.strong.familypost.Util.PostException;
-import com.strong.familypost.Util.ResponseWrapper;
 
 /**
  * Service class responsible for managing Post-related operations.
@@ -55,43 +49,7 @@ public class PostService {
     private UserServiceClient client;
 
     @Autowired
-    private RedisTemplate<String, List<Post>> redisTemplate;
-
-    @SuppressWarnings("null")
-    public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
-        ResponseEntity<ResponseWrapper<List<LiteUser>>> response = client.getRandomFeedUsers(mineId, userLimit, token);
-
-        if (response.getBody() == null || response.getBody().getData() == null) {
-            return List.of();
-        }
-
-        List<LiteUser> users = response.getBody().getData();
-
-        Pageable pageable = PageRequest.of(0, 2);
-
-        return users.stream()
-                .flatMap(user -> {
-                    List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
-
-                    return posts.stream()
-                            .filter(post -> post != null && post.getUserId() != null)
-                            .map(post -> {
-                                return new PostWithUser(
-                                        user.getUsername(),
-                                        user.getName(),
-                                        user.getThumbnailId(),
-                                        post.getId(),
-                                        post.getUserId(),
-                                        post.getCaption(),
-                                        post.getMediaIds() != null ? post.getMediaIds() : List.of(),
-                                        post.getLocation(),
-                                        post.getLikes() != null ? post.getLikes() : new HashSet<>(),
-                                        post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now());
-                            });
-                })
-                .collect(Collectors.toList());
-
-    }
+    private RedisTemplate<String, Object> redisTemplate;
 
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -153,15 +111,20 @@ public class PostService {
                 postRepo.save(savedPost);
             }
 
-            // 🛑 Step 5: Update Redis Cache Correctly (Append Instead of Replace)
+            // Step 5: Update Redis Cache Correctly (Append Instead of Replace)
             String cacheKey = "posts:" + loggedId;
 
             // Fetch existing cached posts
-            List<Post> cachedPosts = redisTemplate.opsForValue().get(cacheKey);
+            Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+            List<Post> cachedPosts = new ArrayList<>();
 
-            if (cachedPosts == null) {
-                // If cache doesn't exist, create it with just this post
-                cachedPosts = new ArrayList<>();
+            if (cachedValue != null && cachedValue instanceof List<?>) {
+                List<?> cachedList = (List<?>) cachedValue;
+                for (Object obj : cachedList) {
+                    if (obj instanceof Post) {
+                        cachedPosts.add((Post) obj);
+                    }
+                }
             }
 
             // Add the new post at the start (newest first)
@@ -181,6 +144,7 @@ public class PostService {
 
     /**
      * Deletes a post and all its associated comments from the database.
+     * Also removes the post from Redis cache if it exists.
      * 
      * @param postId The unique identifier of the post to be deleted
      * @throws PostException        if the postId is null or empty, or if no post
@@ -190,21 +154,46 @@ public class PostService {
      */
     @Transactional
     public void deletePost(String postId) throws PostException {
-        String loggedId = getAuthenticatedUserId();
-
-        if (!postId.equals(loggedId)) {
-            throw new PostException("You are not authorized to access this Resource");
-        }
         if (postId == null || postId.trim().isEmpty()) {
             throw new PostException("PostId cannot be null or empty");
         }
-        if (!postRepo.existsById(postId)) {
-            throw new PostException("No Post with id: " + postId);
+
+        Post post = postRepo.findById(postId)
+                .orElseThrow(() -> new PostException("No Post with id: " + postId));
+
+        String loggedId = getAuthenticatedUserId();
+
+        // Check if the logged-in user is the owner of the post
+        if (!post.getUserId().equals(loggedId)) {
+            throw new PostException("You are not authorized to access this Resource");
         }
 
+        // Delete all comments associated with the post
         commentRepo.deleteByPostId(postId);
 
+        // Delete post from database
         postRepo.deleteById(postId);
+
+        // Update Redis cache - remove the post if it exists in cache
+        String cacheKey = "posts:" + post.getUserId();
+        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedValue != null && cachedValue instanceof List<?>) {
+            List<?> cachedList = (List<?>) cachedValue;
+            List<Post> updatedList = new ArrayList<>();
+
+            for (Object obj : cachedList) {
+                if (obj instanceof Post) {
+                    Post cachedPost = (Post) obj;
+                    if (!cachedPost.getId().equals(postId)) {
+                        updatedList.add(cachedPost); // Keep posts that aren't being deleted
+                    }
+                }
+            }
+
+            // Update the cache with the filtered list
+            redisTemplate.opsForValue().set(cacheKey, updatedList, Duration.ofMinutes(20));
+        }
     }
 
     /**
@@ -215,28 +204,19 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    public Post getPostById(String userId, String postId, String token) throws PostException {
-        String authenticatedUserId = getAuthenticatedUserId();
-        try {
-            // Call FamilyAuth Service to check privacy settings
-            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
-
-            if (response.getStatusCode().is2xxSuccessful()) {
-                return postRepo.findById(postId)
-                        .orElseThrow(() -> new PostException("No Post with postId: " + postId));
-            } else {
-                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
-            }
-
-        } catch (Exception e) {
-            throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
-        }
+    public Post getPostById(String postId) throws PostException {
+        return postRepo.findById(postId)
+                .orElseThrow(() -> new PostException("No Post with postId: " + postId));
     }
 
     /**
-     * Retrieves all posts from the database.
+     * Retrieves all posts for a specific user, with caching.
      * 
-     * @return A List containing all Post objects
+     * @param userId The user ID whose posts to retrieve
+     * @param token  Authentication token for privacy checks
+     * @return A List containing all Post objects for the user
+     * @throws PostException if there's an error retrieving the posts or if privacy
+     *                       settings prevent access
      */
     public List<Post> getUserPosts(String userId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
@@ -245,8 +225,17 @@ public class PostService {
         String cacheKey = "posts:" + userId;
 
         // 1️⃣ Try to fetch from Redis first
-        List<Post> cachedPosts = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedPosts != null) {
+        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        List<Post> cachedPosts = new ArrayList<>();
+
+        if (cachedValue != null && cachedValue instanceof List<?>) {
+            List<?> cachedList = (List<?>) cachedValue;
+            for (Object obj : cachedList) {
+                if (obj instanceof Post) {
+                    cachedPosts.add((Post) obj);
+                }
+            }
+
             return cachedPosts; // Return cached data
         }
 
@@ -267,11 +256,18 @@ public class PostService {
         }
     }
 
+    /**
+     * Fetches posts from database and caches them in Redis.
+     * 
+     * @param userId   The user ID whose posts to fetch
+     * @param cacheKey The Redis cache key
+     * @return List of posts for the user
+     */
     private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
         // 3️⃣ Fetch posts from database
         List<Post> posts = postRepo.findByUserId(userId);
 
-        // 4️⃣ Store result in Redis (set expiration of 10 minutes)
+        // 4️⃣ Store result in Redis (set expiration of 20 minutes)
         redisTemplate.opsForValue().set(cacheKey, posts, Duration.ofMinutes(20));
 
         return posts;
@@ -281,6 +277,7 @@ public class PostService {
      * Toggles a like on a post for a specific user.
      * If the user has already liked the post, their like is removed.
      * If the user hasn't liked the post, a like is added.
+     * Also updates the Redis cache if the post is cached.
      * 
      * @param postId The unique identifier of the post
      * @param userId The unique identifier of the user toggling the like
@@ -305,7 +302,35 @@ public class PostService {
 
         post.setLikes(likes);
         postRepo.save(post);
+
+        // Update Redis cache if this post is in cache
+        String postOwnerUserId = post.getUserId();
+        String cacheKey = "posts:" + postOwnerUserId;
+
+        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedValue != null && cachedValue instanceof List<?>) {
+            List<?> cachedList = (List<?>) cachedValue;
+            List<Post> updatedList = new ArrayList<>();
+
+            boolean foundPost = false;
+            for (Object obj : cachedList) {
+                if (obj instanceof Post) {
+                    Post cachedPost = (Post) obj;
+                    if (cachedPost.getId().equals(postId)) {
+                        updatedList.add(post); // Replace with updated post
+                        foundPost = true;
+                    } else {
+                        updatedList.add(cachedPost); // Keep existing post
+                    }
+                }
+            }
+
+            if (foundPost) {
+                // Save updated cache
+                redisTemplate.opsForValue().set(cacheKey, updatedList, Duration.ofMinutes(20));
+            }
+        }
+
         return likes.size();
     }
-
 }

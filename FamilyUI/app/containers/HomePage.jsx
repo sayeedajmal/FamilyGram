@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   useColorScheme,
   View,
+  Alert,
 } from "react-native";
 import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
@@ -50,8 +51,12 @@ const HomePage = () => {
   useEffect(() => {
     const handleNewNotification = (notification) => {
       setUnreadCount((prev) => prev + 1);
+      Alert.alert(
+        "Notification",
+        notification.message || "You have a new notification!"
+      );
     };
-    
+
     NotificationSocket.onNotificationReceived = handleNewNotification;
     NotificationSocket.connect();
 
@@ -60,7 +65,6 @@ const HomePage = () => {
     };
   }, []);
 
-  // Fetch Posts (append option)
   const fetchPosts = async (append = false) => {
     if (!myProfile?.id) return;
     append ? setLoadingMore(true) : setRefreshing(true);
@@ -84,7 +88,6 @@ const HomePage = () => {
         );
 
         setPosts((prev) => {
-          // Merge without duplicates
           const combined = append
             ? [
                 ...prev,
@@ -94,7 +97,6 @@ const HomePage = () => {
               ]
             : fetchedPosts;
 
-          // If more than MAX_POSTS_COUNT, remove the oldest 6 posts
           if (combined.length > MAX_POSTS_COUNT) {
             return combined.slice(6);
           }
@@ -113,16 +115,26 @@ const HomePage = () => {
     fetchUserProfile();
   }, []);
 
+  const setupNotificationSocket = (userId) => {
+    const handleNewNotification = (notification) => {
+      setUnreadCount((prev) => prev + 1);
+    };
+
+    NotificationSocket.userId = userId;
+    NotificationSocket.onNotificationReceived = handleNewNotification;
+    NotificationSocket.connect();
+  };
+
   useEffect(() => {
     if (myProfile?.id) {
-      fetchPosts(false);
+      setupNotificationSocket(myProfile.id);
     }
   }, [myProfile]);
 
   // Handle pull-to-refresh
   const onRefresh = () => {
     setPosts([]);
-     fetchPosts(false);
+    //fetchPosts(false);
   };
 
   // Auto-play videos when visible
@@ -274,7 +286,7 @@ const HomePage = () => {
         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        onEndReached={() => fetchPosts(true)}
+        //onEndReached={() => fetchPosts(true)}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />

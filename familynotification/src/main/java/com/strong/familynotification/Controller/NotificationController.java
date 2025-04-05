@@ -52,8 +52,8 @@ public class NotificationController {
     }
 
     @MutationMapping
-    public Notification markNotificationAsRead(@Argument String notifId) throws NotifException {
-        return notificationService.markAsRead(notifId);
+    public List<Notification> markNotificationAsRead(@Argument List<String> notifIds) throws NotifException {
+        return notificationService.markAsRead(notifIds);
     }
 
     @MutationMapping
