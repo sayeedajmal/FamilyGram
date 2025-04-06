@@ -22,3 +22,10 @@ Someone comments ➝ Comment Service emits event
 
 ➡️ WebSocket won't receive these events on its own.
 That's where Kafka comes in.
+
+[Frontend]  
+ │  
+ ▼  
+[UserService] → [Redis] → (Kafka Producer) → [MongoUpdaterService] → [MongoDB] (Kafka Consumer)
+
+[PostService] → [Redis] → (Kafka Producer) → [MongoUpdaterService] → [MongoDB] (Kafka Consumer)

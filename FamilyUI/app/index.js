@@ -20,7 +20,6 @@ import InAppNotification from "./containers/InAppNotification";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
-import SendNotification from "./containers/SendNotification";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -44,10 +43,6 @@ export default function App() {
 
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
-
-
-
-  const [notifications, setNotifications] = useState([]);
 
 
   const [fonts] = useFonts({
@@ -87,27 +82,16 @@ export default function App() {
           loginSignup.clearTokens();
           return;
         }
-        setProfileImage(userProfile.thumbnailUrl);
-        const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        setIsAuthenticated(profile.status);
+        setProfileImage(userProfile?.thumbnailUrl);
+        setIsAuthenticated(true);
       } catch (error) {
         console.error("Authentication check failed:", error);
         loginSignup.clearTokens();
         setIsAuthenticated(false);
       }
     };
-
-    // const fetchUserProfile = async () => {
-    //   const profile = await loginSignup.getStoredUserProfile();
-
-    //   if (profile?.thumbnailId) {
-    //     const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
-    //     setProfileImage(imageUrl.data);
-    //   }
-    // };
-
+    
     checkAuth();
-    //fetchUserProfile();
   }, []);
 
   return (
@@ -148,11 +132,7 @@ export default function App() {
                       return (
                         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                           <Image
-                            source={
-                              profileImage
-                                ? { uri: profileImage }
-                                : require("../assets/images/profile.png")
-                            }
+                            source={profileImage ? { uri: profileImage } : require("../assets/images/profile.png")}
                             style={{
                               width: size,
                               height: size,

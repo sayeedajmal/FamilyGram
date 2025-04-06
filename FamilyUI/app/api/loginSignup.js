@@ -135,19 +135,28 @@ class ApiService {
             });
 
             const responseData = await response.json();
-            
+
             if (response.ok) {
-                const { accessToken, refreshToken } = responseData.data || {};
+                const { accessToken, refreshToken, myProfile } = responseData.data || {};
+                const myProfileData = myProfile;
                 if (accessToken && refreshToken) {
+                    let thumbnailUrl = "";
+
+                    const thumbnailId = myProfileData.thumbnailId || "67f22def7d18c31ce1040da1";
+                    const imageResponse = await this.getProfileImage(thumbnailId);
+                    if (imageResponse.status) {
+                        thumbnailUrl = imageResponse.data;
+                    }
+
+                    if (myProfileData) {
+                        myProfileData.thumbnailUrl = thumbnailUrl;
+                        await Storage.setItem("userProfile", JSON.stringify(myProfileData));
+                    }
+
                     await this.saveTokens(accessToken, refreshToken);
                 }
-
-                const profileResponse = await this.fetchUserProfileByEmail(userData.email);
-                if (profileResponse.status) {
-                    return { status: true, message: "Login successful", data: profileResponse.data };
-                }
+                return { status: true, message: "Login successful", data: null };
             }
-
             return { status: false, message: responseData.message || "Login failed", data: null };
         } catch (error) {
             console.error("Login error:", error);
@@ -167,19 +176,23 @@ class ApiService {
         const responseData = await response.json();
 
         if (response.ok) {
-            const { accessToken, refreshToken } = responseData.data || {};
+            const { accessToken, refreshToken, myProfile } = responseData.data || {};
+            const myProfileData = myProfile;
             if (accessToken && refreshToken) {
+                let thumbnailUrl = "";
+
+                const thumbnailId = myProfileData.thumbnailId || "67f22def7d18c31ce1040da1";
+                const imageResponse = await this.getProfileImage(thumbnailId);
+                if (imageResponse.status) {
+                    thumbnailUrl = imageResponse.data;
+                }
+                myProfileData.thumbnailUrl = thumbnailUrl;
+                await Storage.setItem("userProfile", JSON.stringify(myProfileData));
+
                 await this.saveTokens(accessToken, refreshToken);
             }
-
-            const profileResponse = await this.fetchUserProfileByEmail(userData.email);
-            if (profileResponse.status) {
-                return { status: true, message: "Registration successful", data: profileResponse.data };
-            }
-
-            return { status: false, message: "Registration successful, but failed to fetch profile", data: null };
+            return { status: true, message: "Register successful", data: null };
         }
-
         return { status: false, message: responseData.message || "Registration failed", data: null };
     }
 
@@ -188,43 +201,6 @@ class ApiService {
         return await fetch(`${AUTH_API_URL}/auth/sendSignupOtp?email=${encodeURIComponent(email)}`, { method: "POST" });
     }
 
-    async fetchUserProfileByEmail(email) {
-
-        const response = await this.request(`${AUTH_API_URL}/user/email?email=${encodeURIComponent(email)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-        });
-
-        if (response.status) {
-            const userProfile = response.data.data;
-
-            let defaultThumbnail = Image.resolveAssetSource(require("../../assets/images/profile.png")).uri;
-            let thumbnailUrl = defaultThumbnail;
-
-            if (userProfile.thumbnailId && typeof userProfile.thumbnailId === "string") {
-                const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
-                if (imageResponse.status) {
-                    thumbnailUrl = imageResponse.data;
-                }
-            }
-
-            userProfile.thumbnailUrl = thumbnailUrl || defaultThumbnail;
-
-            await Storage.setItem("userProfile", JSON.stringify(userProfile));
-
-            return {
-                status: true,
-                message: "User profile fetched and stored",
-                data: userProfile,
-            };
-        } else {
-            return {
-                status: false,
-                message: response.message || "Failed to fetch user profile",
-                data: null,
-            };
-        }
-    }
 
 
     async getLiteUser(userId) {
@@ -341,18 +317,17 @@ class ApiService {
                     "Accept": "application/json",
                 }
             });
+            console.log("Response from updateUserProfile:", response);
 
             if (response.status) {
                 const userProfile = response.data.data;
-                let thumbnailUrl = require("../../assets/images/profile.png");
+                let thumbnailUrl = "";
 
-                if (userProfile.thumbnailId) {
-                    const imageResponse = await this.getProfileImage(userProfile.thumbnailId);
-                    if (imageResponse.status) {
-                        thumbnailUrl = imageResponse.data;
-                    }
+                const thumbnailId = userProfile.thumbnailId || "67f22def7d18c31ce1040da1";
+                const imageResponse = await this.getProfileImage(thumbnailId);
+                if (imageResponse.status) {
+                    thumbnailUrl = imageResponse.data;
                 }
-
                 userProfile.thumbnailUrl = thumbnailUrl;
                 await Storage.setItem("userProfile", JSON.stringify(userProfile));
 

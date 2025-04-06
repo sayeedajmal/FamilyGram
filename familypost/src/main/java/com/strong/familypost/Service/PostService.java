@@ -6,7 +6,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -111,18 +110,17 @@ public class PostService {
                 postRepo.save(savedPost);
             }
 
-            // Step 5: Update Redis Cache Correctly (Append Instead of Replace)
-            String cacheKey = "posts:" + loggedId;
+            // Step 5: Update Redis Cache - Store posts as is without type information
+            String cacheKey = "posts:" + savedPost.getUserId();
 
             // Fetch existing cached posts
-            Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
             List<Post> cachedPosts = new ArrayList<>();
+            List<?> existingList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
 
-            if (cachedValue != null && cachedValue instanceof List<?>) {
-                List<?> cachedList = (List<?>) cachedValue;
-                for (Object obj : cachedList) {
-                    if (obj instanceof Post) {
-                        cachedPosts.add((Post) obj);
+            if (existingList != null) {
+                for (Object item : existingList) {
+                    if (item instanceof Post) {
+                        cachedPosts.add((Post) item);
                     }
                 }
             }
@@ -176,10 +174,9 @@ public class PostService {
 
         // Update Redis cache - remove the post if it exists in cache
         String cacheKey = "posts:" + post.getUserId();
-        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
 
-        if (cachedValue != null && cachedValue instanceof List<?>) {
-            List<?> cachedList = (List<?>) cachedValue;
+        if (cachedList != null) {
             List<Post> updatedList = new ArrayList<>();
 
             for (Object obj : cachedList) {
@@ -224,26 +221,37 @@ public class PostService {
         // Cache Key
         String cacheKey = "posts:" + userId;
 
-        // 1️⃣ Try to fetch from Redis first
-        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
-        List<Post> cachedPosts = new ArrayList<>();
+        try {
+            // 1️⃣ Try to fetch from Redis first
+            Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
 
-        if (cachedValue != null && cachedValue instanceof List<?>) {
-            List<?> cachedList = (List<?>) cachedValue;
-            for (Object obj : cachedList) {
-                if (obj instanceof Post) {
-                    cachedPosts.add((Post) obj);
+            if (cachedValue != null) {
+                if (cachedValue instanceof List) {
+                    List<?> cachedList = (List<?>) cachedValue;
+
+                    // If the list is not empty and contains Post objects, return it
+                    if (!cachedList.isEmpty() && cachedList.get(0) instanceof Post) {
+                        List<Post> posts = new ArrayList<>();
+                        for (Object obj : cachedList) {
+                            if (obj instanceof Post) {
+                                posts.add((Post) obj);
+                            }
+                        }
+
+                        return posts;
+                    }
                 }
+
+                // If we're here, the cache value wasn't usable
+
+                redisTemplate.delete(cacheKey);
             }
 
-            return cachedPosts; // Return cached data
-        }
+            // Proceed with the normal flow if cache miss or invalid cache
+            if (userId.equals(authenticatedUserId)) {
+                return fetchAndCachePosts(userId, cacheKey);
+            }
 
-        if (userId.equals(authenticatedUserId)) {
-            return fetchAndCachePosts(userId, cacheKey);
-        }
-
-        try {
             // 2️⃣ Call FamilyAuth Service to check privacy settings
             ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
             if (response.getStatusCode().is2xxSuccessful()) {
@@ -252,6 +260,8 @@ public class PostService {
                 throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
             }
         } catch (Exception e) {
+
+            e.printStackTrace();
             throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
@@ -266,10 +276,7 @@ public class PostService {
     private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
         // 3️⃣ Fetch posts from database
         List<Post> posts = postRepo.findByUserId(userId);
-
-        // 4️⃣ Store result in Redis (set expiration of 20 minutes)
         redisTemplate.opsForValue().set(cacheKey, posts, Duration.ofMinutes(20));
-
         return posts;
     }
 
@@ -307,9 +314,8 @@ public class PostService {
         String postOwnerUserId = post.getUserId();
         String cacheKey = "posts:" + postOwnerUserId;
 
-        Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedValue != null && cachedValue instanceof List<?>) {
-            List<?> cachedList = (List<?>) cachedValue;
+        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
+        if (cachedList != null) {
             List<Post> updatedList = new ArrayList<>();
 
             boolean foundPost = false;

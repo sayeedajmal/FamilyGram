@@ -54,6 +54,18 @@ public class JwtUtil {
     }
 
     /**
+     * Extracts the user id (id) from the given JWT.
+     * 
+     * @param token the JWT from which the user id is to be extracted.
+     * @return the extracted user id.
+     * @throws UserException if the token is invalid or has expired.
+     */
+    public String extractUserId(String token) throws UserException {
+        Claims claims = extractAllClaims(token);
+        return claims.get("id", String.class);
+    }
+
+    /**
      * Validates the given JWT against the provided user details.
      * 
      * @param token the JWT to validate.
@@ -193,6 +205,7 @@ public class JwtUtil {
                 .claim("accountNonLocked", user.isAccountNonLocked())
                 .claim("accountNonExpired", user.isAccountNonExpired())
                 .claim("authorities", user.getAuthorities())
+                .claim("credentialsNonExpired", user.isCredentialsNonExpired())
                 .issuedAt(new Date(System.currentTimeMillis()))
                 .expiration(new Date(System.currentTimeMillis() + expireTime))
                 .signWith(getSigninKey())

@@ -1,19 +1,16 @@
-package com.strong.familyauth.Model;
+package com.strong.familynotification.Model;
 
-import java.util.Collection;
 import java.util.Set;
 
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import lombok.Data;
 
 @Data
 @Document(collection = "users")
-public class User implements UserDetails {
+public class User {
     @Id
     @Indexed(unique = true)
     private String id;
@@ -33,13 +30,13 @@ public class User implements UserDetails {
     private String thumbnailId;
     private boolean accountNonExpired;
     private boolean accountNonLocked;
+    private boolean credentialsNonExpired;
     private boolean enabled;
     private boolean isPrivate;
     private Set<String> followRequests;
-    private boolean credentialsNonExpired;
     private Set<String> followers;
     private Set<String> following;
     private String website;
-    private Collection<? extends GrantedAuthority> authorities;
+    private Set<String> authorities;
 
 }
