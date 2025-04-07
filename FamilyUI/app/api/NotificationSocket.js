@@ -52,6 +52,27 @@ class NotificationSocket {
         this.client.activate();
     }
 
+    async deleteNotificationById(notifId) {
+        const response = await fetch(`${this.serverUrl}/graphql`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                query: `
+                    mutation {
+                        deleteNotification(notifId: "${notifId}")
+                    }
+                `,
+                variables: {}
+            }),
+        });
+
+        const result = await response.json();
+        return result;
+    }
+
+
     // Fetch existing notifications from GraphQL API
     async fetchNotifications(userId) {
         try {
@@ -69,6 +90,7 @@ class NotificationSocket {
                 message
                 senderUsername
                 postThumbId
+                senderId
                 thumbnailId
                 postId
                 read
@@ -106,9 +128,9 @@ class NotificationSocket {
         }
     }
 
-    async sendNotificationsBulk(type, message, senderUsername, receivers, thumbnailId, postId, postThumbId) {
+    async sendNotificationsBulk(type, message, senderUsername, receivers, senderId, thumbnailId, postId, postThumbId) {
         try {
-            if (!type || !message || !senderUsername || !receivers?.length) {
+            if (!type || !message || !senderUsername || !receivers?.length || !senderId) {
                 console.error("Missing required fields");
                 return;
             }
@@ -132,6 +154,7 @@ class NotificationSocket {
                 message,
                 senderUsername,
                 receiverId,
+                senderId,
                 thumbnailId,
                 postId,
                 postThumbId,
@@ -219,9 +242,9 @@ class NotificationSocket {
         });
     }
 
-    async sendNotification(type, message, senderUsername, receiverId, thumbnailId, postId, postThumbId) {
+    async sendNotification(type, message, senderUsername, receiverId, senderId, thumbnailId, postId, postThumbId) {
         try {
-            if (!type || !message || !senderUsername || !receiverId || !thumbnailId) {
+            if (!type || !message || !senderUsername || !receiverId || !thumbnailId || !senderId) {
                 console.error("Missing required fields");
                 return;
             }
@@ -251,6 +274,7 @@ class NotificationSocket {
                     message,
                     senderUsername,
                     receiverId,
+                    senderId,
                     thumbnailId,
                     postId,
                     postThumbId,

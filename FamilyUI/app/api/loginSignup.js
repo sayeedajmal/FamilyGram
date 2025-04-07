@@ -258,18 +258,17 @@ class ApiService {
             headers: { "Content-Type": "application/json" },
         });
         if (response.status) {
-            await this.fetchUserProfileByEmail(this.getStoredUserProfile?.email);
+            await this.fetchUserProfile(mineId);
         }
         return response;
     }
-
-    async removeFollow(userId, mineId) {
-        const response = await this.request(`${AUTH_API_URL}/user/removeFollow?mineId=${mineId}&yourId=${userId}`, {
+    async rejectFollowRequest(userId, mineId) {
+        const response = await this.request(`${AUTH_API_URL}/user/rejectFollowRequest?mineId=${mineId}&yourId=${userId}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
         if (response.status) {
-            await this.fetchUserProfileByEmail(this.getStoredUserProfile?.email);
+            await this.fetchUserProfile(mineId);
         }
         return response;
     }

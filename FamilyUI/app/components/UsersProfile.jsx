@@ -77,16 +77,40 @@ export const UsersProfile = () => {
   };
 
   const toggleFollow = async () => {
-    
     if (!userProfile?.id || myProfile?.id === userProfile?.id) return;
-    await NotificationSocket.sendNotificationsBulk(
-      "FOLLOW_REQUEST",
-      "requested to follow you",
-      myProfile?.username,
-      [userProfile?.id],
-      myProfile?.thumbnailId
+
+    setIsLoading(true);
+
+    const response = await loginSignup.toggleFollow(
+      userProfile.id,
+      myProfile.id,
+      thumbnailUrl
     );
-  
+
+    if (response) {
+      setUserProfile(response);
+      if (userProfile.privacy && !isFollowing) {
+        setIsRequested(true);
+        await NotificationSocket.sendNotificationsBulk(
+          "FOLLOW_REQUEST",
+          "requested to follow you",
+          myProfile?.username,
+          [userProfile?.id],
+          myProfile?.id,
+          myProfile?.thumbnailId
+        );
+      }
+
+      // Refresh profile data
+      await fetchUserProfile();
+      setIsLoading(false);
+    } else {
+      Alert.alert(
+        "Error",
+        response.message || "Failed to update follow status"
+      );
+      setIsLoading(false);
+    }
   };
 
   const FetchPosts = async () => {

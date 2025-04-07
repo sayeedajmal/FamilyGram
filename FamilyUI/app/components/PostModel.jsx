@@ -87,6 +87,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       message,
       myProf?.username,
       myProf?.followers,
+      myProf?.id,
       myProf?.thumbnailId,
       post?.id,
       post?.mediaIds?.[0]
@@ -373,6 +374,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
             myProf?.username,
             myProf?.followers,
             myProf?.thumbnailId,
+            myProf?.id,
             post?.id,
             post?.mediaIds?.[0]
           );

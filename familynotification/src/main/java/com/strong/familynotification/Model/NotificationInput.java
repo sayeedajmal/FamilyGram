@@ -7,5 +7,6 @@ public record NotificationInput(
                 String thumbnailId,
                 String senderUsername,
                 String receiverId,
+                String senderId,
                 String postId) {
 }

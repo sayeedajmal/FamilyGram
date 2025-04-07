@@ -35,8 +35,6 @@ export const ProfileSection = () => {
   const fetchUserProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
-      console.log("Profile fetched:", profile);
-      
       setMyProfile(profile);
     }
     setRefreshing(false);

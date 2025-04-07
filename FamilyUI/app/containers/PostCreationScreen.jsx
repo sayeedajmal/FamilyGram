@@ -129,6 +129,7 @@ const PostCreationScreen = () => {
         "Posted a new post",
         userProfile?.username,
         userProfile?.followers,
+        userProfile?.id,
         userProfile?.thumbnailId,
         postId,
         postThumbId

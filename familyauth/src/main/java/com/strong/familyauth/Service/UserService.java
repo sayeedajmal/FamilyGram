@@ -6,6 +6,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 import org.bson.Document;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +83,7 @@ public class UserService implements UserDetailsService {
             }
 
             user = userOptional.get();
+            user.setPassword(null);
             redisTemplate.opsForValue().set(redisKey, user); // cache it
         }
 
@@ -127,8 +129,8 @@ public class UserService implements UserDetailsService {
 
         String refreshToken = jwtUtil.generateRefreshToken(user);
         User save = userRepo.save(user);
-        save.setPassword(null);
         String accessToken = jwtUtil.generateAccessToken(save);
+        save.setPassword(null);
         redisTemplate.opsForValue().set("user:" + save.getId(), save);
         saveToken(accessToken, refreshToken, save);
         Map<String, Object> tokens = new HashMap<>();
@@ -139,41 +141,34 @@ public class UserService implements UserDetailsService {
         return tokens;
     }
 
-    public String removeFollow(String mineId, String yourId) throws UserException {
-        String yourKey = "user:" + yourId;
+    public boolean rejectFollowRequest(String mineId, String yourId) throws UserException {
+        String mineKey = "user:" + mineId;
 
         // Try Redis
-        User yourUser = redisTemplate.opsForValue().get(yourKey);
+        User mineUser = redisTemplate.opsForValue().get(mineKey);
 
         // Fallback to DB
-        if (yourUser == null) {
-            yourUser = userRepo.findById(yourId).orElse(null);
-            if (yourUser != null)
-                redisTemplate.opsForValue().set(yourKey, yourUser);
+        if (mineUser == null) {
+            mineUser = userRepo.findById(yourId).orElse(null);
         }
 
-        if (yourUser == null) {
-            return "User not found.";
+        if (mineUser == null) {
+            throw new UserException("User not found: " + mineId);
         }
-
         // Check and remove follow request
-        if (yourUser.getFollowRequests().contains(mineId)) {
-            yourUser.getFollowRequests().remove(mineId);
-
+        if (mineUser.getFollowRequests().contains(yourId)) {
+            mineUser.getFollowRequests().remove(yourId);
+            mineUser.setPassword(null);
             // 🔥 Correct Kafka payload — send updated list
             Map<String, Object> payload = new HashMap<>();
             payload.put("id", yourId);
-            payload.put("followRequests", yourUser.getFollowRequests());
+            payload.put("followRequests", mineUser.getFollowRequests());
             kafkaProducer.sendToKafka(payload, "UPDATE");
-
-            // Save + Update Redis
-            userRepo.save(yourUser);
-            redisTemplate.opsForValue().set(yourKey, yourUser);
-
-            return "Follow request rejected.";
+            redisTemplate.opsForValue().set(mineKey, mineUser);
+            return true;
         }
 
-        return "No follow request from this user.";
+        return false;
     }
 
     public boolean acceptFollowRequest(String mineId, String userId) throws UserException {
@@ -186,16 +181,11 @@ public class UserService implements UserDetailsService {
         // Fallback to DB if not in Redis
         if (mineUser == null) {
             mineUser = userRepo.findById(mineId).orElse(null);
-            if (mineUser != null)
-                redisTemplate.opsForValue().set(mineKey, mineUser);
         }
 
         if (user == null) {
             user = userRepo.findById(userId).orElse(null);
-            if (user != null)
-                redisTemplate.opsForValue().set(userKey, user);
         }
-
         // Validate and process the follow request
         if (mineUser != null && user != null) {
             if (mineUser.getFollowRequests().contains(userId)) {
@@ -204,19 +194,31 @@ public class UserService implements UserDetailsService {
                 mineUser.getFollowRequests().remove(userId);
 
                 // Add to followers/following
-                // Update 1: mineUser (id = mineId, followers = id)
+                // Update 1: mineUser (id = mineId, followers = Set of ids)
+                Set<String> mineFollowers = mineUser.getFollowers();
+                if (mineFollowers == null)
+                    mineFollowers = new HashSet<>();
+                mineFollowers.add(userId);
+
                 Map<String, Object> minePayload = new HashMap<>();
                 minePayload.put("id", mineId);
-                minePayload.put("followers", userId);
+                minePayload.put("followers", mineFollowers); // sending full updated set
                 kafkaProducer.sendToKafka(minePayload, "UPDATE");
 
-                // Update 2: user (userId = userId, followingAdded = mineId)
+                // Update 2: user (id = userId, following = Set of ids)
+                Set<String> userFollowing = user.getFollowing();
+                if (userFollowing == null)
+                    userFollowing = new HashSet<>();
+                userFollowing.add(mineId);
+
                 Map<String, Object> userPayload = new HashMap<>();
                 userPayload.put("id", userId);
-                userPayload.put("following", mineId);
+                userPayload.put("following", userFollowing); // sending full updated set
                 kafkaProducer.sendToKafka(userPayload, "UPDATE");
 
                 // Update Redis again after saving
+                mineUser.setPassword(null);
+                user.setPassword(null);
                 redisTemplate.opsForValue().set(mineKey, mineUser);
                 redisTemplate.opsForValue().set(userKey, user);
 
@@ -259,6 +261,7 @@ public class UserService implements UserDetailsService {
             }
 
             // Update Redis cache
+            your.setPassword(null);
             redisTemplate.opsForValue().set(yourKey, your);
 
             // 🔥 Kafka payload
@@ -284,6 +287,8 @@ public class UserService implements UserDetailsService {
         }
 
         // Update Redis cache
+        mine.setPassword(null);
+        your.setPassword(null);
         redisTemplate.opsForValue().set(mineKey, mine);
         redisTemplate.opsForValue().set(yourKey, your);
 
@@ -296,8 +301,8 @@ public class UserService implements UserDetailsService {
         yourPayload.put("id", yourId);
         yourPayload.put("followers", new ArrayList<>(your.getFollowers()));
 
-        kafkaProducer.sendToKafka(minePayload, "FOLLOW");
-        kafkaProducer.sendToKafka(yourPayload, "FOLLOW");
+        kafkaProducer.sendToKafka(minePayload, "UPDATE");
+        kafkaProducer.sendToKafka(yourPayload, "UPDATE");
 
         return isAlreadyFollowing ? "Unfollowed successfully." : "Followed successfully.";
     }
@@ -433,8 +438,8 @@ public class UserService implements UserDetailsService {
         if (user == null) {
             user = userRepo.findById(userId)
                     .orElseThrow(() -> new UserException("User not found"));
-            user.setPassword(null);
             // Store in Redis for future requests
+            user.setPassword(null);
             redisTemplate.opsForValue().set(redisKey, user);
         } else {
             user.setPassword(null); // Just in case it's cached
@@ -470,12 +475,12 @@ public class UserService implements UserDetailsService {
         if (existingUser == null) {
             existingUser = userRepo.findById(id)
                     .orElseThrow(() -> new UserException("User not found"));
-            existingUser.setPassword(null); // Ensure password is not exposed
         }
 
         existingUser.setEmail(email);
 
         // Update Redis cache
+        existingUser.setPassword(null); // Ensure password is not exposed
         redisTemplate.opsForValue().set(redisKey, existingUser);
 
         userRepo.save(existingUser);
@@ -557,9 +562,9 @@ public class UserService implements UserDetailsService {
         }
 
         // Cache updated user
+        existingUser.setPassword(null);
         redisTemplate.opsForValue().set(redisKey, existingUser);
 
-        existingUser.setPassword(null); // Don't expose
         updatedFields.put("id", existingUser.getId());
 
         if (!updatedFields.isEmpty()) {

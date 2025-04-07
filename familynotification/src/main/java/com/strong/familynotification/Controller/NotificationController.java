@@ -42,6 +42,7 @@ public class NotificationController {
             notification.setThumbnailId(input.thumbnailId());
             notification.setPostThumbId(input.postThumbId());
             notification.setReceiverId(input.receiverId());
+            notification.setSenderId(input.senderId());
             notification.setPostId(input.postId());
             notification.setCreatedAt(Instant.now());
             return notification;

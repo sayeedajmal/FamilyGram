@@ -135,16 +135,6 @@ public class UserController {
                 .ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Phone number updated successfully", result));
     }
 
-    /**
-     * @param mineId   ID of the authenticated user (the one performing the
-     *                 follow/unfollow action)
-     * @param yourId   ID of the user to be followed or unfollowed
-     * @param imageUrl The image URL used for follow request emails (if applicable)
-     * @return A ResponseEntity containing a ResponseWrapper with the result message
-     *         and the updated user data (including following/followers lists)
-     * @throws UserException if either of the users cannot be found or any other
-     *                       user-related error occurs
-     */
     @PostMapping("/toggleFollow")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<String>> toggleFollow(@RequestParam("mineId") String mineId,
@@ -156,23 +146,13 @@ public class UserController {
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), toggleFollowerMessage, ""));
     }
 
-    /**
-     * @param mineId   ID of the authenticated user (the one performing the
-     *                 follow/unfollow action)
-     * @param yourId   ID of the user to be followed or unfollowed
-     * @param imageUrl The image URL used for follow request emails (if applicable)
-     * @return A ResponseEntity containing a ResponseWrapper with the result message
-     *         and the updated user data (including following/followers lists)
-     * @throws UserException if either of the users cannot be found or any other
-     *                       user-related error occurs
-     */
-    @PostMapping("/removeFollow")
+    @PostMapping("/rejectFollowRequest")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<String>> removeFollow(@RequestParam("mineId") String mineId,
+    public ResponseEntity<ResponseWrapper<Boolean>> rejectFollowRequest(@RequestParam("mineId") String mineId,
             @RequestParam("yourId") String yourId)
             throws UserException {
-        String removed = userService.removeFollow(mineId, yourId);
-        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), removed, ""));
+        Boolean removed = userService.rejectFollowRequest(mineId, yourId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Rejected", removed));
     }
 
     @PostMapping("/accept")
