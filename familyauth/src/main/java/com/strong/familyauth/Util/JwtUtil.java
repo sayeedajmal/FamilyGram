@@ -200,7 +200,7 @@ public class JwtUtil {
                 .claim("username", user.getUsername())
                 .claim("name", user.getName())
                 .claim("phone", user.getPhone())
-                .claim("isPrivate", user.isPrivate())
+                .claim("privacy", user.isPrivacy())
                 .claim("enabled", user.isEnabled())
                 .claim("accountNonLocked", user.isAccountNonLocked())
                 .claim("accountNonExpired", user.isAccountNonExpired())

@@ -27,7 +27,6 @@ public class KafkaProducer {
             case "CREATE" -> "user-create";
             case "UPDATE" -> "user-update";
             case "DELETE" -> "user-delete";
-            case "FOLLOW" -> "user-follow";
             default -> throw new RuntimeException("Unknown type");
         };
         try {

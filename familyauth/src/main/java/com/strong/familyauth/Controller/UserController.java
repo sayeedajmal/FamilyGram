@@ -54,22 +54,10 @@ public class UserController {
     @PostMapping("/updatePrivacy")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Boolean>> updatePrivacy(@RequestParam("userId") String userId,
-            @RequestParam("isPrivate") boolean isPrivate) throws UserException {
-        boolean updatedProfile = userService.updatePrivacy(isPrivate, userId);
+            @RequestParam("privacy") boolean privacy) throws UserException {
+        boolean updatedProfile = userService.updatePrivacy(privacy, userId);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Privacy updated successfully",
                 updatedProfile));
-    }
-
-    @GetMapping("/privacy")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<String> privacy(@RequestParam String mineId, @RequestParam String yourId) {
-        boolean canAccessProfile = userService.canAccessProfile(mineId, yourId);
-
-        if (canAccessProfile) {
-            return ResponseEntity.ok("Access granted");
-        } else {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("User Account is Private");
-        }
     }
 
     @PostMapping("/profile")
@@ -116,12 +104,17 @@ public class UserController {
                         .body(new ResponseWrapper<>(HttpStatus.NOT_FOUND.value(), "User not found", null)));
     }
 
+    @GetMapping("/myProfile")
+    public ResponseEntity<ResponseWrapper<User>> myProfile(@RequestParam("mineId") String mineId) throws UserException {
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved",
+                userService.getUserByUserId(mineId)));
+    }
+
     @PostMapping("/byId")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<User>> getProfileByID(@RequestParam("mineId") String mineId,
-            @RequestParam("userId") String userId)
+    public ResponseEntity<ResponseWrapper<User>> getProfileByID(@RequestParam("userId") String userId)
             throws UserException {
-        User profile = userService.getUserByUserId(mineId, userId);
+        User profile = userService.getUserByUserId(userId);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "User profile retrieved", profile));
     }
 
@@ -161,6 +154,25 @@ public class UserController {
 
         String toggleFollowerMessage = userService.toggleFollower(mineId, yourId, imageUrl);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), toggleFollowerMessage, ""));
+    }
+
+    /**
+     * @param mineId   ID of the authenticated user (the one performing the
+     *                 follow/unfollow action)
+     * @param yourId   ID of the user to be followed or unfollowed
+     * @param imageUrl The image URL used for follow request emails (if applicable)
+     * @return A ResponseEntity containing a ResponseWrapper with the result message
+     *         and the updated user data (including following/followers lists)
+     * @throws UserException if either of the users cannot be found or any other
+     *                       user-related error occurs
+     */
+    @PostMapping("/removeFollow")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<ResponseWrapper<String>> removeFollow(@RequestParam("mineId") String mineId,
+            @RequestParam("yourId") String yourId)
+            throws UserException {
+        String removed = userService.removeFollow(mineId, yourId);
+        return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), removed, ""));
     }
 
     @PostMapping("/accept")

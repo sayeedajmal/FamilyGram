@@ -2,6 +2,7 @@ import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { Alert } from "react-native";
 import * as Notifications from "expo-notifications";
+import Toast from 'react-native-toast-message';
 
 class NotificationSocket {
     constructor(userId, onNotificationReceived, onFetchNotifications) {
@@ -37,9 +38,11 @@ class NotificationSocket {
             this.connected = true;
             this.client.subscribe(`/user/${this.userId}/queue/notifications`, (message) => {
                 const notification = JSON.parse(message.body);
+                //console.log("Notification received:", notification);
 
                 // 🔔 Show notification & play default sound
                 this.triggerSystemNotification(notification);
+                this.showToastForNotification(notification);
                 if (this.onNotificationReceived) {
                     this.onNotificationReceived(notification);
                 }
@@ -164,6 +167,57 @@ class NotificationSocket {
         }
     }
 
+    showToastForNotification(notification) {
+        if (!notification) return;
+
+        const { type, senderUsername, message } = notification;
+
+        let title = "🔔 New Notification";
+        let body = `${senderUsername} ${message || "sent you a notification"}`;
+        let toastType = "info";
+
+        switch (type) {
+            case "LIKE":
+                title = "❤️ New Like";
+                body = `${senderUsername} liked your post.`;
+                toastType = "success";
+                break;
+            case "COMMENT":
+                title = "💬 New Comment";
+                body = `${senderUsername} commented on your post.`;
+                toastType = "info";
+                break;
+            case "POST":
+                title = "📸 New Post";
+                body = `${senderUsername} posted something new.`;
+                toastType = "info";
+                break;
+            case "FOLLOW":
+                title = "👤 New Follower";
+                body = `${senderUsername} started following you.`;
+                toastType = "success";
+                break;
+            case "FOLLOW_REQUEST":
+                title = "🔒 Follow Request";
+                body = `@${senderUsername} requested to follow you.`;
+                toastType = "info";
+                break;
+            default:
+                title = "📢 Notification";
+                body = `${senderUsername} ${message || ""}`;
+                toastType = "info";
+        }
+
+        Toast.show({
+            type: toastType,
+            text1: title,
+            text2: body,
+            position: 'bottom',
+            visibilityTime: 3000,
+            autoHide: true,
+            bottomOffset: 50,
+        });
+    }
 
     async sendNotification(type, message, senderUsername, receiverId, thumbnailId, postId, postThumbId) {
         try {

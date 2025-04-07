@@ -86,7 +86,7 @@ public class UserService implements UserDetailsService {
         }
 
         // If public profile, allow access
-        if (!user.isPrivate()) {
+        if (!user.isPrivacy()) {
             return true;
         }
 
@@ -119,7 +119,7 @@ public class UserService implements UserDetailsService {
         user.setEnabled(true);
         user.setPhone("");
         user.setPhotoId("");
-        user.setPrivate(false);
+        user.setPrivacy(false);
         user.setCredentialsNonExpired(true);
         user.setFollowers(new HashSet<>());
         user.setFollowing(new HashSet<>());
@@ -137,6 +137,43 @@ public class UserService implements UserDetailsService {
         tokens.put("myProfile", save);
 
         return tokens;
+    }
+
+    public String removeFollow(String mineId, String yourId) throws UserException {
+        String yourKey = "user:" + yourId;
+
+        // Try Redis
+        User yourUser = redisTemplate.opsForValue().get(yourKey);
+
+        // Fallback to DB
+        if (yourUser == null) {
+            yourUser = userRepo.findById(yourId).orElse(null);
+            if (yourUser != null)
+                redisTemplate.opsForValue().set(yourKey, yourUser);
+        }
+
+        if (yourUser == null) {
+            return "User not found.";
+        }
+
+        // Check and remove follow request
+        if (yourUser.getFollowRequests().contains(mineId)) {
+            yourUser.getFollowRequests().remove(mineId);
+
+            // 🔥 Correct Kafka payload — send updated list
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", yourId);
+            payload.put("followRequests", yourUser.getFollowRequests());
+            kafkaProducer.sendToKafka(payload, "UPDATE");
+
+            // Save + Update Redis
+            userRepo.save(yourUser);
+            redisTemplate.opsForValue().set(yourKey, yourUser);
+
+            return "Follow request rejected.";
+        }
+
+        return "No follow request from this user.";
     }
 
     public boolean acceptFollowRequest(String mineId, String userId) throws UserException {
@@ -171,13 +208,13 @@ public class UserService implements UserDetailsService {
                 Map<String, Object> minePayload = new HashMap<>();
                 minePayload.put("id", mineId);
                 minePayload.put("followers", userId);
-                kafkaProducer.sendToKafka(minePayload, "FOLLOW");
+                kafkaProducer.sendToKafka(minePayload, "UPDATE");
 
                 // Update 2: user (userId = userId, followingAdded = mineId)
                 Map<String, Object> userPayload = new HashMap<>();
                 userPayload.put("id", userId);
                 userPayload.put("following", mineId);
-                kafkaProducer.sendToKafka(userPayload, "FOLLOW");
+                kafkaProducer.sendToKafka(userPayload, "UPDATE");
 
                 // Update Redis again after saving
                 redisTemplate.opsForValue().set(mineKey, mineUser);
@@ -207,7 +244,7 @@ public class UserService implements UserDetailsService {
         }
 
         // 🔒 Handle private account
-        if (your.isPrivate()) {
+        if (your.isPrivacy()) {
             if (your.getFollowRequests() == null) {
                 your.setFollowRequests(new HashSet<>());
             }
@@ -228,7 +265,7 @@ public class UserService implements UserDetailsService {
             Map<String, Object> requestPayload = new HashMap<>();
             requestPayload.put("id", yourId);
             requestPayload.put("followRequests", new ArrayList<>(your.getFollowRequests()));
-            kafkaProducer.sendToKafka(requestPayload, "FOLLOW");
+            kafkaProducer.sendToKafka(requestPayload, "UPDATE");
 
             return alreadyRequested
                     ? "Follow request removed."
@@ -290,7 +327,7 @@ public class UserService implements UserDetailsService {
         String accessToken = jwtUtil.generateAccessToken(user);
         String refreshToken = jwtUtil.generateRefreshToken(user);
         saveToken(accessToken, refreshToken, user);
-        
+
         user.setPassword(null);
         redisTemplate.opsForValue().set("user:" + user.getId(), user);
 
@@ -341,7 +378,7 @@ public class UserService implements UserDetailsService {
                         .and(
                                 Aggregation.match(
                                         new Criteria().and("_id").ne(mineId)
-                                                .and("isPrivate").is(false)),
+                                                .and("privacy").is(false)),
                                 Aggregation.sample(limit),
                                 Aggregation.project()
                                         .and("_id").as("id")
@@ -387,9 +424,8 @@ public class UserService implements UserDetailsService {
     }
 
     // BY USERID
-    public User getUserByUserId(String mineId, String userId) throws UserException {
+    public User getUserByUserId(String userId) throws UserException {
         String redisKey = "user:" + userId;
-
         // Check Redis cache first
         User user = redisTemplate.opsForValue().get(redisKey);
 
@@ -398,7 +434,6 @@ public class UserService implements UserDetailsService {
             user = userRepo.findById(userId)
                     .orElseThrow(() -> new UserException("User not found"));
             user.setPassword(null);
-
             // Store in Redis for future requests
             redisTemplate.opsForValue().set(redisKey, user);
         } else {
@@ -456,26 +491,23 @@ public class UserService implements UserDetailsService {
     }
 
     // Update Privacy
-    public boolean updatePrivacy(Boolean isPrivate, String userId) throws UserException {
+    public boolean updatePrivacy(Boolean privacy, String userId) throws UserException {
         // Try fetching from Redis first
         String redisKey = "user:" + userId;
-        User existingUser = redisTemplate.opsForValue().get(redisKey);
 
-        if (existingUser == null) {
-            // Fallback to DB
-            existingUser = userRepo.findById(userId)
-                    .orElseThrow(() -> new UserException("User not found"));
-        }
+        // Fallback to DB
+        User existingUser = userRepo.findById(userId)
+                .orElseThrow(() -> new UserException("User not found"));
 
-        existingUser.setPrivate(isPrivate);
+        existingUser.setPrivacy(privacy);
         // Save to DB
-        userRepo.save(savedUser);
+        userRepo.save(existingUser);
 
         // Update Redis cache
-        savedUser.setPassword(null);
-        redisTemplate.opsForValue().set(redisKey, savedUser);
+        existingUser.setPassword(null);
+        redisTemplate.opsForValue().set(redisKey, existingUser);
 
-        return savedUser.isPrivate();
+        return existingUser.isPrivacy();
     }
 
     public User updateUser(MultipartFile file, User updatedUser, MultipartFile thumbnail) throws UserException {

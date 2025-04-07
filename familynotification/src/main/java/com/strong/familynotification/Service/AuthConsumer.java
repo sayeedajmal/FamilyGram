@@ -10,7 +10,7 @@ public class AuthConsumer {
     @Autowired
     private StorageService storageService;
 
-    @KafkaListener(topics = { "user-create", "user-update", "user-follow" }, groupId = "family-group")
+    @KafkaListener(topics = { "user-create", "user-update" }, groupId = "user-group")
     public void consumeUserEvents(String message) {
         storageService.addToBuffer(message);
     }

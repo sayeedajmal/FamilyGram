@@ -4,6 +4,6 @@ import lombok.Data;
 
 @Data
 public class UserPrivacyResponse {
-    private boolean isPrivate;
+    private boolean privacy;
     private boolean isFollowing;
 }

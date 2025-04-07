@@ -32,7 +32,7 @@ public class User {
     private boolean accountNonLocked;
     private boolean credentialsNonExpired;
     private boolean enabled;
-    private boolean isPrivate;
+    private boolean privacy;
     private Set<String> followRequests;
     private Set<String> followers;
     private Set<String> following;

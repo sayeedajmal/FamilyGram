@@ -202,7 +202,6 @@ class ApiService {
     }
 
 
-
     async getLiteUser(userId) {
         const response = await this.request(`${AUTH_API_URL}/user/${encodeURIComponent(userId)}/lite`, {
             method: "GET",
@@ -219,8 +218,8 @@ class ApiService {
 
     }
 
-    async updatePrivacy(userId, isPrivate) {
-        const response = await this.request(`${AUTH_API_URL}/user/updatePrivacy?userId=${userId}&isPrivate=${isPrivate}`, {
+    async updatePrivacy(userId, privacy) {
+        const response = await this.request(`${AUTH_API_URL}/user/updatePrivacy?userId=${userId}&privacy=${privacy}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
@@ -228,8 +227,8 @@ class ApiService {
         return response;
     }
 
-    async getSecondProfile(userId, mineId) {
-        const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}&mineId=${mineId}`, {
+    async getSecondProfile(userId) {
+        const response = await this.request(`${AUTH_API_URL}/user/byId?userId=${encodeURIComponent(userId)}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
@@ -237,22 +236,20 @@ class ApiService {
         if (response.status) {
             const userProfile = response.data.data;
 
-
             return { status: true, message: "Second Profile Fetched", data: userProfile };
         } else {
             return { status: false, message: response.message || "Failed to fetch user profile", data: null };
         }
 
     }
-    async toggleFollow(userId, mineId, imageUrl, email) {
+    async toggleFollow(userId, mineId, imageUrl) {
         const response = await this.request(`${AUTH_API_URL}/user/toggleFollow?mineId=${mineId}&yourId=${userId}&imageUrl=${imageUrl}`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
         });
         if (response.status) {
-            await this.fetchUserProfileByEmail(email);
+            return await this.fetchUserProfile(mineId);
         }
-        return response;
     }
 
     async acceptRequest(userId, mineId) {
@@ -317,8 +314,6 @@ class ApiService {
                     "Accept": "application/json",
                 }
             });
-            console.log("Response from updateUserProfile:", response);
-
             if (response.status) {
                 const userProfile = response.data.data;
                 let thumbnailUrl = "";
@@ -349,6 +344,28 @@ class ApiService {
         }
     }
 
+    async fetchUserProfile(mineId) {
+        const response = await this.request(`${AUTH_API_URL}/user/myProfile?mineId=${encodeURIComponent(mineId)}`, {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+        });
+
+        if (response.status) {
+            const userProfile = response.data.data;
+            let thumbnailUrl = "";
+
+            const thumbnailId = userProfile.thumbnailId || "67f22def7d18c31ce1040da1";
+            const imageResponse = await this.getProfileImage(thumbnailId);
+            if (imageResponse.status) {
+                thumbnailUrl = imageResponse.data;
+            }
+            userProfile.thumbnailUrl = thumbnailUrl;
+            await Storage.setItem("userProfile", JSON.stringify(userProfile));
+            return userProfile;
+        } else {
+            return { status: false, message: response.message || "Failed to fetch user profile", data: null };
+        }
+    }
 
 
     async checkUsernameAvailability(username) {

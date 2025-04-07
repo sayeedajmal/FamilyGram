@@ -34,7 +34,7 @@ public class User implements UserDetails {
     private boolean accountNonExpired;
     private boolean accountNonLocked;
     private boolean enabled;
-    private boolean isPrivate;
+    private boolean privacy;
     private Set<String> followRequests;
     private boolean credentialsNonExpired;
     private Set<String> followers;

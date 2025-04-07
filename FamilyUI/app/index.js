@@ -22,6 +22,7 @@ import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+import Toast from 'react-native-toast-message';
 
 const Storage = {
   setItem: async (key, value) => {
@@ -82,6 +83,7 @@ export default function App() {
           loginSignup.clearTokens();
           return;
         }
+        await loginSignup.fetchUserProfile(userProfile?.id)
         setProfileImage(userProfile?.thumbnailUrl);
         setIsAuthenticated(true);
       } catch (error) {
@@ -90,7 +92,7 @@ export default function App() {
         setIsAuthenticated(false);
       }
     };
-    
+
     checkAuth();
   }, []);
 
@@ -236,7 +238,6 @@ export default function App() {
             },
             overlayEnabled: true,
           }} component={UsersProfile} />
-
         </Stack.Navigator>
       ) : (
         <Stack.Navigator
@@ -257,6 +258,7 @@ export default function App() {
           </Stack.Screen>
         </Stack.Navigator>
       )}
+      <Toast />
     </View>
   );
 }
