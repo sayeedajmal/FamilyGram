@@ -134,7 +134,7 @@ const HomePage = () => {
   // Handle pull-to-refresh
   const onRefresh = () => {
     setPosts([]);
-    //fetchPosts(false);
+    fetchPosts(false);
   };
 
   // Auto-play videos when visible
@@ -286,7 +286,7 @@ const HomePage = () => {
         viewabilityConfigCallbackPairs={viewabilityConfigCallbackPairs.current}
         refreshing={refreshing}
         onRefresh={onRefresh}
-        //onEndReached={() => fetchPosts(true)}
+        onEndReached={() => fetchPosts(true)}
         onEndReachedThreshold={0.5}
         ListFooterComponent={renderFooter}
       />

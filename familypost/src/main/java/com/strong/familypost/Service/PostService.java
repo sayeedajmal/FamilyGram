@@ -17,6 +17,9 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
@@ -110,29 +113,34 @@ public class PostService {
                 postRepo.save(savedPost);
             }
 
-            // Step 5: Update Redis Cache - Store posts as is without type information
+            // Step 5: Update Redis Cache - Store posts for the user
             String cacheKey = "posts:" + savedPost.getUserId();
 
-            // Fetch existing cached posts
+            // Fetch existing cached posts (safe deserialization)
             List<Post> cachedPosts = new ArrayList<>();
             List<?> existingList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
 
             if (existingList != null) {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
                 for (Object item : existingList) {
                     if (item instanceof Post) {
                         cachedPosts.add((Post) item);
+                    } else if (item instanceof Map) {
+                        Post myPost = mapper.convertValue(item, Post.class);
+                        cachedPosts.add(myPost);
                     }
                 }
             }
 
-            // Add the new post at the start (newest first)
+            // Add the new post to the top
             cachedPosts.add(0, savedPost);
 
-            // Store updated list back into Redis
+            // Save the updated list with TTL
             redisTemplate.opsForValue().set(cacheKey, cachedPosts, Duration.ofMinutes(20));
-
             return savedPost;
-
         } catch (PostException e) {
             throw e; // Preserve PostException messages
         } catch (Exception e) {
@@ -217,50 +225,54 @@ public class PostService {
      */
     public List<Post> getUserPosts(String userId, String token) throws PostException {
         String authenticatedUserId = getAuthenticatedUserId();
-
-        // Cache Key
         String cacheKey = "posts:" + userId;
 
         try {
             // 1️⃣ Try to fetch from Redis first
             Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
 
-            if (cachedValue != null) {
-                if (cachedValue instanceof List) {
-                    List<?> cachedList = (List<?>) cachedValue;
+            if (cachedValue != null && cachedValue instanceof List) {
+                List<?> cachedList = (List<?>) cachedValue;
 
-                    // If the list is not empty and contains Post objects, return it
-                    if (!cachedList.isEmpty() && cachedList.get(0) instanceof Post) {
-                        List<Post> posts = new ArrayList<>();
-                        for (Object obj : cachedList) {
-                            if (obj instanceof Post) {
-                                posts.add((Post) obj);
-                            }
+                if (!cachedList.isEmpty()) {
+                    List<Post> posts = new ArrayList<>();
+
+                    for (Object obj : cachedList) {
+                        if (obj instanceof Post) {
+                            posts.add((Post) obj);
+                        } else if (obj instanceof Map) {
+                            // Safe fallback: convert Map to Post using ObjectMapper
+                            ObjectMapper mapper = new ObjectMapper();
+                            mapper.registerModule(new JavaTimeModule());
+                            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+                            Post post = mapper.convertValue(obj, Post.class);
+                            posts.add(post);
                         }
-
-                        return posts;
                     }
+
+                    return posts;
+                } else {
+                    // Empty list is still a valid cache hit
+                    return new ArrayList<>();
                 }
-
-                // If we're here, the cache value wasn't usable
-
-                redisTemplate.delete(cacheKey);
             }
 
-            // Proceed with the normal flow if cache miss or invalid cache
+            // 🚫 Cache miss or invalid, clear it just in case
+            redisTemplate.delete(cacheKey);
+
+            // 2️⃣ Fetch from DB based on privacy
             if (userId.equals(authenticatedUserId)) {
                 return fetchAndCachePosts(userId, cacheKey);
             }
 
-            // 2️⃣ Call FamilyAuth Service to check privacy settings
             ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
             if (response.getStatusCode().is2xxSuccessful()) {
                 return fetchAndCachePosts(userId, cacheKey);
             } else {
                 throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
             }
-        } catch (Exception e) {
 
+        } catch (Exception e) {
             e.printStackTrace();
             throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }

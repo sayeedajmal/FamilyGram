@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
 import org.springframework.data.redis.serializer.StringRedisSerializer;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -29,11 +30,17 @@ public class FamilypostApplication {
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.registerModule(new JavaTimeModule());
 		objectMapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+		Jackson2JsonRedisSerializer<Object> valueSerializer = new Jackson2JsonRedisSerializer<>(objectMapper,
+				Object.class);
+
+		template.setValueSerializer(valueSerializer);
+		template.afterPropertiesSet();
 		return template;
 	}
 
 	@Bean
 	public LettuceConnectionFactory redisConnectionFactory() {
-		return new LettuceConnectionFactory("localhost", 6379);
+		return new LettuceConnectionFactory("redis", 6379);
 	}
 }

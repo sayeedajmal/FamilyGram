@@ -15,7 +15,7 @@ spring:
       hibernate.jdbc.time_zone: UTC
 
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: broker:9092
     consumer:
       auto-offset-reset: latest
     listener:
