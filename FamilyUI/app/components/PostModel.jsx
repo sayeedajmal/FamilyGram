@@ -183,6 +183,13 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     fetchMediaUrls();
   }, [post]);
 
+  // useEffect(() => {
+  //   if (post) {
+  //     setMediaUrls(post.mediaUrls || []);
+  //     setMediaType(post.mediaType || "");
+  //   }
+  // }, [post]);
+
   useEffect(() => {
     if (videoRef.current) {
       videoRefs.current[post.id] = videoRef.current;
@@ -346,27 +353,36 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   // Toggle Like Function
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
-
+    
     // Toggle the like state
     setLikedPosts((prev) => ({
       ...prev,
       [postId]: !isCurrentlyLiked,
     }));
-
+    
     // Update the like count
     setPostLikesCount((prev) => ({
       ...prev,
       [postId]: prev[postId] + (isCurrentlyLiked ? -1 : 1),
     }));
+    
     try {
       const response = await postService.toggleLike(myProf?.id, postId);
-
+      
       if (!response.status) {
         // Revert state if API call fails
         setLikedPosts((prev) => ({
           ...prev,
           [postId]: isCurrentlyLiked,
         }));
+        setPostLikesCount((prev) => ({
+          ...prev,
+          [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
+        }));
+        
+        Alert.alert("Error", "Failed to toggle like. Please try again.");
+      } else {
+        // Send notification only when liking (not unliking)
         if (!isCurrentlyLiked) {
           await NotificationSocket.sendNotificationsBulk(
             "LIKE",
@@ -379,27 +395,21 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
             post?.mediaIds?.[0]
           );
         }
-        setPostLikesCount((prev) => ({
-          ...prev,
-          [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
-        }));
-
-        Alert.alert("Error", "Failed to toggle like. Please try again.");
       }
     } catch (error) {
       // Revert state if there's an error
       Alert.alert("Error", "Failed Like " + error);
-
+      
       setLikedPosts((prev) => ({
         ...prev,
         [postId]: isCurrentlyLiked,
       }));
-
+      
       setPostLikesCount((prev) => ({
         ...prev,
         [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
       }));
-
+      
       Alert.alert(
         "Error",
         "Something went wrong. Please check your connection."
@@ -523,12 +533,11 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                                 source={{ uri: url }}
                                 style={{
                                   width: width - 25,
-                                  height: 300,
                                   aspectRatio: 4 / 5,
                                   borderRadius: 8,
                                 }}
                                 resizeMode="contain"
-                                shouldPlay
+                                shouldPlay="true"
                                 isLooping
                               />
                             ) : (

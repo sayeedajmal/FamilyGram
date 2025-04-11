@@ -140,9 +140,9 @@ public class PostController {
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Post>> getPostById(
-            @PathVariable String postId) {
+            @PathVariable String postId, @RequestParam String userId) {
         try {
-            Post post = postService.getPostById(postId);
+            Post post = postService.getPostById(postId, userId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
             return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));
@@ -176,14 +176,14 @@ public class PostController {
      */
     @PostMapping("/{postId}/toggle-like")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Integer>> toggleLike(
+    public ResponseEntity<ResponseWrapper<Boolean>> toggleLike(
             @PathVariable String postId,
             @RequestParam("userId") String userId) {
         try {
-            int totalLikes = postService.toggleLike(postId, userId);
-            return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
+            boolean liked = postService.toggleLike(postId, userId);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", liked));
         } catch (PostException e) {
-            return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));
+            return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", false));
         }
     }
 }

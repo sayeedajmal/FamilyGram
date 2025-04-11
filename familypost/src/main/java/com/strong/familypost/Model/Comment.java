@@ -8,7 +8,9 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mongodb.lang.NonNull;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 /**
  * Represents a Comment entity in the system.
@@ -21,6 +23,8 @@ import lombok.Data;
  */
 @Data
 @Document(collection = "comments")
+@NoArgsConstructor
+@AllArgsConstructor
 public class Comment {
 
     /** Unique identifier for the comment */

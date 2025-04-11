@@ -1,11 +1,12 @@
 package com.strong.familypost.Service;
 
+import java.math.BigInteger;
 import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -17,6 +18,7 @@ import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
@@ -95,7 +97,7 @@ public class PostService {
             }
 
             if (files != null && !files.isEmpty()) {
-                // Step 2: Try uploading media and thumbnails
+                // Step 2: Upload media and thumbnails
                 List<Map<String, String>> uploadedFiles;
                 try {
                     uploadedFiles = storageService.uploadMedia(files, thumbnails, savedPost.getId());
@@ -109,40 +111,26 @@ public class PostService {
                     savedPost.getThumbnailIds().add(mediaData.get("thumbnailId"));
                 }
 
-                // Step 4: Save post with updated media references
-                postRepo.save(savedPost);
+                // Step 4: Save post again with media references
+                savedPost.setLikeCount(BigInteger.valueOf(0));
+                savedPost = postRepo.save(savedPost);
             }
 
-            // Step 5: Update Redis Cache - Store posts for the user
-            String cacheKey = "posts:" + savedPost.getUserId();
+            // Step 5: Cache in Redis as HASH
+            String cacheKey = "posts:" + savedPost.getUserId(); // Hash key
+            String postId = savedPost.getId(); // Hash field
 
-            // Fetch existing cached posts (safe deserialization)
-            List<Post> cachedPosts = new ArrayList<>();
-            List<?> existingList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-            if (existingList != null) {
-                ObjectMapper mapper = new ObjectMapper();
-                mapper.registerModule(new JavaTimeModule());
-                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            String jsonPost = mapper.writeValueAsString(savedPost);
 
-                for (Object item : existingList) {
-                    if (item instanceof Post) {
-                        cachedPosts.add((Post) item);
-                    } else if (item instanceof Map) {
-                        Post myPost = mapper.convertValue(item, Post.class);
-                        cachedPosts.add(myPost);
-                    }
-                }
-            }
+            redisTemplate.opsForHash().put(cacheKey, postId, jsonPost);
 
-            // Add the new post to the top
-            cachedPosts.add(0, savedPost);
-
-            // Save the updated list with TTL
-            redisTemplate.opsForValue().set(cacheKey, cachedPosts, Duration.ofMinutes(20));
             return savedPost;
         } catch (PostException e) {
-            throw e; // Preserve PostException messages
+            throw e;
         } catch (Exception e) {
             throw new PostException("Error saving post: " + e.getMessage());
         }
@@ -209,9 +197,42 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    public Post getPostById(String postId) throws PostException {
-        return postRepo.findById(postId)
-                .orElseThrow(() -> new PostException("No Post with postId: " + postId));
+    public Post getPostById(String postId, String userId) throws PostException {
+        try {
+            String redisHashKey = "posts:" + userId;
+
+            // Step 1: Try getting from Redis Hash
+            Object cached = redisTemplate.opsForHash().get(redisHashKey, postId);
+            if (cached != null) {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+                if (cached instanceof String) {
+                    return mapper.readValue((String) cached, Post.class);
+                } else if (cached instanceof Map) {
+                    return mapper.convertValue(cached, Post.class);
+                }
+            }
+
+            // Step 2: Fallback to DB
+            Post post = postRepo.findById(postId)
+                    .orElseThrow(() -> new PostException("No Post with postId: " + postId));
+
+            // Step 3: Cache it in Redis for next time
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+            String json = mapper.writeValueAsString(post);
+
+            redisTemplate.opsForHash().put(redisHashKey, postId, json);
+
+            return post;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new PostException("Error getting post: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
     }
 
     /**
@@ -228,41 +249,39 @@ public class PostService {
         String cacheKey = "posts:" + userId;
 
         try {
-            // 1️⃣ Try to fetch from Redis first
-            Object cachedValue = redisTemplate.opsForValue().get(cacheKey);
+            // 1️⃣ Try to fetch from Redis HASH
+            Map<Object, Object> cachedMap = redisTemplate.opsForHash().entries(cacheKey);
 
-            if (cachedValue != null && cachedValue instanceof List) {
-                List<?> cachedList = (List<?>) cachedValue;
+            if (cachedMap != null && !cachedMap.isEmpty()) {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-                if (!cachedList.isEmpty()) {
-                    List<Post> posts = new ArrayList<>();
+                List<Post> posts = cachedMap.values().stream()
+                        .map(obj -> {
+                            try {
+                                if (obj instanceof String) {
+                                    return mapper.readValue((String) obj, Post.class);
+                                } else if (obj instanceof Post) {
+                                    return (Post) obj;
+                                } else if (obj instanceof Map) {
+                                    return mapper.convertValue(obj, Post.class);
+                                } else {
+                                    return null;
+                                }
+                            } catch (Exception e) {
+                                return null;
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
 
-                    for (Object obj : cachedList) {
-                        if (obj instanceof Post) {
-                            posts.add((Post) obj);
-                        } else if (obj instanceof Map) {
-                            // Safe fallback: convert Map to Post using ObjectMapper
-                            ObjectMapper mapper = new ObjectMapper();
-                            mapper.registerModule(new JavaTimeModule());
-                            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-                            Post post = mapper.convertValue(obj, Post.class);
-                            posts.add(post);
-                        }
-                    }
-
-                    return posts;
-                } else {
-                    // Empty list is still a valid cache hit
-                    return new ArrayList<>();
-                }
+                return posts;
             }
-
-            // 🚫 Cache miss or invalid, clear it just in case
-            redisTemplate.delete(cacheKey);
 
             // 2️⃣ Fetch from DB based on privacy
             if (userId.equals(authenticatedUserId)) {
-                return fetchAndCachePosts(userId, cacheKey);
+                return fetchAndCachePosts(userId, cacheKey); // This should also store in Redis HASH
             }
 
             ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
@@ -285,70 +304,40 @@ public class PostService {
      * @param cacheKey The Redis cache key
      * @return List of posts for the user
      */
-    private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
-        // 3️⃣ Fetch posts from database
+    public List<Post> fetchAndCachePosts(String userId, String cacheKey) {
         List<Post> posts = postRepo.findByUserId(userId);
-        redisTemplate.opsForValue().set(cacheKey, posts, Duration.ofMinutes(20));
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.registerModule(new JavaTimeModule());
+        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+        for (Post post : posts) {
+            try {
+                String json = mapper.writeValueAsString(post);
+                redisTemplate.opsForHash().put(cacheKey, post.getId(), json);
+            } catch (JsonProcessingException e) {
+                e.printStackTrace();
+            }
+        }
+
         return posts;
     }
 
-    /**
-     * Toggles a like on a post for a specific user.
-     * If the user has already liked the post, their like is removed.
-     * If the user hasn't liked the post, a like is added.
-     * Also updates the Redis cache if the post is cached.
-     * 
-     * @param postId The unique identifier of the post
-     * @param userId The unique identifier of the user toggling the like
-     * @return The updated number of likes on the post
-     * @throws PostException if the post cannot be found or if there's an error
-     *                       processing the like
-     */
-    public int toggleLike(String postId, String userId) throws PostException {
-        Post post = postRepo.findById(postId)
-                .orElseThrow(() -> new PostException("No Post with postId: " + postId));
-        Set<String> likes = post.getLikes();
+    public boolean toggleLike(String postId, String userId) throws PostException {
+        String redisLikeKey = "post_like:" + postId;
 
-        if (likes == null) {
-            likes = new HashSet<>();
-        }
+        // Step 1: Check if user already liked
+        Boolean hasLiked = redisTemplate.opsForSet().isMember(redisLikeKey, userId);
 
-        if (likes.contains(userId)) {
-            likes.remove(userId);
+        boolean isLiked;
+        if (Boolean.TRUE.equals(hasLiked)) {
+            // User already liked → remove like
+            redisTemplate.opsForSet().remove(redisLikeKey, userId);
+            isLiked = false;
         } else {
-            likes.add(userId);
+            // User hasn't liked → add like
+            redisTemplate.opsForSet().add(redisLikeKey, userId);
+            isLiked = true;
         }
-
-        post.setLikes(likes);
-        postRepo.save(post);
-
-        // Update Redis cache if this post is in cache
-        String postOwnerUserId = post.getUserId();
-        String cacheKey = "posts:" + postOwnerUserId;
-
-        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
-        if (cachedList != null) {
-            List<Post> updatedList = new ArrayList<>();
-
-            boolean foundPost = false;
-            for (Object obj : cachedList) {
-                if (obj instanceof Post) {
-                    Post cachedPost = (Post) obj;
-                    if (cachedPost.getId().equals(postId)) {
-                        updatedList.add(post); // Replace with updated post
-                        foundPost = true;
-                    } else {
-                        updatedList.add(cachedPost); // Keep existing post
-                    }
-                }
-            }
-
-            if (foundPost) {
-                // Save updated cache
-                redisTemplate.opsForValue().set(cacheKey, updatedList, Duration.ofMinutes(20));
-            }
-        }
-
-        return likes.size();
+        return isLiked;
     }
 }

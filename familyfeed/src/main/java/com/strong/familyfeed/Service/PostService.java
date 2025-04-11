@@ -1,10 +1,6 @@
 package com.strong.familyfeed.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashSet;
-import java.util.LinkedHashSet;
-import java.util.List;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
@@ -14,6 +10,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.http.ResponseEntity;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import com.strong.familyfeed.Model.LiteUser;
@@ -21,15 +18,6 @@ import com.strong.familyfeed.Model.Post;
 import com.strong.familyfeed.Model.PostWithUser;
 import com.strong.familyfeed.Repository.PostRepo;
 import com.strong.familyfeed.Util.ResponseWrapper;
-
-/**
- * Service class responsible for managing Post-related operations.
- * This service provides methods for creating, retrieving, deleting, and
- * managing likes on Posts.
- *
- * @author FamilyGram
- * @version 1.0
- */
 
 @Service
 public class PostService {
@@ -45,25 +33,20 @@ public class PostService {
 
     @SuppressWarnings({ "null", "unchecked" })
     public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
-        String cacheKey = "user_feed:" + mineId; // 🔑 Unique key per user
-
+        String cacheKey = "user_feed:" + mineId;
         ValueOperations<String, Object> valueOps = redisTemplate.opsForValue();
 
-        // ✅ Step 1: Check if feed is cached in Redis
         List<PostWithUser> cachedFeed = (List<PostWithUser>) valueOps.get(cacheKey);
         if (cachedFeed != null) {
             return cachedFeed;
         }
 
-        // ✅ Step 2: If cache is empty, fetch from database
         ResponseEntity<ResponseWrapper<List<LiteUser>>> response = client.getRandomFeedUsers(mineId, userLimit, token);
-
         if (response.getBody() == null || response.getBody().getData() == null) {
             return List.of();
         }
 
         List<LiteUser> users = response.getBody().getData();
-
         Pageable pageable = PageRequest.of(0, 5);
 
         List<PostWithUser> freshFeed = users.stream()
@@ -84,16 +67,50 @@ public class PostService {
                                     post.getCreatedAt()));
                 })
                 .collect(Collectors.collectingAndThen(
-                        Collectors.toCollection(() -> new LinkedHashSet<>()), // 🔥 Removes duplicates
+                        Collectors.toCollection(LinkedHashSet::new),
                         list -> {
                             List<PostWithUser> finalList = new ArrayList<>(list);
-                            Collections.shuffle(finalList); // 🔀 Shuffle to randomize the feed
+                            Collections.shuffle(finalList);
                             return finalList;
                         }));
 
-        // ✅ Step 3: Store in Redis cache (Expires in 10 minutes)
         valueOps.set(cacheKey, freshFeed, 10, TimeUnit.MINUTES);
         return freshFeed;
     }
 
+    public List<PostWithUser> getPagedFeedPosts(String mineId, int page, int size, String token) {
+        String cacheKey = "user_feed:" + mineId;
+        ValueOperations<String, Object> valueOps = redisTemplate.opsForValue();
+
+        @SuppressWarnings("unchecked")
+        List<PostWithUser> fullFeed = (List<PostWithUser>) valueOps.get(cacheKey);
+
+        if (fullFeed == null) {
+            fullFeed = getRandomFeedPosts(mineId, 10, token);
+        }
+
+        int start = page * size;
+        int end = Math.min(start + size, fullFeed.size());
+
+        if (start >= fullFeed.size()) {
+            return List.of();
+        }
+
+        // 🔥 Detect if this is the last page
+        boolean isLastPage = end >= fullFeed.size();
+
+        if (isLastPage) {
+            // 🧠 Background refresh
+            refreshFeedAsync(mineId, size, token);
+        }
+
+        return fullFeed.subList(start, end);
+    }
+
+    @Async
+    public void refreshFeedAsync(String mineId, int size, String token) {
+        String cacheKey = "user_feed:" + mineId;
+        redisTemplate.delete(cacheKey); // Clear old
+        getRandomFeedPosts(mineId, size, token); // Generate fresh and cache it
+    }
 }

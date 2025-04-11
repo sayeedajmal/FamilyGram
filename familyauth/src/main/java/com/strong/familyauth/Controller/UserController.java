@@ -90,7 +90,7 @@ public class UserController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<List<LiteUser>>> getRandomFeedUsers(
             @RequestParam String mineId,
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "20") int limit) {
         List<LiteUser> users = userService.findRandomFeedUsers(mineId, limit);
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Random feed users retrieved", users));
     }

@@ -1,5 +1,6 @@
 package com.strong.familypost.Model;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +54,8 @@ public class Post {
     /** Set of user IDs who have liked this post */
     private Set<String> likes = new HashSet<>();
 
+    private BigInteger likeCount;
+    
     /** Timestamp when the post was created */
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime createdAt = LocalDateTime.now();

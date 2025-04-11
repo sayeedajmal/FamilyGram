@@ -65,7 +65,7 @@ class PostService {
                     // Generate thumbnail for video
                     const { uri } = await VideoThumbnails.getThumbnailAsync(fileUri, {
                         time: 1000,
-                        quality: 0.5,
+                        quality: 0.2,
                     });
                     thumbnail = uri;
                 } else {
@@ -73,7 +73,7 @@ class PostService {
                     const resizedImage = await ImageManipulator.manipulateAsync(
                         fileUri,
                         [{ resize: { width: 300 } }],
-                        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                        { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
                     );
                     thumbnail = resizedImage.uri;
                 }
@@ -109,7 +109,7 @@ class PostService {
 
         const response = await loginSignup.request(`${POST_API_URL}/posts?userId=${userId}`, {
             method: "GET",
-        });
+        });        
 
         return response;
     }
@@ -127,16 +127,16 @@ class PostService {
         return response;
     }
 
-    async getFeed(mineId) {
+    async getFeed(mineId,page) {
 
         if (!mineId) {
             throw new Error("UserID is required");
         }
 
-        const response = await loginSignup.request(`${FEED_API_URL}/feeds/random-feed?mineId=${mineId}`, {
+        const response = await loginSignup.request(`${FEED_API_URL}/feeds/random-feed?mineId=${mineId}&&page=${page}`, {
             method: "GET",
         });
-
+        
         return response;
     }
 
@@ -145,10 +145,9 @@ class PostService {
             throw new Error("User ID, Post ID are required");
         }
 
-        const response= await loginSignup.request(`${POST_API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
+        const response = await loginSignup.request(`${POST_API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
             method: "POST",
         });
-        console.log("RESPONSE:",JSON.stringify(response))
         return response;
     }
 

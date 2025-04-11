@@ -30,7 +30,7 @@ public class StorageService {
 
     public void flushToMongo() throws JsonProcessingException {
         if (buffer.isEmpty()) {
-            System.out.println("Buffer is empty, nothing to flush.");
+            // System.out.println("Buffer is empty, nothing to flush.");
             return;
         }
 
@@ -39,7 +39,7 @@ public class StorageService {
             String id = (String) updates.remove("id");
 
             if (id == null) {
-                System.out.println("❌ Skipping: No ID in payload");
+                // System.out.println("❌ Skipping: No ID in payload");
                 continue;
             }
 
@@ -54,10 +54,10 @@ public class StorageService {
                 "users" // 👈 or use User.class instead
             );
 
-            System.out.println("✅ Patched user: " + id + " with fields: " + updates.keySet());
+            // System.out.println("✅ Patched user: " + id + " with fields: " + updates.keySet());
         }
 
         buffer.clear();
-        System.out.println("Buffer cleared.");
+        // System.out.println("Buffer cleared.");
     }
 }

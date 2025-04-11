@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   useColorScheme,
   View,
-  Alert,
 } from "react-native";
 import loginSignup from "../api/loginSignup";
 import postHandle from "../api/postHandle";
@@ -30,7 +29,8 @@ const HomePage = () => {
   const [myProfile, setMyProfile] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
-  const MAX_POSTS_COUNT = 12;
+  const [page, setPage] = useState(0);
+  const MAX_POSTS_COUNT = 10;
   const flatListRef = useRef(null);
   const videoRefs = useRef({});
 
@@ -48,16 +48,14 @@ const HomePage = () => {
     }
   };
 
+  // Set up notification handler only once when profile is loaded
   useEffect(() => {
     const handleNewNotification = (notification) => {
-      setUnreadCount((prev) => prev + 1);
-      Alert.alert(
-        "Notification",
-        notification.message || "You have a new notification!"
-      );
-    };
+        setUnreadCount((prev) => prev + 1);
+      };
 
-    NotificationSocket.onNotificationReceived = handleNewNotification;
+      // We only need to set the handler, the connection is managed in App.js
+      NotificationSocket.onNotificationReceived = handleNewNotification;
     NotificationSocket.connect();
 
     return () => {
@@ -65,12 +63,82 @@ const HomePage = () => {
     };
   }, []);
 
+  const post = [
+    {
+      id: "post001",
+      username: "sara.k",
+      userThumbnailUrl: "https://randomuser.me/api/portraits/women/45.jpg",
+      caption: "Chasing sunsets 🌅✨",
+      location: "Santa Monica, CA",
+      mediaUrls: [
+        "https://plus.unsplash.com/premium_photo-1678495222603-b66f6393c166?q=80&w=1978&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      ],
+      mediaType: "image",
+      likes: [],
+      createdAt: "2025-04-10 19:27:45",
+    },
+    {
+      id: "post002",
+      username: "jay_m",
+      userThumbnailUrl: "https://randomuser.me/api/portraits/men/32.jpg",
+      caption: "Quick drone test flight 🎥",
+      location: "Austin, TX",
+      mediaUrls: [
+        "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+      ],
+      mediaType: "video",
+      likes: [],
+      createdAt: "2025-04-10 19:27:45",
+    },
+    {
+      id: "post003",
+      username: "lena.art",
+      userThumbnailUrl: "https://randomuser.me/api/portraits/women/65.jpg",
+      caption: "New art piece finally done 🎨🖼️",
+      location: "Berlin, Germany",
+      mediaUrls: [
+        "https://images.unsplash.com/photo-1742599968125-a790a680a605?q=80&w=1964&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+        "https://images.unsplash.com/photo-1734630630491-458df4f38213?q=80&w=1887&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      ],
+      mediaType: "image",
+      likes: [],
+      createdAt: "2025-04-10 19:27:45",
+    },
+    {
+      id: "post004",
+      username: "travel.jon",
+      userThumbnailUrl: "https://randomuser.me/api/portraits/men/74.jpg",
+      caption: "Exploring Kyoto with my lens 📷🍁",
+      location: "Kyoto, Japan",
+      mediaUrls: [
+        "https://www.sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4",
+      ],
+      mediaType: "video",
+      likes: [],
+      createdAt: "2025-04-10 19:27:45",
+    },
+    {
+      id: "post005",
+      username: "nina_cafe",
+      userThumbnailUrl: "https://randomuser.me/api/portraits/women/12.jpg",
+      caption: "Coffee and calm mornings ☕🌿",
+      location: "Paris, France",
+      mediaUrls: [
+        "https://images.unsplash.com/photo-1741687969502-4c406092f7de?q=80&w=1964&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D",
+      ],
+      mediaType: "image",
+      likes: [],
+      createdAt: "2025-04-10 19:27:45",
+    },
+  ];
+
   const fetchPosts = async (append = false) => {
     if (!myProfile?.id) return;
     append ? setLoadingMore(true) : setRefreshing(true);
 
     try {
-      const response = await postHandle.getFeed(myProfile.id, 10);
+      const response = await postHandle.getFeed(myProfile?.id, page);
+      setPage((prev) => (prev === 10 ? 0 : prev + 1));
       if (response?.status && response.data?.data) {
         const fetchedPosts = await Promise.all(
           response.data.data.map(async (post) => {
@@ -104,6 +172,8 @@ const HomePage = () => {
           return combined;
         });
       }
+
+      //setPosts(post);
     } catch (error) {
       console.error("Error fetching posts:", error);
     } finally {
@@ -113,23 +183,8 @@ const HomePage = () => {
 
   useEffect(() => {
     fetchUserProfile();
+    fetchPosts(false);
   }, []);
-
-  const setupNotificationSocket = (userId) => {
-    const handleNewNotification = (notification) => {
-      setUnreadCount((prev) => prev + 1);
-    };
-
-    NotificationSocket.userId = userId;
-    NotificationSocket.onNotificationReceived = handleNewNotification;
-    NotificationSocket.connect();
-  };
-
-  useEffect(() => {
-    if (myProfile?.id) {
-      setupNotificationSocket(myProfile.id);
-    }
-  }, [myProfile]);
 
   // Handle pull-to-refresh
   const onRefresh = () => {
@@ -164,10 +219,12 @@ const HomePage = () => {
       </View>
     );
   };
+
   const openNotif = () => {
     setUnreadCount(0);
     navigation.navigate("Notification");
   };
+
   return (
     <View style={{ flex: 1, backgroundColor: bg }}>
       {/* Header */}

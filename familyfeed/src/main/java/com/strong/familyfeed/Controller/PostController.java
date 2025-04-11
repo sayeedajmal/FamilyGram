@@ -71,14 +71,15 @@ public class PostController {
     @GetMapping("/random-feed")
     public ResponseEntity<ResponseWrapper<List<PostWithUser>>> getRandomFeedPosts(
             @RequestParam String mineId,
-            @RequestParam(defaultValue = "10") int limit,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
             @RequestHeader("Authorization") String token) {
 
-        List<PostWithUser> posts = postService.getRandomFeedPosts(mineId, limit, token);
+        List<PostWithUser> posts = postService.getPagedFeedPosts(mineId, page, size, token);
 
         return ResponseEntity.ok(new ResponseWrapper<>(
                 HttpStatus.OK.value(),
-                "Random feed posts retrieved successfully",
+                "Paged feed posts retrieved successfully",
                 posts));
     }
 

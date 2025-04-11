@@ -1,7 +1,14 @@
 import { Ionicons } from "@expo/vector-icons";
 import moment from "moment";
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useState,
+  useRef,
+} from "react";
 import {
+  ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
@@ -29,6 +36,12 @@ const notificationReducer = (state, action) => {
       );
     case "REMOVE_NOTIFICATION":
       return state.filter((notif) => notif.id !== action.payload);
+    case "UPDATE_NOTIFICATION_IMAGE":
+      return state.map((notif) =>
+        notif.id === action.payload.id
+          ? { ...notif, ...action.payload.data }
+          : notif
+      );
     default:
       return state;
   }
@@ -45,6 +58,13 @@ const AppNotification = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [myProfile, setMyProfile] = useState(null);
   const [isProcessingId, setIsProcessingId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const isMounted = useRef(true);
+
+  // Default images for fallbacks
+  const DEFAULT_AVATAR = require("../../assets/images/profile.png");
+  const DEFAULT_POST_IMAGE = require("../../assets/images/profile.png");
 
   const formatTime = (createdAt) => {
     const postDate = moment.utc(createdAt).local();
@@ -60,52 +80,103 @@ const AppNotification = () => {
     return postDate.format("MMM D, YYYY");
   };
 
-  const processNotification = async (notification) => {
-    let thumbnailUrl = notification.thumbnailId;
-    let postThumbUrl = notification.postThumbId;
+  // This loads the images in the background after rendering
+  const loadImageForNotification = async (notification) => {
+    if (!isMounted.current) return;
+
+    let updates = {};
 
     try {
-      if (notification.thumbnailId) {
+      if (
+        notification.thumbnailId &&
+        typeof notification.thumbnailId === "string" &&
+        !notification.thumbnailId.startsWith("http")
+      ) {
         const imageResponse = await loginSignup.getProfileImage(
           notification.thumbnailId
         );
         if (imageResponse.status) {
-          thumbnailUrl = imageResponse.data;
+          updates.thumbnailId = imageResponse.data;
         }
       }
 
-      if (notification.postThumbId) {
+      if (
+        notification.postThumbId &&
+        typeof notification.postThumbId === "string" &&
+        !notification.postThumbId.startsWith("http")
+      ) {
         const postResponse = await postHandle.getPostMedia(
           notification.postThumbId
         );
         if (postResponse.status) {
-          postThumbUrl = postResponse.data;
+          updates.postThumbId = postResponse.data;
         }
       }
-    } catch (error) {
-      console.error("Error processing notification:", error);
-    }
 
+      if (Object.keys(updates).length > 0 && isMounted.current) {
+        dispatch({
+          type: "UPDATE_NOTIFICATION_IMAGE",
+          payload: {
+            id: notification.id,
+            data: updates,
+          },
+        });
+      }
+    } catch (error) {
+      console.error(
+        `Error loading images for notification ${notification.id}:`,
+        error
+      );
+    }
+  };
+
+  const processNotificationForDisplay = (notification) => {
+    // Format the creation time - this is fast and doesn't need to be async
     return {
       ...notification,
-      thumbnailId: thumbnailUrl,
-      postThumbId: postThumbUrl,
       createdAt: formatTime(notification.createdAt),
     };
   };
 
-  const handleNewNotification = async (notification) => {
-    const processed = await processNotification(notification);
-    dispatch({ type: "ADD_NOTIFICATION", payload: processed });
+  const handleNewNotification = (notification) => {
+    // First display the notification with whatever data it has
+    const processedNotif = processNotificationForDisplay(notification);
+    dispatch({ type: "ADD_NOTIFICATION", payload: processedNotif });
+
+    // Then load the images in the background
+    loadImageForNotification(processedNotif);
   };
 
-  const handleFetchedNotifications = async (notifList) => {
-    if (!Array.isArray(notifList)) return;
-    const sorted = notifList.sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
-    const processed = await Promise.all(sorted.map(processNotification));
-    dispatch({ type: "SET_NOTIFICATIONS", payload: processed });
+  const handleFetchedNotifications = (notifList) => {
+    try {
+      if (!Array.isArray(notifList)) {
+        setIsLoading(false);
+        return;
+      }
+
+      // Sort notifications by date first
+      const sorted = notifList.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
+      // Process for immediate display (fast operations only)
+      const processedForDisplay = sorted.map(processNotificationForDisplay);
+
+      // Update the state with the notifications (without images yet)
+      dispatch({ type: "SET_NOTIFICATIONS", payload: processedForDisplay });
+
+      // Set loading to false as we now have content to display
+      setIsLoading(false);
+
+      // Load images in the background
+      processedForDisplay.forEach((notification) => {
+        loadImageForNotification(notification);
+      });
+    } catch (err) {
+      setError("Failed to load notifications");
+      console.error("Error handling fetched notifications:", err);
+      setIsLoading(false);
+    }
   };
 
   const setupNotificationSocket = (userId) => {
@@ -119,20 +190,36 @@ const AppNotification = () => {
 
   useEffect(() => {
     const init = async () => {
-      const profile = await loginSignup.getStoredUserProfile();
-      if (profile) {
-        setMyProfile(profile);
-        setupNotificationSocket(profile.id);
+      try {
+        setIsLoading(true);
+        const profile = await loginSignup.getStoredUserProfile();
+        if (profile) {
+          setMyProfile(profile);
+          setupNotificationSocket(profile?.id);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("Error initializing:", err);
+        setError("Failed to load profile data");
+        setIsLoading(false);
       }
     };
-    init();
 
-    return () => NotificationSocket.disconnect();
+    init();
+    return () => {
+      isMounted.current = false;
+      NotificationSocket.disconnect();
+    };
   }, []);
 
   const markAsRead = async (id) => {
-    const success = await NotificationSocket.markAsRead(id);
-    if (success) dispatch({ type: "MARK_AS_READ", payload: id });
+    try {
+      const success = await NotificationSocket.markAsRead(id);
+      if (success) dispatch({ type: "MARK_AS_READ", payload: id });
+    } catch (err) {
+      console.error("Error marking notification as read:", err);
+    }
   };
 
   const acceptFollowRequest = async (item) => {
@@ -152,9 +239,10 @@ const AppNotification = () => {
         );
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error accepting follow request:", err);
+    } finally {
+      setIsProcessingId(null);
     }
-    setIsProcessingId(null);
   };
 
   const rejectFollowRequest = async (item) => {
@@ -169,18 +257,33 @@ const AppNotification = () => {
         dispatch({ type: "REMOVE_NOTIFICATION", payload: item.id });
       }
     } catch (err) {
-      console.error(err);
+      console.error("Error rejecting follow request:", err);
+    } finally {
+      setIsProcessingId(null);
     }
-    setIsProcessingId(null);
   };
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (myProfile?.id) {
-      NotificationSocket.fetchNotifications(myProfile.id);
+    try {
+      if (myProfile?.id) {
+        await NotificationSocket.fetchNotifications(myProfile.id);
+      }
+    } catch (err) {
+      console.error("Error refreshing notifications:", err);
+      setError("Failed to refresh notifications");
+    } finally {
+      setRefreshing(false);
     }
-    setRefreshing(false);
   }, [myProfile?.id]);
+
+  const getImageSource = (uri) => {
+    if (!uri) return null;
+    if (typeof uri === "string" && uri.startsWith("http")) {
+      return { uri };
+    }
+    return null; // Will use defaultSource instead
+  };
 
   const renderNotification = ({ item }) => (
     <TouchableOpacity
@@ -191,7 +294,8 @@ const AppNotification = () => {
       disabled={isProcessingId === item.id}
     >
       <Image
-        source={{ uri: item.thumbnailId }}
+        source={getImageSource(item.thumbnailId)}
+        defaultSource={DEFAULT_AVATAR}
         className="w-10 h-10 rounded-full border border-[#0278ae]"
       />
       <View className="flex-1 ml-4">
@@ -212,50 +316,97 @@ const AppNotification = () => {
 
       {item.postThumbId && (
         <Image
-          source={{ uri: item.postThumbId }}
+          source={getImageSource(item.postThumbId)}
+          defaultSource={DEFAULT_POST_IMAGE}
           className="w-14 h-14 rounded-md ml-2"
         />
       )}
 
       {item.type === "FOLLOW_REQUEST" && (
         <View className="flex-row ml-3">
-          <TouchableOpacity
-            className="px-3 py-2 bg-green-500 rounded-md mr-2"
-            onPress={() => acceptFollowRequest(item)}
-            disabled={isProcessingId === item.id}
-          >
-            <Text className="text-white text-xs font-bold">Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="px-3 py-2 bg-red-500 rounded-full"
-            onPress={() => rejectFollowRequest(item)}
-            disabled={isProcessingId === item.id}
-          >
-            <Ionicons name="close" size={16} color="white" />
-          </TouchableOpacity>
+          {isProcessingId === item.id ? (
+            <ActivityIndicator size="small" color={themeColors.tint} />
+          ) : (
+            <>
+              <TouchableOpacity
+                className="px-3 py-2 bg-green-500 rounded-md mr-2"
+                onPress={() => acceptFollowRequest(item)}
+                disabled={isProcessingId === item.id}
+              >
+                <Text className="text-white text-xs font-bold">Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="px-3 py-2 bg-red-500 rounded-full"
+                onPress={() => rejectFollowRequest(item)}
+                disabled={isProcessingId === item.id}
+              >
+                <Ionicons name="close" size={16} color="white" />
+              </TouchableOpacity>
+            </>
+          )}
         </View>
       )}
     </TouchableOpacity>
   );
 
-  return (
-    <View className="flex-1 px-2" style={{ backgroundColor: bg }}>
-      <Text className="text-2xl font-bold my-4" style={{ color: textColor }}>
-        Notifications
-      </Text>
+  const renderContent = () => {
+    if (isLoading && !refreshing && notifications.length === 0) {
+      return (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={themeColors.tint} />
+          <Text className="mt-4" style={{ color: textColor }}>
+            Loading notifications...
+          </Text>
+        </View>
+      );
+    }
+
+    if (error && notifications.length === 0) {
+      return (
+        <View className="flex-1 justify-center items-center px-4">
+          <Ionicons name="alert-circle-outline" size={40} color="red" />
+          <Text className="text-center mt-2 text-red-500">{error}</Text>
+          <TouchableOpacity
+            className="mt-4 px-4 py-2 bg-blue-500 rounded-lg"
+            onPress={onRefresh}
+          >
+            <Text className="text-white font-bold">Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
       <FlatList
         data={notifications}
         keyExtractor={(item) => item.id}
         renderItem={renderNotification}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[themeColors.tint]}
+            tintColor={themeColors.tint}
+          />
         }
         ListEmptyComponent={
           <Text className="text-center py-8" style={{ color: textColor }}>
             No notifications yet
           </Text>
         }
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
+    );
+  };
+
+  return (
+    <View className="flex-1 px-2" style={{ backgroundColor: bg }}>
+      <Text className="text-2xl font-bold my-4" style={{ color: textColor }}>
+        Notifications
+      </Text>
+      {renderContent()}
     </View>
   );
 };

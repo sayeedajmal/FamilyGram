@@ -23,6 +23,7 @@ import ProfileSection from "./containers/ProfileSection";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
 import Toast from 'react-native-toast-message';
+import NotificationSocket from "./api/NotificationSocket";
 
 const Storage = {
   setItem: async (key, value) => {
@@ -45,13 +46,38 @@ export default function App() {
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
 
-
   const [fonts] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     SpaceBold: require("../assets/fonts/SpaceMono-Bold.ttf"),
     SpaceItalic: require("../assets/fonts/SpaceMono-Italic.ttf"),
-
   });
+
+  // Setup notification handling only once
+  useEffect(() => {
+    const setupNotifications = async () => {
+      try {
+        const userProfile = await loginSignup.getStoredUserProfile();
+        if (!userProfile?.id) return;
+
+        // Set the user ID for notifications
+        NotificationSocket.userId = userProfile.id;
+
+        // Connect to the notification socket
+        NotificationSocket.connect();
+      } catch (error) {
+        console.error("Failed to setup notifications:", error);
+      }
+    };
+
+    if (isAuthenticated) {
+      setupNotifications();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      NotificationSocket.disconnect();
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -68,6 +94,7 @@ export default function App() {
       easing: Easing.ease,
       useNativeDriver: true,
     }).start();
+
     const checkAuth = async () => {
       try {
         const token = await Storage.getItem("accessToken");
@@ -83,7 +110,8 @@ export default function App() {
           loginSignup.clearTokens();
           return;
         }
-        await loginSignup.fetchUserProfile(userProfile?.id)
+
+        await loginSignup.fetchUserProfile(userProfile?.id);
         setProfileImage(userProfile?.thumbnailUrl);
         setIsAuthenticated(true);
       } catch (error) {

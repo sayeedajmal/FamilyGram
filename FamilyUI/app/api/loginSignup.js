@@ -294,7 +294,7 @@ class ApiService {
                 const resizedImage = await ImageManipulator.manipulateAsync(
                     file.uri,
                     [{ resize: { width: 100, height: 100 } }],
-                    { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+                    { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
                 );
 
                 formData.append("thumbnail", {

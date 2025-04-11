@@ -1,7 +1,7 @@
 package com.strong.familypost.Service;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -18,7 +18,7 @@ import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Util.PostException;
 
 /**
- * Service class for managing comment operations with Redis caching
+ * Service class for managing comment operations with Redis hash-based caching
  */
 @Service
 public class CommentService {
@@ -29,9 +29,6 @@ public class CommentService {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
-    /**
-     * Get authenticated user ID
-     */
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         if (principal instanceof User) {
@@ -40,9 +37,6 @@ public class CommentService {
         return null;
     }
 
-    /**
-     * Creates a new comment and updates cache
-     */
     public Comment createComment(Comment comment) throws PostException {
         String loggedId = getAuthenticatedUserId();
         if (!comment.getUserId().equals(loggedId)) {
@@ -51,42 +45,42 @@ public class CommentService {
 
         Comment savedComment = commentRepo.save(comment);
 
-        updateCachedComments(comment.getPostId());
+        // ➕ Add comment to Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().put(hashKey, savedComment.getId(), savedComment);
 
         return savedComment;
     }
 
-    /**
-     * Retrieves all comments for a specific post (Uses Redis Cache)
-     */
-    @SuppressWarnings("unchecked")
     public List<Comment> getCommentsByPostId(String postId) throws PostException {
-        String cacheKey = "comments:" + postId;
+        String hashKey = "comments:" + postId;
 
-        // 1️⃣ Try fetching from Redis first
-        Object cachedData = redisTemplate.opsForValue().get(cacheKey);
-        if (cachedData instanceof List<?>) {
-            return (List<Comment>) cachedData; // Return cached comments
+        // 🧠 Try getting all comment values from Redis hash
+        List<Object> cachedComments = redisTemplate.opsForHash().values(hashKey);
+        if (!cachedComments.isEmpty()) {
+            List<Comment> result = new ArrayList<>();
+            for (Object obj : cachedComments) {
+                result.add((Comment) obj);
+            }
+            return result;
         }
 
-        // 2️⃣ If cache is empty, fetch from DB and store in cache
+        // 💾 Fallback to DB if cache miss
         List<Comment> comments = commentRepo.findByPostId(postId);
-        redisTemplate.opsForValue().set(cacheKey, comments, Duration.ofMinutes(20));
+
+        // 🧠 Cache each comment individually in Redis hash
+        for (Comment comment : comments) {
+            redisTemplate.opsForHash().put(hashKey, comment.getId(), comment);
+        }
 
         return comments;
     }
 
-    /**
-     * Retrieves a specific comment by its ID
-     */
     public Comment getCommentById(String id) throws PostException {
         return commentRepo.findById(id)
                 .orElseThrow(() -> new PostException("Comment not found with id: " + id));
     }
 
-    /**
-     * Updates an existing comment and refreshes cache
-     */
     public Comment updateComment(String id, Comment commentDetails) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
@@ -99,18 +93,17 @@ public class CommentService {
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id));
 
         comment.setText(commentDetails.getText());
-        comment.setCreatedAt(LocalDateTime.now()); // Update timestamp
+        comment.setCreatedAt(LocalDateTime.now());
 
         Comment updatedComment = commentRepo.save(comment);
 
-        updateCachedComments(comment.getPostId());
+        // 🔄 Update comment in Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().put(hashKey, updatedComment.getId(), updatedComment);
 
         return updatedComment;
     }
 
-    /**
-     * Deletes a comment and updates cache
-     */
     public void deleteComment(String id) throws PostException {
         String loggedId = getAuthenticatedUserId();
         Optional<Comment> optionalComment = commentRepo.findById(id);
@@ -127,19 +120,8 @@ public class CommentService {
 
         commentRepo.delete(comment);
 
-        updateCachedComments(comment.getPostId());
-    }
-
-    /**
-     * Utility method to refresh cached comments for a given post
-     */
-    private void updateCachedComments(String postId) {
-        String cacheKey = "comments:" + postId;
-
-        // Fetch latest comments from DB
-        List<Comment> updatedComments = commentRepo.findByPostId(postId);
-
-        // Update cache with fresh data
-        redisTemplate.opsForValue().set(cacheKey, updatedComments, Duration.ofMinutes(20));
+        // ❌ Remove comment from Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().delete(hashKey, comment.getId());
     }
 }

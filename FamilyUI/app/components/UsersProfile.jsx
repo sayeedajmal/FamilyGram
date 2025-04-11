@@ -29,6 +29,7 @@ export const UsersProfile = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isRequested, setIsRequested] = useState(false);
+
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
   const iconColor = themeColors.icon;
@@ -56,8 +57,6 @@ export const UsersProfile = () => {
       const response = await loginSignup.getSecondProfile(userId);
       if (response.status) {
         setUserProfile(response.data);
-
-        // Check if current user has requested to follow this profile
         if (
           response.data.followRequests &&
           Array.isArray(response.data.followRequests)
@@ -89,6 +88,7 @@ export const UsersProfile = () => {
 
     if (response) {
       setUserProfile(response);
+
       if (userProfile.privacy && !isFollowing) {
         setIsRequested(true);
         await NotificationSocket.sendNotificationsBulk(
@@ -101,7 +101,6 @@ export const UsersProfile = () => {
         );
       }
 
-      // Refresh profile data
       await fetchUserProfile();
       setIsLoading(false);
     } else {
@@ -122,7 +121,6 @@ export const UsersProfile = () => {
       let posts = response.data.data;
 
       if (Array.isArray(posts) && posts.length > 0) {
-        // Sort posts by createdAt (newest first)
         posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
         const updatedPosts = await Promise.all(
@@ -166,38 +164,43 @@ export const UsersProfile = () => {
     setRefreshing(false);
   };
 
+  // Fetch my profile once
   useEffect(() => {
     fetchMyProfile();
   }, []);
 
+  // Fetch user profile when myProfile is ready
   useEffect(() => {
     if (myProfile && userId) {
       fetchUserProfile();
     }
   }, [myProfile, userId]);
 
+  // Set follow state when both profiles are ready
   useEffect(() => {
-    if (userProfile) {
-      // Check if the current user is following this profile
+    if (userProfile && myProfile) {
       setIsFollowing(
         Array.isArray(myProfile?.following) &&
-          myProfile?.following.includes(userProfile?.id)
+          myProfile.following.includes(userProfile.id)
       );
 
-      // Check if current user has requested to follow this profile
-      if (
-        userProfile.followRequests &&
-        Array.isArray(userProfile.followRequests)
-      ) {
-        setIsRequested(userProfile.followRequests.includes(myProfile?.id));
-      }
-
-      // Fetch posts if this is a public profile or we're following a private profile
-      if (!userProfile.privacy || isFollowing) {
-        FetchPosts();
-      }
+      setIsRequested(
+        Array.isArray(userProfile.followRequests) &&
+          userProfile.followRequests.includes(myProfile.id)
+      );
     }
   }, [userProfile, myProfile]);
+
+  // Conditionally fetch posts based on privacy
+  useEffect(() => {
+    if (!userProfile || !myProfile) return;
+
+    const isPrivate = userProfile.privacy;
+
+    if (!isPrivate || isFollowing) {
+      FetchPosts();
+    }
+  }, [userProfile, myProfile, isFollowing]);
 
   const openPost = (post, index) => {
     navigation.navigate("Posts", {
