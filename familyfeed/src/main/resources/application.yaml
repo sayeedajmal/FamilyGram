@@ -19,6 +19,9 @@ spring:
   jpa:
     properties:
       hibernate.jdbc.time_zone: UTC
+  redis:
+    host: ${REDIS_HOST}
+    port: 6379
 
 jwt:
   secret: ${JWT_SECRET}

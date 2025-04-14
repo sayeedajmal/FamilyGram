@@ -71,16 +71,16 @@ services:
     volumes:
       - familygram-storage:/var/lib/redis/data
 
-  redisinsight:
-    image: redis/redisinsight:latest
-    container_name: redisinsight
-    restart: always
-    ports:
-      - "5540:5540"  # GUI Port
-    networks:
-      - familygram-network
-    volumes:
-      - familygram-storage:/var/lib/redisInsight/data
+  # redisinsight:
+  #   image: redis/redisinsight:latest
+  #   container_name: redisinsight
+  #   restart: always
+  #   ports:
+  #     - "5540:5540"
+  #   networks:
+  #     - familygram-network
+  #   volumes:
+  #     - familygram-storage:/var/lib/redisInsight/data
 
   broker:
     image: apache/kafka:latest
@@ -105,7 +105,6 @@ services:
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - familygram-storage:/var/lib/kafka/data
-
     networks:
       - familygram-network
 

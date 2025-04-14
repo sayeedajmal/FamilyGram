@@ -1,5 +1,6 @@
 package com.strong.familynotification;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
@@ -28,6 +29,10 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 @EnableWebSocketMessageBroker
 @EnableScheduling
 public class FamilynotificationApplication implements WebSocketMessageBrokerConfigurer {
+
+	@Value("${spring.redis.host}")
+	private String redisUrl;
+
 	public static void main(String[] args) {
 		SpringApplication.run(FamilynotificationApplication.class, args);
 	}
@@ -85,6 +90,6 @@ public class FamilynotificationApplication implements WebSocketMessageBrokerConf
 
 	@Bean
 	public LettuceConnectionFactory redisConnectionFactory() {
-		return new LettuceConnectionFactory("redis", 6379);
+		return new LettuceConnectionFactory(redisUrl, 6379);
 	}
 }

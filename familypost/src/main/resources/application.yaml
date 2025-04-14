@@ -20,7 +20,10 @@ spring:
     properties:
       hibernate.jdbc.time_zone: UTC
   kafka:
-    bootstrap-servers: broker:9092
+    bootstrap-servers: ${BROKER_URL}
+  redis:
+    host: ${REDIS_HOST}
+    port: 6379
 
 jwt:
   secret: ${JWT_SECRET}
