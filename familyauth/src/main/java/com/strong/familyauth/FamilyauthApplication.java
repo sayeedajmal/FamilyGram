@@ -1,5 +1,6 @@
 package com.strong.familyauth;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
@@ -17,6 +18,9 @@ import com.strong.familyauth.Model.User;
 
 @SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
 public class FamilyauthApplication {
+
+	@Value("${spring.redis.host}")
+	private String redisUrl;
 
 	public static void main(String[] args) {
 		SpringApplication.run(FamilyauthApplication.class, args);
@@ -41,6 +45,6 @@ public class FamilyauthApplication {
 
 	@Bean
 	public LettuceConnectionFactory redisConnectionFactory() {
-		return new LettuceConnectionFactory("redis", 6379);
+		return new LettuceConnectionFactory(redisUrl, 6379);
 	}
 }
