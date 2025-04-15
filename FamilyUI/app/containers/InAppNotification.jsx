@@ -32,7 +32,7 @@ const notificationReducer = (state, action) => {
         : [action.payload, ...state];
     case "MARK_AS_READ":
       return state.map((notif) =>
-        notif.id === action.payload ? { ...notif, read: true } : notif
+        action.payload.includes(notif.id) ? { ...notif, read: true } : notif
       );
     case "REMOVE_NOTIFICATION":
       return state.filter((notif) => notif.id !== action.payload);
@@ -80,12 +80,10 @@ const AppNotification = () => {
     return postDate.format("MMM D, YYYY");
   };
 
-  // This loads the images in the background after rendering
   const loadImageForNotification = async (notification) => {
     if (!isMounted.current) return;
 
     let updates = {};
-
     try {
       if (
         notification.thumbnailId &&
@@ -116,10 +114,7 @@ const AppNotification = () => {
       if (Object.keys(updates).length > 0 && isMounted.current) {
         dispatch({
           type: "UPDATE_NOTIFICATION_IMAGE",
-          payload: {
-            id: notification.id,
-            data: updates,
-          },
+          payload: { id: notification.id, data: updates },
         });
       }
     } catch (error) {
@@ -131,7 +126,6 @@ const AppNotification = () => {
   };
 
   const processNotificationForDisplay = (notification) => {
-    // Format the creation time - this is fast and doesn't need to be async
     return {
       ...notification,
       createdAt: formatTime(notification.createdAt),
@@ -139,11 +133,8 @@ const AppNotification = () => {
   };
 
   const handleNewNotification = (notification) => {
-    // First display the notification with whatever data it has
     const processedNotif = processNotificationForDisplay(notification);
     dispatch({ type: "ADD_NOTIFICATION", payload: processedNotif });
-
-    // Then load the images in the background
     loadImageForNotification(processedNotif);
   };
 
@@ -154,21 +145,23 @@ const AppNotification = () => {
         return;
       }
 
-      // Sort notifications by date first
       const sorted = notifList.sort(
         (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
       );
-
-      // Process for immediate display (fast operations only)
       const processedForDisplay = sorted.map(processNotificationForDisplay);
-
-      // Update the state with the notifications (without images yet)
       dispatch({ type: "SET_NOTIFICATIONS", payload: processedForDisplay });
 
-      // Set loading to false as we now have content to display
-      setIsLoading(false);
+      // Collect unread notification IDs
+      const unreadNotifIds = processedForDisplay
+        .filter((notif) => !notif.read)
+        .map((notif) => notif.id);
 
-      // Load images in the background
+      // Mark unread notifications as read
+      if (unreadNotifIds.length > 0) {
+        markAsRead(unreadNotifIds);
+      }
+
+      setIsLoading(false);
       processedForDisplay.forEach((notification) => {
         loadImageForNotification(notification);
       });
@@ -183,7 +176,6 @@ const AppNotification = () => {
     NotificationSocket.userId = userId;
     NotificationSocket.onNotificationReceived = handleNewNotification;
     NotificationSocket.onFetchNotifications = handleFetchedNotifications;
-
     NotificationSocket.connect();
     NotificationSocket.fetchNotifications(userId);
   };
@@ -213,12 +205,27 @@ const AppNotification = () => {
     };
   }, []);
 
-  const markAsRead = async (id) => {
+  const markAsRead = async (notifIds) => {
     try {
-      const success = await NotificationSocket.markAsRead(id);
-      if (success) dispatch({ type: "MARK_AS_READ", payload: id });
+      const query = `
+        mutation MarkNotificationAsRead($notifIds: [String!]) {
+          markNotificationAsRead(notifIds: $notifIds) {
+            id
+            read
+          }
+        }
+      `;
+      const response = await NotificationSocket.markAsRead(notifIds);
+
+      if (response) {
+        dispatch({ type: "MARK_AS_READ", payload: notifIds });
+        return true;
+      } else {
+        throw new Error("Failed to mark notifications as read");
+      }
     } catch (err) {
-      console.error("Error marking notification as read:", err);
+      console.error("Error marking notifications as read:", err);
+      return false;
     }
   };
 
@@ -227,7 +234,7 @@ const AppNotification = () => {
     try {
       const res = await loginSignup.acceptRequest(item.senderId, myProfile.id);
       if (res.status) {
-        dispatch({ type: "MARK_AS_READ", payload: item.id });
+        dispatch({ type: "MARK_AS_READ", payload: [item.id] });
         await NotificationSocket.deleteNotificationById(item.id);
         await NotificationSocket.sendNotificationsBulk(
           "FOLLOW",
@@ -282,7 +289,7 @@ const AppNotification = () => {
     if (typeof uri === "string" && uri.startsWith("http")) {
       return { uri };
     }
-    return null; // Will use defaultSource instead
+    return null;
   };
 
   const renderNotification = ({ item }) => (
@@ -290,7 +297,7 @@ const AppNotification = () => {
       activeOpacity={0.8}
       className="flex-row items-center py-3 px-2 mb-1 rounded-lg"
       style={{ backgroundColor: item.read ? bg : tint }}
-      onPress={() => markAsRead(item.id)}
+      onPress={() => markAsRead([item.id])}
       disabled={isProcessingId === item.id}
     >
       <Image
@@ -307,7 +314,7 @@ const AppNotification = () => {
           }}
         >
           <Text className="font-custom-bold">@{item.senderUsername}</Text>{" "}
-          {item.message} {item.comment ? ` "${item.comment}"` : ""}
+          {item.message} {item.comment ? `"${item.comment}"` : ""}
         </Text>
         <Text className="text-xs font-custom text-gray-400">
           {item.createdAt}

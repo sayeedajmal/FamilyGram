@@ -124,10 +124,9 @@ public class PostController {
      */
     @GetMapping()
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts(@RequestParam("userId") String userId,
-            @RequestHeader("Authorization") String token)
+    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts(@RequestParam("userId") String userId)
             throws PostException {
-        List<Post> posts = postService.getUserPosts(userId, token);
+        List<Post> posts = postService.getUserPosts(userId);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
     }
 

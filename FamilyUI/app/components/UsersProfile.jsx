@@ -194,13 +194,17 @@ export const UsersProfile = () => {
   // Conditionally fetch posts based on privacy
   useEffect(() => {
     if (!userProfile || !myProfile) return;
-
+  
     const isPrivate = userProfile.privacy;
-
-    if (!isPrivate || isFollowing) {
-      FetchPosts();
+  
+    if (isPrivate) {
+      FetchPosts()
+      // else: Private and I'm not following → don't fetch
+    } else {
+      FetchPosts(); // Public profile → always fetch
     }
   }, [userProfile, myProfile, isFollowing]);
+  
 
   const openPost = (post, index) => {
     navigation.navigate("Posts", {
@@ -214,7 +218,7 @@ export const UsersProfile = () => {
   // Common header with profile info - shown for both private and public accounts
   const ProfileHeader = () => (
     <View className="w-full flex-col items-center">
-      <View className="w-full flex-row justify-between items-center px-4">
+      <View className="w-full flex-row justify-between items-center pr-4">
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <MaterialIcons
             name="arrow-back-ios-new"
@@ -305,7 +309,7 @@ export const UsersProfile = () => {
           className={`flex-1 py-1 rounded-md mx-[1%] ${
             isFollowing || isRequested
               ? `bg-${themeColors.tint} border border-black dark:border-white`
-              : "bg-blue-500 border-black dark:border-white"
+              : "border border-black dark:border-white bg-blue-500"
           }`}
           onPress={toggleFollow}
           disabled={isLoading}

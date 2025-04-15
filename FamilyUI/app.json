@@ -14,7 +14,8 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png"
-      }
+      },
+      "package": "com.sayeedthedev.FamilyUI"
     },
     "web": {
       "bundler": "metro",

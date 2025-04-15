@@ -6,6 +6,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -31,7 +32,13 @@ import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 public class FamilynotificationApplication implements WebSocketMessageBrokerConfigurer {
 
 	@Value("${spring.redis.host}")
-	private String redisUrl;
+	String host;
+	@Value("${spring.redis.port}")
+	int port;
+	@Value("${spring.redis.username}")
+	String username;
+	@Value("${spring.redis.password}")
+	String password;
 
 	public static void main(String[] args) {
 		SpringApplication.run(FamilynotificationApplication.class, args);
@@ -90,6 +97,11 @@ public class FamilynotificationApplication implements WebSocketMessageBrokerConf
 
 	@Bean
 	public LettuceConnectionFactory redisConnectionFactory() {
-		return new LettuceConnectionFactory(redisUrl, 6379);
+		RedisStandaloneConfiguration redisConfig = new RedisStandaloneConfiguration();
+		redisConfig.setHostName(host);
+		redisConfig.setPort(port);
+		redisConfig.setUsername(username);
+		redisConfig.setPassword(password);
+		return new LettuceConnectionFactory(redisConfig);
 	}
 }

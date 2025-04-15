@@ -1,89 +1,66 @@
 import * as ImageManipulator from "expo-image-manipulator";
 import * as VideoThumbnails from "expo-video-thumbnails";
-import Platform from "react-native";
+import { Platform } from "react-native";
+
 import loginSignup from "./loginSignup";
+//const POST_API_URL = "http://34.55.86.158:8083";
+//const FEED_API_URL = "http://34.55.86.158:8084";
 const POST_API_URL = "http://192.168.31.218:8083";
-//const POST_API_URL = "https://familypost.onrender.com";
 const FEED_API_URL = "http://192.168.31.218:8084";
+//const POST_API_URL = "https://familypost.onrender.com";
 //const FEED_API_URL = "https://familyfeed.onrender.com";
 
 class PostService {
-    async createPost(post, file) {
-
-        const formData = new FormData();
-
-        if (file && file.uri) {
-
-            const mimeType = file.type;
-
-
-            const fileName = file.name || `upload.${mimeType.split("/")[1]}`;
-
-
-            const fileUri = Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
-
-            formData.append("file", {
-                uri: fileUri,
-                name: fileName,
-                type: mimeType
-            });
-        }
-
-        formData.append("post", JSON.stringify(post));
-
-
-        const response = await loginSignup.request(`${POST_API_URL}/posts`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
-            body: formData,
-        });
-
-        return response;
-
-    }
 
     async createPostWithThumbnails(post, files) {
         const formData = new FormData();
         const thumbnails = [];
 
         for (const file of files) {
-            if (file) {
-                const mimeType = file.type;
-                const fileName = file.name || `upload.${mimeType.split("/")[1]}`;
-                const fileUri = Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
+            if (!file) continue;
 
-                formData.append("files", {
-                    uri: fileUri,
-                    name: fileName,
-                    type: mimeType,
-                });
+            const mimeType = file.type;
+            const fileName = file.name || `upload.${mimeType.split("/")[1]}`;
+            let fileUri = Platform.OS === "ios" ? file.uri.replace("file://", "") : file.uri;
 
-                let thumbnail;
-                if (mimeType.includes("video")) {
-                    // Generate thumbnail for video
-                    const { uri } = await VideoThumbnails.getThumbnailAsync(fileUri, {
-                        time: 1000,
-                        quality: 0.2,
-                    });
-                    thumbnail = uri;
-                } else {
-                    // Generate a resized thumbnail for image
-                    const resizedImage = await ImageManipulator.manipulateAsync(
-                        fileUri,
-                        [{ resize: { width: 300 } }],
-                        { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
-                    );
-                    thumbnail = resizedImage.uri;
-                }
-
-                const thumbFileName = `thumb_${fileName}`;
-                thumbnails.push({ uri: thumbnail, name: thumbFileName, type: "image/jpeg" });
+            // 👉 Compress image only (Expo doesn't support video compression)
+            if (mimeType.includes("image")) {
+                const compressedImage = await ImageManipulator.manipulateAsync(
+                    fileUri,
+                    [{ resize: { width: 1080 } }],
+                    { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                fileUri = compressedImage.uri;
             }
+
+            // 👇 Add file to formData (video remains uncompressed)
+            formData.append("files", {
+                uri: fileUri,
+                name: fileName,
+                type: mimeType,
+            });
+
+            // 👉 Generate thumbnail (images resized, videos get snapshot)
+            let thumbnail;
+            if (mimeType.includes("video")) {
+                const { uri } = await VideoThumbnails.getThumbnailAsync(fileUri, {
+                    time: 1000,
+                    quality: 0.2,
+                });
+                thumbnail = uri;
+            } else {
+                const resizedImage = await ImageManipulator.manipulateAsync(
+                    fileUri,
+                    [{ resize: { width: 300 } }],
+                    { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
+                );
+                thumbnail = resizedImage.uri;
+            }
+
+            const thumbFileName = `thumb_${fileName}`;
+            thumbnails.push({ uri: thumbnail, name: thumbFileName, type: "image/jpeg" });
         }
 
-        // Append thumbnails to formData
         thumbnails.forEach((thumb) => {
             formData.append("thumbnails", thumb);
         });
@@ -99,7 +76,7 @@ class PostService {
         });
 
         return response;
-    };
+    }
 
     async GetPostByUserId(userId) {
 
@@ -109,7 +86,7 @@ class PostService {
 
         const response = await loginSignup.request(`${POST_API_URL}/posts?userId=${userId}`, {
             method: "GET",
-        });        
+        });
 
         return response;
     }
@@ -127,7 +104,7 @@ class PostService {
         return response;
     }
 
-    async getFeed(mineId,page) {
+    async getFeed(mineId, page) {
 
         if (!mineId) {
             throw new Error("UserID is required");
@@ -136,7 +113,7 @@ class PostService {
         const response = await loginSignup.request(`${FEED_API_URL}/feeds/random-feed?mineId=${mineId}&&page=${page}`, {
             method: "GET",
         });
-        
+
         return response;
     }
 

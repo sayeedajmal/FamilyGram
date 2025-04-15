@@ -21,4 +21,5 @@ public interface NotifRepo extends MongoRepository<Notification, String> {
     @Query("{ 'receiverId': ?0, 'read': false }")
     List<Notification> findUnreadNotifications(String receiverId);
 
+    List<Notification> findByReceiverId(String receiverId);
 }

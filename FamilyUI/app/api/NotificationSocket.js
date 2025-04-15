@@ -3,15 +3,18 @@ import SockJS from "sockjs-client";
 import { Alert } from "react-native";
 import * as Notifications from "expo-notifications";
 import Toast from 'react-native-toast-message';
-
+const NOTIF_API_URL = "http://192.168.31.218:8085";
+//const NOTIF_API_URL = "http://34.55.86.158:8085";
+//const NOTIF_API_URL = "https://familygram.onrender.com";
 class NotificationSocket {
+    
     constructor(userId, onNotificationReceived, onFetchNotifications) {
         this.userId = userId;
         this.onNotificationReceived = onNotificationReceived;
         this.onFetchNotifications = onFetchNotifications;
         this.client = null;
         this.connected = false;
-        this.serverUrl = "http://192.168.31.218:8085";
+        this.serverUrl = NOTIF_API_URL;
     }
     async triggerSystemNotification(notification) {
         await Notifications.scheduleNotificationAsync({
@@ -110,23 +113,30 @@ class NotificationSocket {
         }
     }
     // Mark a notification as read
-    async markAsRead(notifId) {
+    async markAsRead(notifIds) {
         try {
-            const response = await fetch(`${this.serverUrl}/graphql`, {
+            await fetch(`${this.serverUrl}/graphql`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                    query: `mutation { markNotificationAsRead(notifId: "${notifId}") { id read } }`,
+                    query: `
+                        mutation {
+                            markNotificationAsRead(notifIds: [${notifIds.map(id => `"${id}"`).join(",")}]) {
+                                id
+                                read
+                            }
+                        }
+                    `,
                 }),
             });
-
-            const result = await response.json();
-            return result.data?.markNotificationAsRead ? true : false;
+    
+           return true;
         } catch (error) {
-            console.error("Error marking notification as read:", error);
+            console.error("Error marking notifications as read:", error);
             return false;
         }
     }
+    
 
     async sendNotificationsBulk(type, message, senderUsername, receivers, senderId, thumbnailId, postId, postThumbId) {
         try {

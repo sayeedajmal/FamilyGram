@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { Image, Platform } from "react-native";
 
 const AUTH_API_URL = "http://192.168.31.218:8082";
+//const AUTH_API_URL = "http://34.55.86.158:8082";
 //const AUTH_API_URL = "https://familygram.onrender.com";
 
 const Storage = {
@@ -279,14 +280,14 @@ class ApiService {
             formData.append("user", JSON.stringify(userData));
 
             if (file) {
-                const originalImage = await ImageManipulator.manipulateAsync(
+                const compressedImage = await ImageManipulator.manipulateAsync(
                     file.uri,
-                    [],
+                    [{ resize: { width: 1080 } }],
                     { compress: 0.3, format: ImageManipulator.SaveFormat.JPEG }
                 );
 
                 formData.append("file", {
-                    uri: originalImage.uri,
+                    uri: compressedImage.uri,
                     name: file.fileName || "image.jpg",
                     type: file.mimeType || "image/jpeg",
                 });

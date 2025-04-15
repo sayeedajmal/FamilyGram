@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { Video } from "expo-av";
+import { useVideoPlayer, VideoView } from "expo-video";
 import LottieView from "lottie-react-native";
 import moment from "moment";
 import React, { useEffect, useRef, useState } from "react";
@@ -53,6 +53,11 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   const lastTap = useRef(null);
   const lottieRef = useRef(null);
   const [isLikeAnimating, setIsLikeAnimating] = useState(false);
+  const [isVideoVisible, setIsVideoVisible] = useState(false);
+
+  // Manage multiple video players for carousel
+  const videoPlayers = useRef({});
+  const visibilityThreshold = 0.8; // 80% visibility to trigger play/pause
 
   const [isCommenting, setIsCommenting] = useState(false);
   const [myComment, setMyComment] = useState({
@@ -63,7 +68,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     text: null,
   });
 
-  const MAX_CACHE_SIZE = 50;
+  const MAX_CACHE_SIZE = 20;
   const manageCacheSize = () => {
     while (mediaContentCache.size >= MAX_CACHE_SIZE) {
       const oldestKey = mediaContentCache.keys().next().value;
@@ -88,7 +93,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       myProf?.username,
       myProf?.followers,
       myProf?.id,
-      myProf?.thumbnailId,
+      myProf?.thumbnailId || "67f22def7d18c31ce1040da1",
       post?.id,
       post?.mediaIds?.[0]
     );
@@ -183,18 +188,32 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     fetchMediaUrls();
   }, [post]);
 
-  // useEffect(() => {
-  //   if (post) {
-  //     setMediaUrls(post.mediaUrls || []);
-  //     setMediaType(post.mediaType || "");
-  //   }
-  // }, [post]);
-
   useEffect(() => {
     if (videoRef.current) {
       videoRefs.current[post.id] = videoRef.current;
     }
   }, [videoRef.current]);
+
+  // Effect to handle video visibility
+  useEffect(() => {
+    // Set isVideoVisible to true when a video is in the center (activeIndex)
+    if (mediaType === "video") {
+      setIsVideoVisible(true);
+
+      // Control video playback based on visibility
+      const player = videoPlayers.current[activeIndex];
+      if (player) {
+        player.playAsync();
+      }
+
+      // Pause other videos
+      Object.keys(videoPlayers.current).forEach((key) => {
+        if (Number(key) !== activeIndex && videoPlayers.current[key]) {
+          videoPlayers.current[key].pauseAsync();
+        }
+      });
+    }
+  }, [activeIndex, mediaType]);
 
   //FETCH COMMENTS
   const fetchComments = async () => {
@@ -263,7 +282,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       postId: post?.id,
       userId: myProf?.id,
       username: myProf?.username,
-      thumbnailId: myProf?.thumbnailId,
+      thumbnailId: myProf?.thumbnailId || "67f22def7d18c31ce1040da1",
     };
 
     setIsCommenting(true);
@@ -353,22 +372,23 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   // Toggle Like Function
   const toggleLike = async (postId) => {
     const isCurrentlyLiked = likedPosts[postId] || false;
-    
+
+    if (isCurrentlyLiked) return;
     // Toggle the like state
     setLikedPosts((prev) => ({
       ...prev,
       [postId]: !isCurrentlyLiked,
     }));
-    
+
     // Update the like count
     setPostLikesCount((prev) => ({
       ...prev,
       [postId]: prev[postId] + (isCurrentlyLiked ? -1 : 1),
     }));
-    
+
     try {
       const response = await postService.toggleLike(myProf?.id, postId);
-      
+
       if (!response.status) {
         // Revert state if API call fails
         setLikedPosts((prev) => ({
@@ -379,17 +399,27 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
           ...prev,
           [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
         }));
-        
+
         Alert.alert("Error", "Failed to toggle like. Please try again.");
       } else {
         // Send notification only when liking (not unliking)
         if (!isCurrentlyLiked) {
+          console.log(
+            "BUDY: ",
+            myProf?.username,
+            [post?.userId],
+            myProf?.thumbnailId || "67f22def7d18c31ce1040da1",
+            myProf?.id,
+            post?.id,
+            post?.mediaIds?.[0]
+          );
+
           await NotificationSocket.sendNotificationsBulk(
             "LIKE",
             "liked your post 💙",
             myProf?.username,
-            myProf?.followers,
-            myProf?.thumbnailId,
+            [post?.userId],
+            myProf?.thumbnailId || "67f22def7d18c31ce1040da1",
             myProf?.id,
             post?.id,
             post?.mediaIds?.[0]
@@ -399,17 +429,17 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
     } catch (error) {
       // Revert state if there's an error
       Alert.alert("Error", "Failed Like " + error);
-      
+
       setLikedPosts((prev) => ({
         ...prev,
         [postId]: isCurrentlyLiked,
       }));
-      
+
       setPostLikesCount((prev) => ({
         ...prev,
         [postId]: prev[postId] + (isCurrentlyLiked ? 1 : -1),
       }));
-      
+
       Alert.alert(
         "Error",
         "Something went wrong. Please check your connection."
@@ -422,6 +452,26 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
       ...prev,
       [postId]: !prev[postId],
     }));
+  };
+
+  // Create a video player for each media index
+  const getVideoPlayer = (index) => {
+    if (!videoPlayers.current[index]) {
+      const player = useVideoPlayer({ shouldPlay: index === activeIndex });
+      videoPlayers.current[index] = player;
+      return player;
+    }
+    return videoPlayers.current[index];
+  };
+
+  // Function to handle visibility changes in the ScrollView
+  const handleScroll = (event) => {
+    const offsetX = event.nativeEvent.contentOffset.x;
+    const pageIndex = Math.round(offsetX / width);
+
+    if (pageIndex !== activeIndex) {
+      setActiveIndex(pageIndex);
+    }
   };
 
   return (
@@ -511,12 +561,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                     horizontal
                     pagingEnabled
                     showsHorizontalScrollIndicator={false}
-                    onScroll={(event) => {
-                      const pageIndex = Math.round(
-                        event.nativeEvent.contentOffset.x / width
-                      );
-                      setActiveIndex(pageIndex);
-                    }}
+                    onScroll={handleScroll}
                     scrollEventThrottle={16}
                   >
                     {mediaUrls.map((url, index) => (
@@ -529,17 +574,50 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                             }}
                           >
                             {mediaType === "video" ? (
-                              <Video
-                                source={{ uri: url }}
+                              <View
                                 style={{
                                   width: width - 25,
                                   aspectRatio: 4 / 5,
                                   borderRadius: 8,
+                                  backgroundColor: "#000",
+                                  overflow: "hidden",
                                 }}
-                                resizeMode="contain"
-                                shouldPlay="true"
-                                isLooping
-                              />
+                              >
+                                {/* Use VideoView with useVideoPlayer hook */}
+                                <VideoView
+                                  videoPlayer={getVideoPlayer(index)}
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                  }}
+                                  source={{ uri: url }}
+                                  resizeMode="contain"
+                                  isLooping
+                                  useNativeControls={false}
+                                />
+
+                                {/* Play indicator overlay - only shows when paused */}
+                                {activeIndex !== index && (
+                                  <View
+                                    style={{
+                                      position: "absolute",
+                                      top: 0,
+                                      left: 0,
+                                      right: 0,
+                                      bottom: 0,
+                                      justifyContent: "center",
+                                      alignItems: "center",
+                                      backgroundColor: "rgba(0,0,0,0.3)",
+                                    }}
+                                  >
+                                    <Ionicons
+                                      name="play-circle"
+                                      size={60}
+                                      color="rgba(255,255,255,0.8)"
+                                    />
+                                  </View>
+                                )}
+                              </View>
                             ) : (
                               <Image
                                 source={{ uri: url }}

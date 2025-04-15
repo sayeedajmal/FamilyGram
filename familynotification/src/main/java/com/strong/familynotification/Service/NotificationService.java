@@ -2,7 +2,9 @@ package com.strong.familynotification.Service;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -33,7 +35,7 @@ public class NotificationService {
 
     private static final long CACHE_EXPIRATION = 24; // Hours
 
-    @Scheduled(cron = "0 0 3 * * ?")
+    @Scheduled(fixedRate = 30000)
     public void cleanupReadNotifications() {
         Instant oneWeekAgo = Instant.now().minus(7, ChronoUnit.DAYS);
         notifRepo.deleteByReadTrueAndCreatedAtBefore(oneWeekAgo);
@@ -62,9 +64,12 @@ public class NotificationService {
     public List<Notification> getUserNotifications(String userId) {
         String redisKey = "notifications:" + userId;
 
-        List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, -1);
+        // 1. Try to fetch all notifications from Redis (up to 10)
+        List<Object> cachedNotifs = redisTemplate.opsForList().range(redisKey, 0, 9); // Get up to 10 notifications
+        List<Notification> notifications;
+
         if (cachedNotifs != null && !cachedNotifs.isEmpty()) {
-            return cachedNotifs.stream()
+            List<Notification> parsedNotifications = cachedNotifs.stream()
                     .map(obj -> {
                         try {
                             return objectMapper.readValue(obj.toString(), Notification.class);
@@ -72,29 +77,65 @@ public class NotificationService {
                             return null;
                         }
                     })
-                    .filter(n -> n != null)
+                    .filter(Objects::nonNull)
                     .collect(Collectors.toList());
+            notifications = new ArrayList<>(parsedNotifications);
+        } else {
+            notifications = new ArrayList<>();
         }
 
-        List<Notification> unreadNotif = notifRepo.findUnreadNotifications(userId);
+        // 2. Separate read and unread notifications
+        List<Notification> unreadNotifs = notifications.stream()
+                .filter(notif -> !notif.isRead()) // unread notifications
+                .collect(Collectors.toList());
+        List<Notification> readNotifs = notifications.stream()
+                .filter(notif -> notif.isRead()) // read notifications
+                .collect(Collectors.toList());
 
-        if (!unreadNotif.isEmpty()) {
-            List<String> jsonNotifs = unreadNotif.stream()
-                    .map(notif -> {
-                        try {
-                            return objectMapper.writeValueAsString(notif);
-                        } catch (JsonProcessingException e) {
-                            return null;
-                        }
-                    })
-                    .filter(json -> json != null)
-                    .collect(Collectors.toList());
+        // 3. If Redis didn't have enough notifications, fetch them from DB
+        if (notifications.size() < 10) {
+            List<Notification> dbNotifs = notifRepo.findByReceiverId(userId);
+            unreadNotifs.addAll(dbNotifs.stream()
+                    .filter(notif -> !notif.isRead())
+                    .collect(Collectors.toList()));
+            readNotifs.addAll(dbNotifs.stream()
+                    .filter(notif -> notif.isRead())
+                    .collect(Collectors.toList()));
+        }
 
-            redisTemplate.opsForList().leftPushAll(redisKey, jsonNotifs);
+        // 5. Calculate how many read notifications to show (20% of total, capped at 2)
+        int readToShow = Math.min((int) (0.2 * 10), readNotifs.size()); // 20% of 10 is 2, so we cap it to 2
+
+        // 6. Combine unread and read notifications (unread first, then read)
+        List<Notification> finalNotifications = new ArrayList<>();
+        finalNotifications.addAll(unreadNotifs); // Add all unread notifications
+        finalNotifications.addAll(readNotifs.subList(0, readToShow)); // Add 20% of read notifications
+
+        // 7. If the total is more than 10, trim to 10
+        if (finalNotifications.size() > 10) {
+            finalNotifications = finalNotifications.subList(0, 10);
+        }
+
+        // 8. Cache only new unread notifications back to Redis if needed
+        // Only add new unread notifications to Redis
+        List<String> jsonUnreadNotifs = unreadNotifs.stream()
+                .filter(notif -> !notifications.contains(notif)) // Avoid duplicating already cached notifications
+                .map(notif -> {
+                    try {
+                        return objectMapper.writeValueAsString(notif);
+                    } catch (JsonProcessingException e) {
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
+
+        if (!jsonUnreadNotifs.isEmpty()) {
+            redisTemplate.opsForList().leftPushAll(redisKey, jsonUnreadNotifs);
             redisTemplate.expire(redisKey, CACHE_EXPIRATION, TimeUnit.HOURS);
         }
 
-        return unreadNotif;
+        return finalNotifications;
     }
 
     // Mark notifications as read and update Redis

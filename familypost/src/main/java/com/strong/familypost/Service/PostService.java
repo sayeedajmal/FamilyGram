@@ -3,6 +3,7 @@ package com.strong.familypost.Service;
 import java.math.BigInteger;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -11,7 +12,6 @@ import java.util.stream.Collectors;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
@@ -48,9 +48,6 @@ public class PostService {
 
     @Autowired
     private StorageService storageService;
-
-    @Autowired
-    private UserServiceClient client;
 
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
@@ -200,13 +197,13 @@ public class PostService {
     public Post getPostById(String postId, String userId) throws PostException {
         try {
             String redisHashKey = "posts:" + userId;
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
             // Step 1: Try getting from Redis Hash
             Object cached = redisTemplate.opsForHash().get(redisHashKey, postId);
             if (cached != null) {
-                ObjectMapper mapper = new ObjectMapper();
-                mapper.registerModule(new JavaTimeModule());
-                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
                 if (cached instanceof String) {
                     return mapper.readValue((String) cached, Post.class);
@@ -219,10 +216,6 @@ public class PostService {
             Post post = postRepo.findById(postId)
                     .orElseThrow(() -> new PostException("No Post with postId: " + postId));
 
-            // Step 3: Cache it in Redis for next time
-            ObjectMapper mapper = new ObjectMapper();
-            mapper.registerModule(new JavaTimeModule());
-            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
             String json = mapper.writeValueAsString(post);
 
             redisTemplate.opsForHash().put(redisHashKey, postId, json);
@@ -244,8 +237,7 @@ public class PostService {
      * @throws PostException if there's an error retrieving the posts or if privacy
      *                       settings prevent access
      */
-    public List<Post> getUserPosts(String userId, String token) throws PostException {
-        String authenticatedUserId = getAuthenticatedUserId();
+    public List<Post> getUserPosts(String userId) throws PostException {
         String cacheKey = "posts:" + userId;
 
         try {
@@ -260,17 +252,14 @@ public class PostService {
                 List<Post> posts = cachedMap.values().stream()
                         .map(obj -> {
                             try {
-                                if (obj instanceof String) {
-                                    return mapper.readValue((String) obj, Post.class);
-                                } else if (obj instanceof Post) {
-                                    return (Post) obj;
-                                } else if (obj instanceof Map) {
-                                    return mapper.convertValue(obj, Post.class);
+                                if (obj instanceof String str) {
+                                    return mapper.readValue(str, Post.class); // parse from JSON string
                                 } else {
+                                    System.out.println("⚠️ Unexpected cached value type: " + obj.getClass().getName());
                                     return null;
                                 }
                             } catch (Exception e) {
-                                return null;
+                                throw new RuntimeException("Error collecting post: " + e.getLocalizedMessage());
                             }
                         })
                         .filter(Objects::nonNull)
@@ -279,17 +268,8 @@ public class PostService {
                 return posts;
             }
 
-            // 2️⃣ Fetch from DB based on privacy
-            if (userId.equals(authenticatedUserId)) {
-                return fetchAndCachePosts(userId, cacheKey); // This should also store in Redis HASH
-            }
-
-            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
-            if (response.getStatusCode().is2xxSuccessful()) {
-                return fetchAndCachePosts(userId, cacheKey);
-            } else {
-                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
-            }
+            // 2️⃣ Fetch from DB and cache if not present
+            return fetchAndCachePosts(userId, cacheKey);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -304,22 +284,36 @@ public class PostService {
      * @param cacheKey The Redis cache key
      * @return List of posts for the user
      */
-    public List<Post> fetchAndCachePosts(String userId, String cacheKey) {
-        List<Post> posts = postRepo.findByUserId(userId);
-        ObjectMapper mapper = new ObjectMapper();
-        mapper.registerModule(new JavaTimeModule());
-        mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+    private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
+        try {
+            // 1️⃣ Fetch from DB
+            List<Post> postsFromDb = postRepo.findByUserId(userId);
 
-        for (Post post : posts) {
-            try {
-                String json = mapper.writeValueAsString(post);
-                redisTemplate.opsForHash().put(cacheKey, post.getId(), json);
-            } catch (JsonProcessingException e) {
-                e.printStackTrace();
+            // 2️⃣ Cache to Redis as JSON strings
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+            Map<String, String> postMap = new HashMap<>();
+            for (Post post : postsFromDb) {
+                try {
+                    String json = mapper.writeValueAsString(post);
+                    postMap.put(post.getId(), json);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException("Error Parsing Json of Post: " + e.getMessage());
+                }
             }
-        }
 
-        return posts;
+            if (!postMap.isEmpty()) {
+                redisTemplate.opsForHash().putAll(cacheKey, postMap);
+                // Optional: Set TTL (e.g., 10 minutes)
+                redisTemplate.expire(cacheKey, Duration.ofMinutes(10));
+            }
+
+            return postsFromDb;
+        } catch (Exception e) {
+            throw new RuntimeException("Error fetching and caching posts: " + e.getMessage());
+        }
     }
 
     public boolean toggleLike(String postId, String userId) throws PostException {

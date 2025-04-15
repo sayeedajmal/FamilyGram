@@ -15,9 +15,9 @@ public class ScheduledFlusher {
     private StorageService storageService;
 
     // ⏱ Run every minute
-    @Scheduled(fixedRate = 25000)
+    @Scheduled(fixedRate = 30000)
     public void flush() throws JsonMappingException, JsonProcessingException {
-        System.out.println("Flushing data to MongoDB...");
+        // System.out.println("Flushing data to MongoDB...");
         // Call the flushToMongo method from StorageService
         storageService.flushToMongo();
     }
