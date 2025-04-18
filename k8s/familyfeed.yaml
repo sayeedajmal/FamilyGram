@@ -1,0 +1,45 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: familyfeed
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: familyfeed
+  template:
+    metadata:
+      labels:
+        app: familyfeed
+    spec:
+      containers:
+        - name: familyfeed
+          image: familyfeed:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8084
+          envFrom:
+            - secretRef:
+                name: familyenv
+          volumeMounts:
+            - name: feed-storage
+              mountPath: /var/lib/feed/data
+      volumes:
+        - name: feed-storage
+          persistentVolumeClaim:
+            claimName: familygram-pvc
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: familyfeed
+spec:
+  selector:
+    app: familyfeed
+  ports:
+    - protocol: TCP
+      port: 8084
+      targetPort: 8084
+  type: ClusterIP
