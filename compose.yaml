@@ -22,7 +22,6 @@ services:
     env_file: .env
     depends_on:
       - broker
-      - redis
     networks:
       - familygram-network
     volumes:
@@ -38,7 +37,6 @@ services:
     env_file: .env
     depends_on:
       - broker
-      - redis
     networks:
       - familygram-network
     volumes:
@@ -54,7 +52,6 @@ services:
     env_file: .env
     depends_on:
       - broker
-      - redis
     networks:
       - familygram-network
     volumes:
