@@ -17,6 +17,8 @@
         <module>familypost</module>
         <module>familyfeed</module>
         <module>familynotification</module>
+        <module>familygateway</module>
+        <module>familydiscovery</module>
         <!-- Add other microservices here -->
     </modules>
 

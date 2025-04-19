@@ -18,7 +18,9 @@ show_menu() {
   echo -e "${GREEN}2.${RESET} familypost"
   echo -e "${GREEN}3.${RESET} familynotification"
   echo -e "${GREEN}4.${RESET} familyfeed"
-  echo -e "${GREEN}5.${RESET} All Services"
+  echo -e "${GREEN}5.${RESET} familygateway"
+  echo -e "${GREEN}6.${RESET} familydiscovery"
+  echo -e "${GREEN}7.${RESET} All Services"
 }
 
 # Function to track and display elapsed time every second
@@ -71,8 +73,10 @@ case $choice in
   2) build_service "familypost" ;;
   3) build_service "familynotification" ;;
   4) build_service "familyfeed" ;;
-  5)
-    for service in familyauth familypost familynotification familyfeed; do
+  5) build_service "familygateway" ;;
+  6) build_service "familydiscovery" ;;
+  7)
+    for service in familyauth familypost familynotification familyfeed familygateway familydiscovery; do
       build_service "$service"
     done
     ;;
@@ -120,5 +124,3 @@ case $docker_choice in
     exit 1
     ;;
 esac
-
-

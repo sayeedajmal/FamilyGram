@@ -1,10 +1,10 @@
-package com.strong.familypost;
+package com.strong.familydiscovery;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class FamilypostApplicationTests {
+class FamilydiscoveryApplicationTests {
 
 	@Test
 	void contextLoads() {
