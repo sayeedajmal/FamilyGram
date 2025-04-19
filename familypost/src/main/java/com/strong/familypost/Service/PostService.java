@@ -1,32 +1,32 @@
 package com.strong.familypost.Service;
 
-import java.time.LocalDateTime;
+import java.math.BigInteger;
+import java.time.Duration;
 import java.util.ArrayList;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import com.strong.familypost.Model.LiteUser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.strong.familypost.Model.Post;
-import com.strong.familypost.Model.PostWithUser;
 import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Repository.PostRepo;
 import com.strong.familypost.Util.PostException;
-import com.strong.familypost.Util.ResponseWrapper;
 
 /**
  * Service class responsible for managing Post-related operations.
@@ -50,43 +50,7 @@ public class PostService {
     private StorageService storageService;
 
     @Autowired
-    private UserServiceClient client;
-
-    @SuppressWarnings("null")
-    public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
-        ResponseEntity<ResponseWrapper<List<LiteUser>>> response = client.getRandomFeedUsers(mineId, userLimit, token);
-
-        if (response.getBody() == null || response.getBody().getData() == null) {
-            return List.of();
-        }
-
-        List<LiteUser> users = response.getBody().getData();
-
-        Pageable pageable = PageRequest.of(0, 2);
-
-        return users.stream()
-                .flatMap(user -> {
-                    List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
-
-                    return posts.stream()
-                            .filter(post -> post != null && post.getUserId() != null)
-                            .map(post -> {
-                                return new PostWithUser(
-                                        user.getUsername(),
-                                        user.getName(),
-                                        user.getThumbnailId(),
-                                        post.getId(),
-                                        post.getUserId(),
-                                        post.getCaption(),
-                                        post.getMediaIds() != null ? post.getMediaIds() : List.of(),
-                                        post.getLocation(),
-                                        post.getLikes() != null ? post.getLikes() : new HashSet<>(),
-                                        post.getCreatedAt() != null ? post.getCreatedAt() : LocalDateTime.now());
-                            });
-                })
-                .collect(Collectors.toList());
-
-    }
+    private RedisTemplate<String, Object> redisTemplate;
 
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -130,7 +94,7 @@ public class PostService {
             }
 
             if (files != null && !files.isEmpty()) {
-                // Step 2: Try uploading media and thumbnails
+                // Step 2: Upload media and thumbnails
                 List<Map<String, String>> uploadedFiles;
                 try {
                     uploadedFiles = storageService.uploadMedia(files, thumbnails, savedPost.getId());
@@ -144,14 +108,26 @@ public class PostService {
                     savedPost.getThumbnailIds().add(mediaData.get("thumbnailId"));
                 }
 
-                // Step 4: Save post with updated media references
-                postRepo.save(savedPost);
+                // Step 4: Save post again with media references
+                savedPost.setLikeCount(BigInteger.valueOf(0));
+                savedPost = postRepo.save(savedPost);
             }
 
-            return savedPost;
+            // Step 5: Cache in Redis as HASH
+            String cacheKey = "posts:" + savedPost.getUserId(); // Hash key
+            String postId = savedPost.getId(); // Hash field
 
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+            String jsonPost = mapper.writeValueAsString(savedPost);
+
+            redisTemplate.opsForHash().put(cacheKey, postId, jsonPost);
+
+            return savedPost;
         } catch (PostException e) {
-            throw e; // Preserve PostException messages
+            throw e;
         } catch (Exception e) {
             throw new PostException("Error saving post: " + e.getMessage());
         }
@@ -159,6 +135,7 @@ public class PostService {
 
     /**
      * Deletes a post and all its associated comments from the database.
+     * Also removes the post from Redis cache if it exists.
      * 
      * @param postId The unique identifier of the post to be deleted
      * @throws PostException        if the postId is null or empty, or if no post
@@ -168,21 +145,45 @@ public class PostService {
      */
     @Transactional
     public void deletePost(String postId) throws PostException {
-        String loggedId = getAuthenticatedUserId();
-
-        if (!postId.equals(loggedId)) {
-            throw new PostException("You are not authorized to access this Resource");
-        }
         if (postId == null || postId.trim().isEmpty()) {
             throw new PostException("PostId cannot be null or empty");
         }
-        if (!postRepo.existsById(postId)) {
-            throw new PostException("No Post with id: " + postId);
+
+        Post post = postRepo.findById(postId)
+                .orElseThrow(() -> new PostException("No Post with id: " + postId));
+
+        String loggedId = getAuthenticatedUserId();
+
+        // Check if the logged-in user is the owner of the post
+        if (!post.getUserId().equals(loggedId)) {
+            throw new PostException("You are not authorized to access this Resource");
         }
 
+        // Delete all comments associated with the post
         commentRepo.deleteByPostId(postId);
 
+        // Delete post from database
         postRepo.deleteById(postId);
+
+        // Update Redis cache - remove the post if it exists in cache
+        String cacheKey = "posts:" + post.getUserId();
+        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
+
+        if (cachedList != null) {
+            List<Post> updatedList = new ArrayList<>();
+
+            for (Object obj : cachedList) {
+                if (obj instanceof Post) {
+                    Post cachedPost = (Post) obj;
+                    if (!cachedPost.getId().equals(postId)) {
+                        updatedList.add(cachedPost); // Keep posts that aren't being deleted
+                    }
+                }
+            }
+
+            // Update the cache with the filtered list
+            redisTemplate.opsForValue().set(cacheKey, updatedList, Duration.ofMinutes(20));
+        }
     }
 
     /**
@@ -193,78 +194,144 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    public Post getPostById(String userId, String postId, String token) throws PostException {
-        String authenticatedUserId = getAuthenticatedUserId();
+    public Post getPostById(String postId, String userId) throws PostException {
         try {
-            // Call FamilyAuth Service to check privacy settings
-            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
+            String redisHashKey = "posts:" + userId;
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                return postRepo.findById(postId)
-                        .orElseThrow(() -> new PostException("No Post with postId: " + postId));
-            } else {
-                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
+            // Step 1: Try getting from Redis Hash
+            Object cached = redisTemplate.opsForHash().get(redisHashKey, postId);
+            if (cached != null) {
+
+                if (cached instanceof String) {
+                    return mapper.readValue((String) cached, Post.class);
+                } else if (cached instanceof Map) {
+                    return mapper.convertValue(cached, Post.class);
+                }
             }
 
+            // Step 2: Fallback to DB
+            Post post = postRepo.findById(postId)
+                    .orElseThrow(() -> new PostException("No Post with postId: " + postId));
+
+            String json = mapper.writeValueAsString(post);
+
+            redisTemplate.opsForHash().put(redisHashKey, postId, json);
+
+            return post;
+
         } catch (Exception e) {
+            e.printStackTrace();
+            throw new PostException("Error getting post: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    /**
+     * Retrieves all posts for a specific user, with caching.
+     * 
+     * @param userId The user ID whose posts to retrieve
+     * @param token  Authentication token for privacy checks
+     * @return A List containing all Post objects for the user
+     * @throws PostException if there's an error retrieving the posts or if privacy
+     *                       settings prevent access
+     */
+    public List<Post> getUserPosts(String userId) throws PostException {
+        String cacheKey = "posts:" + userId;
+
+        try {
+            // 1️⃣ Try to fetch from Redis HASH
+            Map<Object, Object> cachedMap = redisTemplate.opsForHash().entries(cacheKey);
+
+            if (cachedMap != null && !cachedMap.isEmpty()) {
+                ObjectMapper mapper = new ObjectMapper();
+                mapper.registerModule(new JavaTimeModule());
+                mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+                List<Post> posts = cachedMap.values().stream()
+                        .map(obj -> {
+                            try {
+                                if (obj instanceof String str) {
+                                    return mapper.readValue(str, Post.class); // parse from JSON string
+                                } else {
+                                    System.out.println("⚠️ Unexpected cached value type: " + obj.getClass().getName());
+                                    return null;
+                                }
+                            } catch (Exception e) {
+                                throw new RuntimeException("Error collecting post: " + e.getLocalizedMessage());
+                            }
+                        })
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toList());
+
+                return posts;
+            }
+
+            // 2️⃣ Fetch from DB and cache if not present
+            return fetchAndCachePosts(userId, cacheKey);
+
+        } catch (Exception e) {
+            e.printStackTrace();
             throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
     /**
-     * Retrieves all posts from the database.
+     * Fetches posts from database and caches them in Redis.
      * 
-     * @return A List containing all Post objects
+     * @param userId   The user ID whose posts to fetch
+     * @param cacheKey The Redis cache key
+     * @return List of posts for the user
      */
-    public List<Post> getUserPosts(String userId, String token) throws PostException {
-        String authenticatedUserId = getAuthenticatedUserId();
-        if (userId.equals(authenticatedUserId)) {
-            return postRepo.findByUserId(userId);
-        }
+    private List<Post> fetchAndCachePosts(String userId, String cacheKey) {
         try {
-            // Call FamilyAuth Service to check privacy settings
-            ResponseEntity<String> response = client.getUserPrivacy(authenticatedUserId, userId, token);
+            // 1️⃣ Fetch from DB
+            List<Post> postsFromDb = postRepo.findByUserId(userId);
 
-            if (response.getStatusCode().is2xxSuccessful()) {
-                return postRepo.findByUserId(userId);
-            } else {
-                throw new PostException("Account is Private", HttpStatus.UNAUTHORIZED);
+            // 2️⃣ Cache to Redis as JSON strings
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.registerModule(new JavaTimeModule());
+            mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
+
+            Map<String, String> postMap = new HashMap<>();
+            for (Post post : postsFromDb) {
+                try {
+                    String json = mapper.writeValueAsString(post);
+                    postMap.put(post.getId(), json);
+                } catch (JsonProcessingException e) {
+                    throw new RuntimeException("Error Parsing Json of Post: " + e.getMessage());
+                }
             }
 
+            if (!postMap.isEmpty()) {
+                redisTemplate.opsForHash().putAll(cacheKey, postMap);
+                // Optional: Set TTL (e.g., 10 minutes)
+                redisTemplate.expire(cacheKey, Duration.ofMinutes(10));
+            }
+
+            return postsFromDb;
         } catch (Exception e) {
-            throw new PostException("Error retrieving posts: " + e.getMessage(), HttpStatus.INTERNAL_SERVER_ERROR);
+            throw new RuntimeException("Error fetching and caching posts: " + e.getMessage());
         }
     }
 
-    /**
-     * Toggles a like on a post for a specific user.
-     * If the user has already liked the post, their like is removed.
-     * If the user hasn't liked the post, a like is added.
-     * 
-     * @param postId The unique identifier of the post
-     * @param userId The unique identifier of the user toggling the like
-     * @return The updated number of likes on the post
-     * @throws PostException if the post cannot be found or if there's an error
-     *                       processing the like
-     */
-    public int toggleLike(String postId, String userId) throws PostException {
-        Post post = postRepo.findById(postId)
-                .orElseThrow(() -> new PostException("No Post with postId: " + postId));
-        Set<String> likes = post.getLikes();
+    public boolean toggleLike(String postId, String userId) throws PostException {
+        String redisLikeKey = "post_like:" + postId;
 
-        if (likes == null) {
-            likes = new HashSet<>();
-        }
+        // Step 1: Check if user already liked
+        Boolean hasLiked = redisTemplate.opsForSet().isMember(redisLikeKey, userId);
 
-        if (likes.contains(userId)) {
-            likes.remove(userId);
+        boolean isLiked;
+        if (Boolean.TRUE.equals(hasLiked)) {
+            // User already liked → remove like
+            redisTemplate.opsForSet().remove(redisLikeKey, userId);
+            isLiked = false;
         } else {
-            likes.add(userId);
+            // User hasn't liked → add like
+            redisTemplate.opsForSet().add(redisLikeKey, userId);
+            isLiked = true;
         }
-
-        post.setLikes(likes);
-        postRepo.save(post);
-        return likes.size();
+        return isLiked;
     }
-
 }

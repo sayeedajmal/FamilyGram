@@ -8,6 +8,7 @@ import java.util.Set;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mongodb.lang.NonNull;
 
 import lombok.AllArgsConstructor;
@@ -54,5 +55,6 @@ public class Post {
 
     /** Timestamp when the post was created */
     @NonNull
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime createdAt = LocalDateTime.now();
 }

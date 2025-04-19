@@ -36,7 +36,7 @@ const FollowModel = ({
   const removeFollow = async () => {
     setIsProcessing(true);
     try {
-      const response = await loginSignup.removeFollow(userId, mineId);
+      const response = await loginSignup.toggleFollow(userId, mineId, "");
       if (response.status) {
         setFollowers((prev) => prev.filter((user) => user.id !== userId));
         setFollowing((prev) => prev.filter((user) => user.id !== userId));
@@ -50,18 +50,16 @@ const FollowModel = ({
 
   // Accept follow request
   const acceptRequest = async () => {
-    
     setIsProcessing(true);
     try {
       const response = await loginSignup.acceptRequest(userId, mineId);
-      console.log("BUDDY: ",response.message);
-      
+
       if (response.status) {
         setFollowers((prev) => [
           ...prev,
           { id: userId, username, name, userThumbnailUrl },
         ]); // Add to followers
-        setRequested((prev) => prev.filter((user) => user.id !== userId)); // Remove from requested list
+        setRequested((prev) => prev.filter((user) => user.id !== userId));
       }
     } catch (error) {
       console.error("Error accepting follow request:", error);

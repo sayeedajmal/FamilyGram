@@ -34,21 +34,15 @@ const ProfileEdit = ({ onEdit, onUpdate }) => {
   useEffect(() => {
     const fetchProfile = async () => {
       const userProfile = await loginSignup.getStoredUserProfile();
-
       if (userProfile) {
-        setId(userProfile.id);
+        setId(userProfile.id || "");
         setUsername(userProfile.username || "");
         setFullName(userProfile.name || "");
         setBio(userProfile.bio || "");
         setWebsite(userProfile.website || "");
         setOldUsername(userProfile.username);
         setEmail(userProfile.email);
-        if (userProfile.photoId) {
-          const imageUrl = await loginSignup.getProfileImage(
-            userProfile.photoId
-          );
-          setProfileImage(imageUrl.data);
-        }
+        setProfileImage(userProfile.thumbnailUrl || "");
       }
     };
     fetchProfile();

@@ -42,6 +42,7 @@ public class NotificationController {
             notification.setThumbnailId(input.thumbnailId());
             notification.setPostThumbId(input.postThumbId());
             notification.setReceiverId(input.receiverId());
+            notification.setSenderId(input.senderId());
             notification.setPostId(input.postId());
             notification.setCreatedAt(Instant.now());
             return notification;
@@ -52,8 +53,8 @@ public class NotificationController {
     }
 
     @MutationMapping
-    public Notification markNotificationAsRead(@Argument String notifId) throws NotifException {
-        return notificationService.markAsRead(notifId);
+    public List<Notification> markNotificationAsRead(@Argument List<String> notifIds) throws NotifException {
+        return notificationService.markAsRead(notifIds);
     }
 
     @MutationMapping

@@ -32,13 +32,13 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-            
+
         String path = request.getRequestURI();
         if (path.matches("/posts/media/.*")) {
             chain.doFilter(request, response);
             return;
         }
-            
+
         final String authHeader = request.getHeader("Authorization");
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
@@ -53,7 +53,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                         String username = claims.get("username", String.class);
                         String name = claims.get("name", String.class);
                         String phone = claims.get("phone", String.class);
-                        boolean isPrivate = claims.get("isPrivate", Boolean.class);
+                        boolean privacy = claims.get("privacy", Boolean.class);
                         boolean isEnabled = claims.get("enabled", Boolean.class);
                         boolean isAccountNonLocked = claims.get("accountNonLocked", Boolean.class);
                         boolean isAccountNonExpired = claims.get("accountNonExpired", Boolean.class);
@@ -62,7 +62,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                                 .get("authorities", Collection.class);
 
                         User userDetails = new User(
-                                email, id, username, name, phone, isPrivate, isEnabled, isAccountNonLocked,
+                                email, id, username, name, phone, privacy, isEnabled, isAccountNonLocked,
                                 isAccountNonExpired, authorities);
                         UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(
                                 userDetails, null, userDetails.getAuthorities());

@@ -15,6 +15,7 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperation;
 import org.springframework.data.mongodb.core.aggregation.AggregationOperationContext;
 import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -33,6 +34,7 @@ import com.strong.familyauth.Model.User;
 import com.strong.familyauth.Repository.TokenRepository;
 import com.strong.familyauth.Repository.UserRepository;
 import com.strong.familyauth.Util.JwtUtil;
+import com.strong.familyauth.Util.KafkaProducer;
 import com.strong.familyauth.Util.UserException;
 
 @Service
@@ -64,40 +66,34 @@ public class UserService implements UserDetailsService {
 
     @Autowired
     private MongoTemplate mongoTemplate;
+    @Autowired
+    private KafkaProducer kafkaProducer;
+    @Autowired
+    private RedisTemplate<String, User> redisTemplate;
 
     public boolean canAccessProfile(String mineId, String yourId) {
-        Optional<User> userOptional = userRepo.findById(yourId);
+        String redisKey = "user:" + yourId;
+        User user = redisTemplate.opsForValue().get(redisKey);
 
-        // If user doesn't exist, deny access
-        if (userOptional.isEmpty()) {
-            return false;
+        if (user == null) {
+            Optional<User> userOptional = userRepo.findById(yourId);
+
+            if (userOptional.isEmpty()) {
+                return false; // user doesn't exist
+            }
+
+            user = userOptional.get();
+            user.setPassword(null);
+            redisTemplate.opsForValue().set(redisKey, user); // cache it
         }
 
-        User user = userOptional.get();
-
-        // If the account is public, anyone can access
-        if (!user.isPrivate()) {
+        // If public profile, allow access
+        if (!user.isPrivacy()) {
             return true;
         }
 
-        // If private, check if mineId is in followers
+        // If private, allow only if requester is a follower
         return user.getFollowers().contains(mineId);
-    }
-
-    public Set<String> getFollowers(String mineId, String yourId) {
-        boolean canAccessProfile = canAccessProfile(mineId, yourId);
-        if (canAccessProfile) {
-            return userRepo.getFollowersById(yourId).orElse(new HashSet<>());
-        }
-        return new HashSet<>();
-    }
-
-    public Set<String> getFollowings(String mineId, String yourId) {
-        boolean canAccessProfile = canAccessProfile(mineId, yourId);
-        if (canAccessProfile) {
-            return userRepo.getFollowingById(yourId).orElse(new HashSet<>());
-        }
-        return new HashSet<>();
     }
 
     public String sendEmailOtp(String email) throws UserException {
@@ -109,7 +105,7 @@ public class UserService implements UserDetailsService {
         return "Email sent successfully! Validity is 3 Minutes.";
     }
 
-    public Map<String, String> signUp(User user) throws UserException {
+    public Map<String, Object> signUp(User user) throws UserException {
         if (!emailService.validateOtp(user.getEmail(), user.getBio())) {
             throw new UserException("Incorrect OTP/Expired OTP. Please try again.");
         }
@@ -125,106 +121,193 @@ public class UserService implements UserDetailsService {
         user.setEnabled(true);
         user.setPhone("");
         user.setPhotoId("");
-        user.setPrivate(false);
+        user.setPrivacy(false);
+        user.setCredentialsNonExpired(true);
         user.setFollowers(new HashSet<>());
         user.setFollowing(new HashSet<>());
         user.setWebsite("");
 
-        userRepo.save(user);
-
-        String accessToken = jwtUtil.generateAccessToken(user);
         String refreshToken = jwtUtil.generateRefreshToken(user);
-
-        saveToken(accessToken, refreshToken, user);
-
-        Map<String, String> tokens = new HashMap<>();
+        User save = userRepo.save(user);
+        String accessToken = jwtUtil.generateAccessToken(save);
+        save.setPassword(null);
+        redisTemplate.opsForValue().set("user:" + save.getId(), save);
+        saveToken(accessToken, refreshToken, save);
+        Map<String, Object> tokens = new HashMap<>();
         tokens.put("accessToken", accessToken);
         tokens.put("refreshToken", refreshToken);
+        tokens.put("myProfile", save);
 
         return tokens;
     }
 
-    public boolean acceptFollowRequest(String mineId, String userId) {
-        Optional<User> mineUserOpt = userRepo.findById(mineId);
-        Optional<User> userOpt = userRepo.findById(userId);
+    public boolean rejectFollowRequest(String mineId, String yourId) throws UserException {
+        String mineKey = "user:" + mineId;
 
-        if (mineUserOpt.isPresent() && userOpt.isPresent()) {
-            User mineUser = mineUserOpt.get();
-            User user = userOpt.get();
+        // Try Redis
+        User mineUser = redisTemplate.opsForValue().get(mineKey);
 
-            // Check if userId is in mineUser's followRequests
+        // Fallback to DB
+        if (mineUser == null) {
+            mineUser = userRepo.findById(yourId).orElse(null);
+        }
+
+        if (mineUser == null) {
+            throw new UserException("User not found: " + mineId);
+        }
+        // Check and remove follow request
+        if (mineUser.getFollowRequests().contains(yourId)) {
+            mineUser.getFollowRequests().remove(yourId);
+            mineUser.setPassword(null);
+            // 🔥 Correct Kafka payload — send updated list
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("id", yourId);
+            payload.put("followRequests", mineUser.getFollowRequests());
+            kafkaProducer.sendToKafka(payload, "UPDATE");
+            redisTemplate.opsForValue().set(mineKey, mineUser);
+            return true;
+        }
+
+        return false;
+    }
+
+    public boolean acceptFollowRequest(String mineId, String userId) throws UserException {
+        String mineKey = "user:" + mineId;
+        String userKey = "user:" + userId;
+
+        User mineUser = redisTemplate.opsForValue().get(mineKey);
+        User user = redisTemplate.opsForValue().get(userKey);
+
+        // Fallback to DB if not in Redis
+        if (mineUser == null) {
+            mineUser = userRepo.findById(mineId).orElse(null);
+        }
+
+        if (user == null) {
+            user = userRepo.findById(userId).orElse(null);
+        }
+        // Validate and process the follow request
+        if (mineUser != null && user != null) {
             if (mineUser.getFollowRequests().contains(userId)) {
-                // Remove from followRequests
+
+                // Remove request
                 mineUser.getFollowRequests().remove(userId);
 
-                // Add userId to mineUser's followers
-                mineUser.getFollowers().add(userId);
+                // Add to followers/following
+                // Update 1: mineUser (id = mineId, followers = Set of ids)
+                Set<String> mineFollowers = mineUser.getFollowers();
+                if (mineFollowers == null)
+                    mineFollowers = new HashSet<>();
+                mineFollowers.add(userId);
 
-                // Add mineId to user's following list
-                user.getFollowing().add(mineId);
+                Map<String, Object> minePayload = new HashMap<>();
+                minePayload.put("id", mineId);
+                minePayload.put("followers", mineFollowers); // sending full updated set
+                kafkaProducer.sendToKafka(minePayload, "UPDATE");
 
-                // Save both users
-                userRepo.save(mineUser);
-                userRepo.save(user);
+                // Update 2: user (id = userId, following = Set of ids)
+                Set<String> userFollowing = user.getFollowing();
+                if (userFollowing == null)
+                    userFollowing = new HashSet<>();
+                userFollowing.add(mineId);
+
+                Map<String, Object> userPayload = new HashMap<>();
+                userPayload.put("id", userId);
+                userPayload.put("following", userFollowing); // sending full updated set
+                kafkaProducer.sendToKafka(userPayload, "UPDATE");
+
+                // Update Redis again after saving
+                mineUser.setPassword(null);
+                user.setPassword(null);
+                redisTemplate.opsForValue().set(mineKey, mineUser);
+                redisTemplate.opsForValue().set(userKey, user);
 
                 return true;
             }
         }
+
         return false;
     }
 
-    // ADD FOLLOWER
     public String toggleFollower(String mineId, String yourId, String imageUrl) throws UserException {
-        Optional<User> mineOptional = userRepo.findById(mineId);
-        Optional<User> yourOptional = userRepo.findById(yourId);
+        String mineKey = "user:" + mineId;
+        String yourKey = "user:" + yourId;
 
-        if (mineOptional.isEmpty() || yourOptional.isEmpty()) {
-            throw new UserException("User not found");
+        // Fetch mine user from Redis or DB
+        User mine = redisTemplate.opsForValue().get(mineKey);
+        if (mine == null) {
+            mine = userRepo.findById(mineId).orElseThrow(() -> new UserException("User not found: " + mineId));
         }
 
-        User mine = mineOptional.get();
-        User your = yourOptional.get();
+        // Fetch your user from Redis or DB
+        User your = redisTemplate.opsForValue().get(yourKey);
+        if (your == null) {
+            your = userRepo.findById(yourId).orElseThrow(() -> new UserException("User not found: " + yourId));
+        }
 
-        // Check if the user is private
-        if (your.isPrivate()) {
+        // 🔒 Handle private account
+        if (your.isPrivacy()) {
             if (your.getFollowRequests() == null) {
                 your.setFollowRequests(new HashSet<>());
             }
 
-            // If already requested, remove the request (toggle behavior)
-            if (your.getFollowRequests().contains(mineId)) {
+            boolean alreadyRequested = your.getFollowRequests().contains(mineId);
+
+            if (alreadyRequested) {
                 your.getFollowRequests().remove(mineId);
-                userRepo.save(your);
-                return "Follow request removed.";
+            } else {
+                emailService.sendFollowRequestEmail(your.getEmail(), mine.getEmail(), imageUrl);
+                your.getFollowRequests().add(mineId);
             }
 
-            // Else, send a new follow request
-            emailService.sendFollowRequestEmail(your.getEmail(), mine.getEmail(), imageUrl);
-            your.getFollowRequests().add(mineId);
-            userRepo.save(your);
-            return "Follow request sent successfully.";
+            // Update Redis cache
+            your.setPassword(null);
+            redisTemplate.opsForValue().set(yourKey, your);
+
+            // 🔥 Kafka payload
+            Map<String, Object> requestPayload = new HashMap<>();
+            requestPayload.put("id", yourId);
+            requestPayload.put("followRequests", new ArrayList<>(your.getFollowRequests()));
+            kafkaProducer.sendToKafka(requestPayload, "UPDATE");
+
+            return alreadyRequested
+                    ? "Follow request removed."
+                    : "Follow request sent successfully.";
         }
 
-        // Handle following/unfollowing for non-private accounts
-        if (mine.getFollowing().contains(yourId)) {
-            // If already following, unfollow (remove from following and followers)
+        // 🟢 Public follow/unfollow
+        boolean isAlreadyFollowing = mine.getFollowing().contains(yourId);
+
+        if (isAlreadyFollowing) {
             mine.getFollowing().remove(yourId);
             your.getFollowers().remove(mineId);
-            userRepo.save(mine);
-            userRepo.save(your);
-            return "Unfollowed successfully.";
         } else {
-            // If not following, follow (add to following and followers)
             mine.getFollowing().add(yourId);
             your.getFollowers().add(mineId);
-            // Saving the users
-            userRepo.save(mine);
-            userRepo.save(your);
-            return "Followed successfully.";
         }
+
+        // Update Redis cache
+        mine.setPassword(null);
+        your.setPassword(null);
+        redisTemplate.opsForValue().set(mineKey, mine);
+        redisTemplate.opsForValue().set(yourKey, your);
+
+        // 🔥 Kafka payloads with only actual fields in User
+        Map<String, Object> minePayload = new HashMap<>();
+        minePayload.put("id", mineId);
+        minePayload.put("following", new ArrayList<>(mine.getFollowing()));
+
+        Map<String, Object> yourPayload = new HashMap<>();
+        yourPayload.put("id", yourId);
+        yourPayload.put("followers", new ArrayList<>(your.getFollowers()));
+
+        kafkaProducer.sendToKafka(minePayload, "UPDATE");
+        kafkaProducer.sendToKafka(yourPayload, "UPDATE");
+
+        return isAlreadyFollowing ? "Unfollowed successfully." : "Followed successfully.";
     }
 
-    public Map<String, String> authenticate(String email, String password) throws UserException {
+    public Map<String, Object> authenticate(String email, String password) throws UserException {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new UserException("User not found"));
 
@@ -248,11 +331,15 @@ public class UserService implements UserDetailsService {
         revokeAllTokens(user);
         String accessToken = jwtUtil.generateAccessToken(user);
         String refreshToken = jwtUtil.generateRefreshToken(user);
-
         saveToken(accessToken, refreshToken, user);
-        Map<String, String> tokens = new HashMap<>();
+
+        user.setPassword(null);
+        redisTemplate.opsForValue().set("user:" + user.getId(), user);
+
+        Map<String, Object> tokens = new HashMap<>();
         tokens.put("accessToken", accessToken);
         tokens.put("refreshToken", refreshToken);
+        tokens.put("myProfile", user);
         return tokens;
     }
 
@@ -296,7 +383,7 @@ public class UserService implements UserDetailsService {
                         .and(
                                 Aggregation.match(
                                         new Criteria().and("_id").ne(mineId)
-                                                .and("isPrivate").is(false)),
+                                                .and("privacy").is(false)),
                                 Aggregation.sample(limit),
                                 Aggregation.project()
                                         .and("_id").as("id")
@@ -333,59 +420,31 @@ public class UserService implements UserDetailsService {
         return users.isEmpty() ? Optional.empty() : Optional.of(users.get(0));
     }
 
-    // FOR POST
-    public Map<String, Object> userForPost(String yourId, String mineId) {
-        if (!canAccessProfile(mineId, yourId)) {
-            return null;
-        }
-
-        Optional<User> userOptional = userRepo.findById(yourId);
-        if (userOptional.isEmpty()) {
-            return null;
-        }
-
-        User user = userOptional.get();
-        Map<String, Object> userMap = new HashMap<>();
-        userMap.put("id", user.getId());
-        userMap.put("username", user.getUsername());
-        userMap.put("name", user.getName());
-        userMap.put("thumbnailId", user.getThumbnailId());
-
-        return userMap;
-    }
-
     // BY USERNAME
-    public User getUserByUsername(String mineId, String username) throws UserException {
+    public User getUserByUsername(String username) throws UserException {
         User user = userRepo.findByUsername(username)
                 .orElseThrow(() -> new UserException("User not found"));
         user.setPassword(null);
         return user;
     }
 
-    public User getbyId(String userId) throws UserException {
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new UserException("User not found"));
-        user.setPassword(null);
-        return user;
-    }
-
     // BY USERID
-    public User getUserByUserId(String mineId, String userId) throws UserException {
-        User user = userRepo.findById(userId)
-                .orElseThrow(() -> new UserException("User not found"));
-        user.setPassword(null);
-        return user;
-    }
+    public User getUserByUserId(String userId) throws UserException {
+        String redisKey = "user:" + userId;
+        // Check Redis cache first
+        User user = redisTemplate.opsForValue().get(redisKey);
 
-    // BY EMAIL
-    public User getUserByEmail(String email) throws UserException {
-        String authenticatedUserEmail = getAuthenticatedUserEmail();
-        if (!email.equals(authenticatedUserEmail)) {
-            throw new UserException("You are not authorized to access this profile");
+        // Fallback to MongoDB if not found
+        if (user == null) {
+            user = userRepo.findById(userId)
+                    .orElseThrow(() -> new UserException("User not found"));
+            // Store in Redis for future requests
+            user.setPassword(null);
+            redisTemplate.opsForValue().set(redisKey, user);
+        } else {
+            user.setPassword(null); // Just in case it's cached
         }
-        User user = userRepo.findByEmail(email)
-                .orElseThrow(() -> new UserException("User not found"));
-        user.setPassword(null);
+
         return user;
     }
 
@@ -406,10 +465,25 @@ public class UserService implements UserDetailsService {
         if (!email.equals(loggedInEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }
-        User existingUser = userRepo.findById(id)
-                .orElseThrow(() -> new UserException("User not found"));
+
+        String redisKey = "user:" + id;
+
+        // Try Redis first
+        User existingUser = redisTemplate.opsForValue().get(redisKey);
+
+        // Fallback to Mongo if not cached
+        if (existingUser == null) {
+            existingUser = userRepo.findById(id)
+                    .orElseThrow(() -> new UserException("User not found"));
+        }
+
         existingUser.setEmail(email);
-        User savedUser = userRepo.save(existingUser);
+
+        // Update Redis cache
+        existingUser.setPassword(null); // Ensure password is not exposed
+        redisTemplate.opsForValue().set(redisKey, existingUser);
+
+        userRepo.save(existingUser);
         return savedUser.getEmail();
     }
 
@@ -421,99 +495,105 @@ public class UserService implements UserDetailsService {
         return savedUser.getPhone();
     }
 
-    public String removeFollow(String mineId, String yourId) {
-        Optional<User> mineOptional = userRepo.findById(mineId);
-        Optional<User> yourOptional = userRepo.findById(yourId);
-
-        if (mineOptional.isEmpty() || yourOptional.isEmpty()) {
-            return "User not found";
-        }
-
-        User mine = mineOptional.get();
-        User your = yourOptional.get();
-        // Case 1: Reject follow request (if exists)
-        if (mine.getFollowRequests().contains(yourId)) {
-            mine.getFollowRequests().remove(yourId);
-            userRepo.save(mine);
-            return "Follow request rejected.";
-        }
-        // Check if mine is following yourId
-        if (mine.getFollowing().contains(yourId)) {
-            // Remove yourId from mine's following list
-            mine.getFollowing().remove(yourId);
-            userRepo.save(mine);
-
-            // Remove mineId from your's followers list
-            your.getFollowers().remove(mineId);
-            userRepo.save(your);
-
-            return "Unfollowed successfully.";
-        } else {
-            return "You are not following this user.";
-        }
-    }
-
     // Update Privacy
-    public boolean UpdatePrivacy(Boolean isPrivate, String id) throws UserException {
-        User existingUser = userRepo.findById(id)
+    public boolean updatePrivacy(Boolean privacy, String userId) throws UserException {
+        // Try fetching from Redis first
+        String redisKey = "user:" + userId;
+
+        // Fallback to DB
+        User existingUser = userRepo.findById(userId)
                 .orElseThrow(() -> new UserException("User not found"));
-        existingUser.setPrivate(isPrivate);
-        User savedUser = userRepo.save(existingUser);
-        return savedUser.isPrivate();
+
+        existingUser.setPrivacy(privacy);
+        // Save to DB
+        userRepo.save(existingUser);
+
+        // Update Redis cache
+        existingUser.setPassword(null);
+        redisTemplate.opsForValue().set(redisKey, existingUser);
+
+        return existingUser.isPrivacy();
     }
 
     public User updateUser(MultipartFile file, User updatedUser, MultipartFile thumbnail) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
 
-        if (!updatedUser.getEmail().equals(loggedInEmail)) {
+        String redisKey = "user:" + updatedUser.getId();
+        User existingUser = redisTemplate.opsForValue().get(redisKey);
+
+        if (existingUser == null) {
+            existingUser = userRepo.findById(updatedUser.getId())
+                    .orElseThrow(() -> new UserException("User not found"));
+        }
+
+        if (!existingUser.getEmail().equals(loggedInEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }
-        // Fetch the existing user from the database
-        User existingUser = userRepo.findById(updatedUser.getId())
-                .orElseThrow(() -> new UserException("User not found"));
 
-        // Handle profile picture update
+        Map<String, Object> updatedFields = new HashMap<>();
+
+        // Profile picture update
         if (file != null && !file.isEmpty()) {
             Map<String, String> uploadImage = imageStorageService.uploadProfileImage(file, existingUser.getId(),
                     thumbnail);
             existingUser.setPhotoId(uploadImage.get("mediaId"));
             existingUser.setThumbnailId(uploadImage.get("thumbnailId"));
+
+            updatedFields.put("photoId", uploadImage.get("mediaId"));
+            updatedFields.put("thumbnailId", uploadImage.get("thumbnailId"));
         }
 
-        // Update only non-null fields
+        // Text fields
         if (updatedUser.getWebsite() != null) {
             existingUser.setWebsite(updatedUser.getWebsite());
+            updatedFields.put("website", updatedUser.getWebsite());
         }
         if (updatedUser.getUsername() != null) {
             existingUser.setUsername(updatedUser.getUsername());
+            updatedFields.put("username", updatedUser.getUsername());
         }
         if (updatedUser.getName() != null) {
             existingUser.setName(updatedUser.getName());
+            updatedFields.put("name", updatedUser.getName());
         }
-
         if (updatedUser.getBio() != null) {
             existingUser.setBio(updatedUser.getBio());
+            updatedFields.put("bio", updatedUser.getBio());
         }
 
-        User user = userRepo.save(existingUser);
-        user.setPassword(null);
-        return user;
+        // Cache updated user
+        existingUser.setPassword(null);
+        redisTemplate.opsForValue().set(redisKey, existingUser);
+
+        updatedFields.put("id", existingUser.getId());
+
+        if (!updatedFields.isEmpty()) {
+            kafkaProducer.sendToKafka(updatedFields, "UPDATE");
+        }
+
+        return existingUser;
     }
 
-    public void deleteUser(String id) throws UserException {
-
+    public void deleteUser(String userId) throws UserException {
         String loggedInEmail = getAuthenticatedUserEmail();
-        Optional<User> userOptional = userRepo.findById(id);
-        if (userOptional.isEmpty()) {
-            throw new UserException("Can't Find User by Id: " + id);
+
+        User user = redisTemplate.opsForValue().get("user:" + userId);
+
+        if (user == null) {
+            Optional<User> userOptional = userRepo.findById(userId);
+            if (userOptional.isEmpty()) {
+                throw new UserException("Can't Find User by Id: " + userId);
+            }
+            user = userOptional.get();
         }
 
-        User user = userOptional.get();
         if (!user.getEmail().equals(loggedInEmail)) {
             throw new UserException("You are not authorized to access this profile");
         }
 
-        userRepo.deleteById(id);
+        redisTemplate.delete("user:" + userId);
+
+        userRepo.deleteById(userId);
     }
 
     private void saveToken(String accessToken, String refreshToken, User user) {
@@ -578,9 +658,28 @@ public class UserService implements UserDetailsService {
         tokenRepository.delete(token);
     }
 
+    public UserDetails loadbyUserId(String userId) throws UsernameNotFoundException {
+        // First check Redis
+        String redisKey = "user:" + userId;
+        User user = redisTemplate.opsForValue().get(redisKey);
+
+        if (user != null) {
+            return user;
+        }
+
+        // If not found in cache, get from DB
+        user = userRepo.findById(userId)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        // Save to Redis for future requests
+        user.setPassword(null);
+        redisTemplate.opsForValue().set(redisKey, user);
+        return user;
+    }
+
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        return userRepo.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+        return userRepo.findByEmail(email).orElseThrow(() -> new UsernameNotFoundException("User not found"));
     }
+
 }

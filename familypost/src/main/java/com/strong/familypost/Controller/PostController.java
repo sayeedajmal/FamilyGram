@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.InputStreamResource;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -13,7 +12,6 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestPart;
@@ -25,7 +23,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.gridfs.model.GridFSFile;
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Model.Post;
-import com.strong.familypost.Model.PostWithUser;
 import com.strong.familypost.Service.CommentService;
 import com.strong.familypost.Service.PostService;
 import com.strong.familypost.Service.StorageService;
@@ -126,25 +123,10 @@ public class PostController {
      */
     @GetMapping()
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts(@RequestParam("userId") String userId,
-            @RequestHeader("Authorization") String token)
+    public ResponseEntity<ResponseWrapper<List<Post>>> getAllPosts(@RequestParam("userId") String userId)
             throws PostException {
-        List<Post> posts = postService.getUserPosts(userId, token);
+        List<Post> posts = postService.getUserPosts(userId);
         return ResponseEntity.ok(new ResponseWrapper<>(200, "Posts retrieved successfully", posts));
-    }
-
-    @GetMapping("/random-feed")
-    public ResponseEntity<ResponseWrapper<List<PostWithUser>>> getRandomFeedPosts(
-            @RequestParam String mineId,
-            @RequestParam(defaultValue = "10") int limit,
-            @RequestHeader("Authorization") String token) {
-
-        List<PostWithUser> posts = postService.getRandomFeedPosts(mineId, limit, token);
-
-        return ResponseEntity.ok(new ResponseWrapper<>(
-                HttpStatus.OK.value(),
-                "Random feed posts retrieved successfully",
-                posts));
     }
 
     /**
@@ -156,11 +138,9 @@ public class PostController {
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<ResponseWrapper<Post>> getPostById(
-            @PathVariable String postId,
-            @RequestParam("userId") String userId,
-            @RequestHeader("Authorization") String token) {
+            @PathVariable String postId, @RequestParam String userId) {
         try {
-            Post post = postService.getPostById(userId, postId, token);
+            Post post = postService.getPostById(postId, userId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
             return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));
@@ -194,14 +174,14 @@ public class PostController {
      */
     @PostMapping("/{postId}/toggle-like")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Integer>> toggleLike(
+    public ResponseEntity<ResponseWrapper<Boolean>> toggleLike(
             @PathVariable String postId,
             @RequestParam("userId") String userId) {
         try {
-            int totalLikes = postService.toggleLike(postId, userId);
-            return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", totalLikes));
+            boolean liked = postService.toggleLike(postId, userId);
+            return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", liked));
         } catch (PostException e) {
-            return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", 0));
+            return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", false));
         }
     }
 }

@@ -21,7 +21,7 @@ public class Notification {
 
     private String senderUsername; // The user who performed the action
     private String receiverId;
-
+    private String senderId;
     private String postId; // If related to a post, otherwise null
     private String postThumbId; // The thumbnail of the post (if applicable)
 

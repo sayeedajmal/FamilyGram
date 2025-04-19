@@ -6,7 +6,15 @@
   "configurations": [
     {
       "type": "java",
-      "name": "FamilyPostApplication",
+      "name": "NotificationApplication",
+      "request": "launch",
+      "mainClass": "com.strong.familynotification.FamilynotificationApplication",
+      "projectName": "familynotification",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
+      "name": "PostApplication",
       "request": "launch",
       "mainClass": "com.strong.familypost.FamilypostApplication",
       "projectName": "familypost",
@@ -14,7 +22,7 @@
     },
     {
       "type": "java",
-      "name": "FamilyauthApplication",
+      "name": "AuthApplication",
       "request": "launch",
       "mainClass": "com.strong.familyauth.FamilyauthApplication",
       "projectName": "familyauth",

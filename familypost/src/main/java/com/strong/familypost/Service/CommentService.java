@@ -1,9 +1,12 @@
 package com.strong.familypost.Service;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
@@ -15,101 +18,110 @@ import com.strong.familypost.Repository.CommentRepo;
 import com.strong.familypost.Util.PostException;
 
 /**
- * Service class for managing comment operations
+ * Service class for managing comment operations with Redis hash-based caching
  */
 @Service
 public class CommentService {
 
     @Autowired
-    CommentRepo commentRepo;
+    private CommentRepo commentRepo;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
 
     private String getAuthenticatedUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-
         if (principal instanceof User) {
-            User userDetails = (User) principal;
-            // Return the username
-            return userDetails.getId();
+            return ((User) principal).getId();
         }
-
         return null;
     }
 
-    /**
-     * Creates a new comment
-     * 
-     * @param comment The comment to be created
-     * @return The saved comment
-     */
     public Comment createComment(Comment comment) throws PostException {
         String loggedId = getAuthenticatedUserId();
         if (!comment.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
-        return commentRepo.save(comment);
+
+        Comment savedComment = commentRepo.save(comment);
+
+        // ➕ Add comment to Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().put(hashKey, savedComment.getId(), savedComment);
+
+        return savedComment;
     }
 
-    /**
-     * Retrieves all comments for a specific post
-     * 
-     * @param postId The ID of the post
-     * @return List of comments for the specified post
-     */
     public List<Comment> getCommentsByPostId(String postId) throws PostException {
-        return commentRepo.findByPostId(postId);
+        String hashKey = "comments:" + postId;
+
+        // 🧠 Try getting all comment values from Redis hash
+        List<Object> cachedComments = redisTemplate.opsForHash().values(hashKey);
+        if (!cachedComments.isEmpty()) {
+            List<Comment> result = new ArrayList<>();
+            for (Object obj : cachedComments) {
+                result.add((Comment) obj);
+            }
+            return result;
+        }
+
+        // 💾 Fallback to DB if cache miss
+        List<Comment> comments = commentRepo.findByPostId(postId);
+
+        // 🧠 Cache each comment individually in Redis hash
+        for (Comment comment : comments) {
+            redisTemplate.opsForHash().put(hashKey, comment.getId(), comment);
+        }
+
+        return comments;
     }
 
-    /**
-     * Retrieves a specific comment by its ID
-     * 
-     * @param id The ID of the comment
-     * @return The found comment
-     * @throws PostException if comment is not found
-     */
     public Comment getCommentById(String id) throws PostException {
         return commentRepo.findById(id)
                 .orElseThrow(() -> new PostException("Comment not found with id: " + id));
     }
 
-    /**
-     * Updates an existing comment
-     * 
-     * @param id             The ID of the comment to update
-     * @param commentDetails The new comment details
-     * @return The updated comment
-     * @throws ResponseStatusException if comment is not found
-     */
     public Comment updateComment(String id, Comment commentDetails) throws PostException {
         String loggedId = getAuthenticatedUserId();
 
         if (!commentDetails.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
+
         Comment comment = commentRepo.findById(id)
                 .orElseThrow(
                         () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id));
 
         comment.setText(commentDetails.getText());
-        comment.setCreatedAt(LocalDateTime.now()); // Update timestamp
+        comment.setCreatedAt(LocalDateTime.now());
 
-        return commentRepo.save(comment);
+        Comment updatedComment = commentRepo.save(comment);
+
+        // 🔄 Update comment in Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().put(hashKey, updatedComment.getId(), updatedComment);
+
+        return updatedComment;
     }
 
-    /**
-     * Deletes a comment by its ID
-     * 
-     * @param id The ID of the comment to delete
-     * @throws PostException
-     * @throws ResponseStatusException if comment is not found
-     */
     public void deleteComment(String id) throws PostException {
         String loggedId = getAuthenticatedUserId();
-        Comment comment = commentRepo.findById(id)
-                .orElseThrow(
-                        () -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id));
+        Optional<Comment> optionalComment = commentRepo.findById(id);
+
+        if (!optionalComment.isPresent()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Comment not found with id: " + id);
+        }
+
+        Comment comment = optionalComment.get();
+
         if (!comment.getUserId().equals(loggedId)) {
             throw new PostException("You are not authorized to access this Resource");
         }
+
         commentRepo.delete(comment);
+
+        // ❌ Remove comment from Redis hash
+        String hashKey = "comments:" + comment.getPostId();
+        redisTemplate.opsForHash().delete(hashKey, comment.getId());
     }
 }

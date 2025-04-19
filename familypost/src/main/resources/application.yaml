@@ -3,8 +3,8 @@ spring:
     name: FamilyPost
   data:
     mongodb:
-      uri: ${BlogDBUrl}
-      database: ${BlogDBName}
+      uri: ${DBURL}
+      database: ${DBNAME}
   servlet:
     multipart:
       enabled: ${MULTIPART_ENABLED}
@@ -19,13 +19,20 @@ spring:
   jpa:
     properties:
       hibernate.jdbc.time_zone: UTC
+  kafka:
+    bootstrap-servers: ${BROKER_URL}
+  redis:
+    host: ${REDIS_HOST}
+    port: ${REDIS_PORT}
+    username: ${REDIS_USERNAME}
+    password: ${REDIS_PASSWORD}
 
 jwt:
   secret: ${JWT_SECRET}
   tokenValidityInMilliSeconds: ${JWT_TOKEN_VALIDITY_IN_MILLISECONDS}
   tokenRefreshInMilliSeconds: ${JWT_TOKEN_REFRESH_IN_MILLISECONDS}
 
-#http://localhost:8082 https://familygram.onrender.com
+#http://localhost:8082 https://familygram.onrender.com http://familyauth:8082
 feign:
   client-url: "http://familyauth:8082"
 

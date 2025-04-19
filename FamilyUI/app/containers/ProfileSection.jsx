@@ -35,10 +35,7 @@ export const ProfileSection = () => {
   const fetchUserProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
     if (profile) {
-      const resposne = await loginSignup.fetchUserProfileByEmail(
-        profile?.email
-      );
-      setMyProfile(resposne.data);
+      setMyProfile(profile);
     }
     setRefreshing(false);
   };
@@ -170,7 +167,7 @@ export const ProfileSection = () => {
           </View>
           <View className="p-2 w-full flex-row justify-around items-center">
             <Image
-              source={{ uri: myProfile.thumbnailUrl }}
+              source={{ uri: myProfile?.thumbnailUrl }}
               style={{ width: 85, height: 85, borderRadius: 48 }}
             />
             <View className="flex-row gap-6">

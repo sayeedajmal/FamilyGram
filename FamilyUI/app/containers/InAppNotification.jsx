@@ -1,21 +1,27 @@
-import React, { useCallback, useEffect, useReducer, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import moment from "moment";
+import React, {
+  useCallback,
+  useEffect,
+  useReducer,
+  useState,
+  useRef,
+} from "react";
 import {
-  Alert,
+  ActivityIndicator,
   FlatList,
   Image,
   RefreshControl,
   Text,
   TouchableOpacity,
-  useColorScheme,
   View,
+  useColorScheme,
 } from "react-native";
-import moment from "moment";
-import { Colors } from "../constants/Colors";
 import loginSignup from "../api/loginSignup";
-import postHandle from "../api/postHandle";
 import NotificationSocket from "../api/NotificationSocket";
+import postHandle from "../api/postHandle";
+import { Colors } from "../constants/Colors";
 
-// Reducer function for notification state
 const notificationReducer = (state, action) => {
   switch (action.type) {
     case "SET_NOTIFICATIONS":
@@ -26,91 +32,39 @@ const notificationReducer = (state, action) => {
         : [action.payload, ...state];
     case "MARK_AS_READ":
       return state.map((notif) =>
-        notif.id === action.payload ? { ...notif, read: true } : notif
+        action.payload.includes(notif.id) ? { ...notif, read: true } : notif
+      );
+    case "REMOVE_NOTIFICATION":
+      return state.filter((notif) => notif.id !== action.payload);
+    case "UPDATE_NOTIFICATION_IMAGE":
+      return state.map((notif) =>
+        notif.id === action.payload.id
+          ? { ...notif, ...action.payload.data }
+          : notif
       );
     default:
       return state;
   }
 };
 
-const NotificationItem = ({ item, bg, textColor, markAsRead, tint }) => {
-  return (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      className="flex-row items-center py-3 px-2 mb-1 rounded-lg"
-      style={{
-        backgroundColor: item.read ? bg : tint, // Light blue for unread
-      }}
-      onPress={() => markAsRead(item.id)}
-    >
-      {/* User Avatar */}
-      <Image
-        source={{ uri: item.thumbnailId }}
-        className="w-10 h-10 rounded-full border border-[#0278ae]"
-      />
-
-      {/* Notification Text */}
-      <View className="flex-1 ml-4">
-        <Text
-          className="text-sm font-custom"
-          style={{
-            color: textColor,
-            fontWeight: item.read ? "normal" : "bold",
-          }}
-        >
-          <Text className="font-custom-bold">@{item.senderUsername}</Text>{" "}
-          {item.message} {item.comment ? ` "${item.comment}"` : ""}
-        </Text>
-        <Text className="text-xs font-custom text-gray-400">
-          {item.createdAt}
-        </Text>
-      </View>
-
-      {/* Post Image */}
-      {item.postThumbId && (
-        <Image
-          source={{ uri: item.postThumbId }}
-          className="w-14 h-14 rounded-md ml-2"
-        />
-      )}
-
-      {/* Follow Button */}
-      {item.type === "FOLLOW" && (
-        <TouchableOpacity className="ml-3 px-3 py-2 bg-blue-500 rounded-md">
-          <Text className="text-white text-xs font-bold">Follow Back</Text>
-        </TouchableOpacity>
-      )}
-
-      {/* Accept / Reject for Follow-Requests */}
-      {item.type === "FOLLOW_REQUEST" && (
-        <View className="flex-row ml-3">
-          <TouchableOpacity
-            className="px-3 py-2 bg-green-500 rounded-md mr-2"
-            onPress={() => acceptFollowRequest(item)}
-          >
-            <Text className="text-white text-xs font-bold">Accept</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            className="px-3 py-2 bg-red-500 rounded-md"
-            onPress={() => rejectFollowRequest(item)}
-          >
-            <Text className="text-white text-xs font-bold">Reject</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-    </TouchableOpacity>
-  );
-};
-
-const InAppNotification = () => {
+const AppNotification = () => {
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
   const bg = themeColors.background;
   const textColor = themeColors.text;
+  const tint = themeColors.tint;
 
   const [notifications, dispatch] = useReducer(notificationReducer, []);
   const [refreshing, setRefreshing] = useState(false);
   const [myProfile, setMyProfile] = useState(null);
+  const [isProcessingId, setIsProcessingId] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const isMounted = useRef(true);
+
+  // Default images for fallbacks
+  const DEFAULT_AVATAR = require("../../assets/images/profile.png");
+  const DEFAULT_POST_IMAGE = require("../../assets/images/profile.png");
 
   const formatTime = (createdAt) => {
     const postDate = moment.utc(createdAt).local();
@@ -126,128 +80,342 @@ const InAppNotification = () => {
     return postDate.format("MMM D, YYYY");
   };
 
-  const processNotification = async (notification) => {
-    let thumbnailUrl = notification.thumbnailId;
-    let postThumbUrl = notification.postThumbId;
+  const loadImageForNotification = async (notification) => {
+    if (!isMounted.current) return;
 
+    let updates = {};
     try {
-      if (notification.thumbnailId) {
+      if (
+        notification.thumbnailId &&
+        typeof notification.thumbnailId === "string" &&
+        !notification.thumbnailId.startsWith("http")
+      ) {
         const imageResponse = await loginSignup.getProfileImage(
           notification.thumbnailId
         );
         if (imageResponse.status) {
-          thumbnailUrl = imageResponse.data;
+          updates.thumbnailId = imageResponse.data;
         }
       }
 
-      if (notification.postThumbId) {
+      if (
+        notification.postThumbId &&
+        typeof notification.postThumbId === "string" &&
+        !notification.postThumbId.startsWith("http")
+      ) {
         const postResponse = await postHandle.getPostMedia(
           notification.postThumbId
         );
         if (postResponse.status) {
-          postThumbUrl = postResponse.data;
+          updates.postThumbId = postResponse.data;
         }
       }
-    } catch (error) {
-      console.error("Error processing notification:", error);
-    }
 
+      if (Object.keys(updates).length > 0 && isMounted.current) {
+        dispatch({
+          type: "UPDATE_NOTIFICATION_IMAGE",
+          payload: { id: notification.id, data: updates },
+        });
+      }
+    } catch (error) {
+      console.error(
+        `Error loading images for notification ${notification.id}:`,
+        error
+      );
+    }
+  };
+
+  const processNotificationForDisplay = (notification) => {
     return {
       ...notification,
-      thumbnailId: thumbnailUrl,
-      postThumbId: postThumbUrl,
       createdAt: formatTime(notification.createdAt),
     };
   };
 
-  const handleNewNotification = async (notification) => {
-    const processedNotification = await processNotification(notification);
-    dispatch({ type: "ADD_NOTIFICATION", payload: processedNotification });
+  const handleNewNotification = (notification) => {
+    const processedNotif = processNotificationForDisplay(notification);
+    dispatch({ type: "ADD_NOTIFICATION", payload: processedNotif });
+    loadImageForNotification(processedNotif);
   };
 
-  const handleFetchedNotifications = async (notificationsData) => {
-    if (!notificationsData || !Array.isArray(notificationsData)) return;
+  const handleFetchedNotifications = (notifList) => {
+    try {
+      if (!Array.isArray(notifList)) {
+        setIsLoading(false);
+        return;
+      }
 
-    const sortedNotifications = notificationsData.sort(
-      (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
-    );
+      const sorted = notifList.sort(
+        (a, b) => new Date(b.createdAt) - new Date(a.createdAt)
+      );
+      const processedForDisplay = sorted.map(processNotificationForDisplay);
+      dispatch({ type: "SET_NOTIFICATIONS", payload: processedForDisplay });
 
-    const processedNotifications = await Promise.all(
-      sortedNotifications.map(processNotification)
-    );
+      // Collect unread notification IDs
+      const unreadNotifIds = processedForDisplay
+        .filter((notif) => !notif.read)
+        .map((notif) => notif.id);
 
-    dispatch({ type: "SET_NOTIFICATIONS", payload: processedNotifications });
+      // Mark unread notifications as read
+      if (unreadNotifIds.length > 0) {
+        markAsRead(unreadNotifIds);
+      }
+
+      setIsLoading(false);
+      processedForDisplay.forEach((notification) => {
+        loadImageForNotification(notification);
+      });
+    } catch (err) {
+      setError("Failed to load notifications");
+      console.error("Error handling fetched notifications:", err);
+      setIsLoading(false);
+    }
   };
 
   const setupNotificationSocket = (userId) => {
     NotificationSocket.userId = userId;
     NotificationSocket.onNotificationReceived = handleNewNotification;
     NotificationSocket.onFetchNotifications = handleFetchedNotifications;
-
     NotificationSocket.connect();
     NotificationSocket.fetchNotifications(userId);
   };
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
-      const profile = await loginSignup.getStoredUserProfile();
-      if (profile) {
-        setMyProfile(profile);
-        setupNotificationSocket(profile.id);
+    const init = async () => {
+      try {
+        setIsLoading(true);
+        const profile = await loginSignup.getStoredUserProfile();
+        if (profile) {
+          setMyProfile(profile);
+          setupNotificationSocket(profile?.id);
+        } else {
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error("Error initializing:", err);
+        setError("Failed to load profile data");
+        setIsLoading(false);
       }
     };
 
-    fetchUserProfile();
-
+    init();
     return () => {
+      isMounted.current = false;
       NotificationSocket.disconnect();
     };
   }, []);
 
-  const markAsRead = async (notifId) => {
-    const success = await NotificationSocket.markAsRead(notifId);
-    if (success) {
-      dispatch({ type: "MARK_AS_READ", payload: notifId });
+  const markAsRead = async (notifIds) => {
+    try {
+      const query = `
+        mutation MarkNotificationAsRead($notifIds: [String!]) {
+          markNotificationAsRead(notifIds: $notifIds) {
+            id
+            read
+          }
+        }
+      `;
+      const response = await NotificationSocket.markAsRead(notifIds);
+
+      if (response) {
+        dispatch({ type: "MARK_AS_READ", payload: notifIds });
+        return true;
+      } else {
+        throw new Error("Failed to mark notifications as read");
+      }
+    } catch (err) {
+      console.error("Error marking notifications as read:", err);
+      return false;
     }
   };
 
-  const onRefresh = useCallback(() => {
-    setRefreshing(true);
-    if (myProfile?.id) {
-      NotificationSocket.fetchNotifications(myProfile.id);
+  const acceptFollowRequest = async (item) => {
+    setIsProcessingId(item.id);
+    try {
+      const res = await loginSignup.acceptRequest(item.senderId, myProfile.id);
+      if (res.status) {
+        dispatch({ type: "MARK_AS_READ", payload: [item.id] });
+        await NotificationSocket.deleteNotificationById(item.id);
+        await NotificationSocket.sendNotificationsBulk(
+          "FOLLOW",
+          "accepted your follow request",
+          myProfile.username,
+          [item.senderId],
+          myProfile?.id,
+          myProfile.thumbnailId
+        );
+      }
+    } catch (err) {
+      console.error("Error accepting follow request:", err);
+    } finally {
+      setIsProcessingId(null);
     }
-    setRefreshing(false);
+  };
+
+  const rejectFollowRequest = async (item) => {
+    setIsProcessingId(item.id);
+    try {
+      const res = await loginSignup.rejectFollowRequest(
+        item?.senderId,
+        myProfile?.id
+      );
+      if (res.status) {
+        await NotificationSocket.deleteNotificationById(item.id);
+        dispatch({ type: "REMOVE_NOTIFICATION", payload: item.id });
+      }
+    } catch (err) {
+      console.error("Error rejecting follow request:", err);
+    } finally {
+      setIsProcessingId(null);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      if (myProfile?.id) {
+        await NotificationSocket.fetchNotifications(myProfile.id);
+      }
+    } catch (err) {
+      console.error("Error refreshing notifications:", err);
+      setError("Failed to refresh notifications");
+    } finally {
+      setRefreshing(false);
+    }
   }, [myProfile?.id]);
 
-  return (
-    <View className="flex-1 px-1" style={{ backgroundColor: bg }}>
-      <Text className="text-2xl font-bold mb-4" style={{ color: textColor }}>
-        Notifications
-      </Text>
+  const getImageSource = (uri) => {
+    if (!uri) return null;
+    if (typeof uri === "string" && uri.startsWith("http")) {
+      return { uri };
+    }
+    return null;
+  };
+
+  const renderNotification = ({ item }) => (
+    <TouchableOpacity
+      activeOpacity={0.8}
+      className="flex-row items-center py-3 px-2 mb-1 rounded-lg"
+      style={{ backgroundColor: item.read ? bg : tint }}
+      onPress={() => markAsRead([item.id])}
+      disabled={isProcessingId === item.id}
+    >
+      <Image
+        source={getImageSource(item.thumbnailId)}
+        defaultSource={DEFAULT_AVATAR}
+        className="w-10 h-10 rounded-full border border-[#0278ae]"
+      />
+      <View className="flex-1 ml-4">
+        <Text
+          className="text-sm font-custom"
+          style={{
+            color: textColor,
+            fontWeight: item.read ? "normal" : "bold",
+          }}
+        >
+          <Text className="font-custom-bold">@{item.senderUsername}</Text>{" "}
+          {item.message} {item.comment ? `"${item.comment}"` : ""}
+        </Text>
+        <Text className="text-xs font-custom text-gray-400">
+          {item.createdAt}
+        </Text>
+      </View>
+
+      {item.postThumbId && (
+        <Image
+          source={getImageSource(item.postThumbId)}
+          defaultSource={DEFAULT_POST_IMAGE}
+          className="w-14 h-14 rounded-md ml-2"
+        />
+      )}
+
+      {item.type === "FOLLOW_REQUEST" && (
+        <View className="flex-row ml-3">
+          {isProcessingId === item.id ? (
+            <ActivityIndicator size="small" color={themeColors.tint} />
+          ) : (
+            <>
+              <TouchableOpacity
+                className="px-3 py-2 bg-green-500 rounded-md mr-2"
+                onPress={() => acceptFollowRequest(item)}
+                disabled={isProcessingId === item.id}
+              >
+                <Text className="text-white text-xs font-bold">Accept</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                className="px-3 py-2 bg-red-500 rounded-full"
+                onPress={() => rejectFollowRequest(item)}
+                disabled={isProcessingId === item.id}
+              >
+                <Ionicons name="close" size={16} color="white" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+      )}
+    </TouchableOpacity>
+  );
+
+  const renderContent = () => {
+    if (isLoading && !refreshing && notifications.length === 0) {
+      return (
+        <View className="flex-1 justify-center items-center">
+          <ActivityIndicator size="large" color={themeColors.tint} />
+          <Text className="mt-4" style={{ color: textColor }}>
+            Loading notifications...
+          </Text>
+        </View>
+      );
+    }
+
+    if (error && notifications.length === 0) {
+      return (
+        <View className="flex-1 justify-center items-center px-4">
+          <Ionicons name="alert-circle-outline" size={40} color="red" />
+          <Text className="text-center mt-2 text-red-500">{error}</Text>
+          <TouchableOpacity
+            className="mt-4 px-4 py-2 bg-blue-500 rounded-lg"
+            onPress={onRefresh}
+          >
+            <Text className="text-white font-bold">Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+
+    return (
       <FlatList
         data={notifications}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <NotificationItem
-            item={item}
-            bg={bg}
-            textColor={textColor}
-            markAsRead={markAsRead}
-            tint={themeColors.tint}
-          />
-        )}
         keyExtractor={(item) => item.id}
+        renderItem={renderNotification}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[themeColors.tint]}
+            tintColor={themeColors.tint}
+          />
         }
         ListEmptyComponent={
           <Text className="text-center py-8" style={{ color: textColor }}>
             No notifications yet
           </Text>
         }
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
       />
+    );
+  };
+
+  return (
+    <View className="flex-1 px-2" style={{ backgroundColor: bg }}>
+      <Text className="text-2xl font-bold my-4" style={{ color: textColor }}>
+        Notifications
+      </Text>
+      {renderContent()}
     </View>
   );
 };
 
-export default InAppNotification;
+export default AppNotification;

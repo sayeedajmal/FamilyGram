@@ -16,12 +16,6 @@ import com.strong.familypost.Util.ResponseWrapper;
 @Service
 public interface UserServiceClient {
 
-        @GetMapping("/user/privacy")
-        ResponseEntity<String> getUserPrivacy(
-                        @RequestParam("mineId") String mineId,
-                        @RequestParam("yourId") String yourId,
-                        @RequestHeader("Authorization") String token);
-
         @GetMapping("/user/random-feed-users")
         ResponseEntity<ResponseWrapper<List<LiteUser>>> getRandomFeedUsers(
                         @RequestParam("mineId") String mineId,

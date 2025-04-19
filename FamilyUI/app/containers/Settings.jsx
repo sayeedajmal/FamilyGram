@@ -12,14 +12,13 @@ import {
 } from "react-native";
 import loginSignup from "../api/loginSignup";
 import { Colors } from "../constants/Colors";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const Settings = ({ setIsAuthenticated }) => {
   const theme = useColorScheme();
   const themeColors = Colors[theme] || Colors.light;
   const [loading, setLoading] = useState(false);
   const [myProfile, setMyProfile] = useState(null);
-  const [isPrivate, setIsPrivate] = useState(false);
+  const [privacy, setIsPrivacy] = useState(false);
   const [username, setUsername] = useState("");
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [darkMode, setDarkMode] = useState(theme === "dark");
@@ -30,10 +29,10 @@ const Settings = ({ setIsAuthenticated }) => {
 
   const fetchUserProfile = async () => {
     const profile = await loginSignup.getStoredUserProfile();
-    
+
     if (profile) {
       setMyProfile(profile);
-      setIsPrivate(profile.isPrivate);
+      setIsPrivacy(profile.privacy);
       setUsername(profile.username);
     }
   };
@@ -59,24 +58,34 @@ const Settings = ({ setIsAuthenticated }) => {
   };
 
   const updatePrivacy = async () => {
-    setLoading(true);
-    const newPrivacy = !isPrivate;
-    const response = await loginSignup.updatePrivacy(myProfile?.id, newPrivacy);
+    try {
+      setLoading(true);
+      const newPrivacy = !privacy;
 
-    if (response?.status) {
-      Alert.alert(
-        "Privacy Updated",
-        `Your profile is now ${newPrivacy ? "Private" : "Public"}`
+      // Send the update request to the backend
+      const response = await loginSignup.updatePrivacy(
+        myProfile?.id,
+        newPrivacy
       );
 
-      setIsPrivate(newPrivacy);
-      const updatedProfile = { ...myProfile, isPrivate: newPrivacy };
-      setMyProfile(updatedProfile);
-      await AsyncStorage.setItem("userProfile", JSON.stringify(updatedProfile));
-    } else {
-      Alert.alert("Privacy Update Failed", "Please try again.");
+      if (response?.status) {
+        Alert.alert(
+          "Privacy Updated",
+          `Your profile is now ${newPrivacy ? "Private" : "Public"}`
+        );
+
+        setIsPrivacy(newPrivacy); // Update toggle UI immediately
+
+        let updatedProfile = await loginSignup.fetchUserProfile(myProfile?.id);
+        setMyProfile(updatedProfile);
+      } else {
+        Alert.alert("Privacy Update Failed", "Please try again.");
+      }
+    } catch (error) {
+      Alert.alert("Privacy Update Failed", "An unexpected error occurred.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const updateUsername = () => {
@@ -139,9 +148,9 @@ const Settings = ({ setIsAuthenticated }) => {
       {/* Privacy Toggle */}
       <View className="flex-row justify-between items-center mb-4">
         <Text className="text-lg" style={{ color: themeColors.text }}>
-          {isPrivate ? "Private Account" : "Public Account"}
+          {privacy ? "Private Account" : "Public Account"}
         </Text>
-        <Switch value={isPrivate} onValueChange={updatePrivacy} />
+        <Switch value={privacy} onValueChange={updatePrivacy} />
       </View>
 
       {/* Notifications Toggle */}

@@ -1,0 +1,45 @@
+# Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: familyauth
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: familyauth
+  template:
+    metadata:
+      labels:
+        app: familyauth
+    spec:
+      containers:
+        - name: familyauth
+          image: familyauth:latest
+          imagePullPolicy: Never # for local builds
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - secretRef:
+                name: familyenv
+          volumeMounts:
+            - name: auth-storage
+              mountPath: /var/lib/auth/data
+      volumes:
+        - name: auth-storage
+          persistentVolumeClaim:
+            claimName: familygram-pvc
+---
+# Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: familyauth
+spec:
+  selector:
+    app: familyauth
+  ports:
+    - protocol: TCP
+      port: 8082
+      targetPort: 8082
+  type: ClusterIP

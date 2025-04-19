@@ -20,9 +20,10 @@ import InAppNotification from "./containers/InAppNotification";
 import PostCreationScreen from "./containers/PostCreationScreen";
 import Posts from "./containers/Posts";
 import ProfileSection from "./containers/ProfileSection";
-import SendNotification from "./containers/SendNotification";
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
+import Toast from 'react-native-toast-message';
+import NotificationSocket from "./api/NotificationSocket";
 
 const Storage = {
   setItem: async (key, value) => {
@@ -45,17 +46,38 @@ export default function App() {
   const [theme, setTheme] = useState(Appearance.getColorScheme());
   const themeColors = Colors[theme];
 
-
-
-  const [notifications, setNotifications] = useState([]);
-
-
   const [fonts] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
     SpaceBold: require("../assets/fonts/SpaceMono-Bold.ttf"),
     SpaceItalic: require("../assets/fonts/SpaceMono-Italic.ttf"),
-
   });
+
+  // Setup notification handling only once
+  useEffect(() => {
+    const setupNotifications = async () => {
+      try {
+        const userProfile = await loginSignup.getStoredUserProfile();
+        if (!userProfile?.id) return;
+
+        // Set the user ID for notifications
+        NotificationSocket.userId = userProfile.id;
+
+        // Connect to the notification socket
+        NotificationSocket.connect();
+      } catch (error) {
+        console.error("Failed to setup notifications:", error);
+      }
+    };
+
+    if (isAuthenticated) {
+      setupNotifications();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      NotificationSocket.disconnect();
+    };
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const subscription = Appearance.addChangeListener(({ colorScheme }) => {
@@ -72,6 +94,7 @@ export default function App() {
       easing: Easing.ease,
       useNativeDriver: true,
     }).start();
+
     const checkAuth = async () => {
       try {
         const token = await Storage.getItem("accessToken");
@@ -87,9 +110,10 @@ export default function App() {
           loginSignup.clearTokens();
           return;
         }
-        setProfileImage(userProfile.thumbnailUrl);
-        const profile = await loginSignup.fetchUserProfileByEmail(userProfile.email);
-        setIsAuthenticated(profile.status);
+
+        await loginSignup.fetchUserProfile(userProfile?.id);
+        setProfileImage(userProfile?.thumbnailUrl);
+        setIsAuthenticated(true);
       } catch (error) {
         console.error("Authentication check failed:", error);
         loginSignup.clearTokens();
@@ -97,17 +121,7 @@ export default function App() {
       }
     };
 
-    // const fetchUserProfile = async () => {
-    //   const profile = await loginSignup.getStoredUserProfile();
-
-    //   if (profile?.thumbnailId) {
-    //     const imageUrl = await loginSignup.getProfileImage(profile.thumbnailId);
-    //     setProfileImage(imageUrl.data);
-    //   }
-    // };
-
     checkAuth();
-    //fetchUserProfile();
   }, []);
 
   return (
@@ -148,11 +162,7 @@ export default function App() {
                       return (
                         <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
                           <Image
-                            source={
-                              profileImage
-                                ? { uri: profileImage }
-                                : require("../assets/images/profile.png")
-                            }
+                            source={profileImage ? { uri: profileImage } : require("../assets/images/profile.png")}
                             style={{
                               width: size,
                               height: size,
@@ -256,7 +266,6 @@ export default function App() {
             },
             overlayEnabled: true,
           }} component={UsersProfile} />
-
         </Stack.Navigator>
       ) : (
         <Stack.Navigator
@@ -277,6 +286,7 @@ export default function App() {
           </Stack.Screen>
         </Stack.Navigator>
       )}
+      <Toast />
     </View>
   );
 }

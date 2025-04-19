@@ -44,13 +44,13 @@ public class AuthController {
         String message = isAvailable ? "Username is available" : "Username is already taken";
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), message, isAvailable));
     }
-    
+
     @Transactional
     @PostMapping("/register")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<ResponseWrapper<Map<String, String>>> registerUser(@RequestBody User user)
+    public ResponseEntity<ResponseWrapper<Map<String, Object>>> registerUser(@RequestBody User user)
             throws UserException {
-        Map<String, String> result = userService.signUp(user);
+        Map<String, Object> result = userService.signUp(user);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new ResponseWrapper<>(HttpStatus.CREATED.value(), "User registered successfully", result));
     }
@@ -64,8 +64,8 @@ public class AuthController {
 
     @PostMapping("/login")
     @PreAuthorize("permitAll()")
-    public ResponseEntity<ResponseWrapper<Map<String, String>>> login(@RequestBody User user) throws UserException {
-        Map<String, String> result = userService.authenticate(user.getEmail(), user.getPassword());
+    public ResponseEntity<ResponseWrapper<Map<String, Object>>> login(@RequestBody User user) throws UserException {
+        Map<String, Object> result = userService.authenticate(user.getEmail(), user.getPassword());
         return ResponseEntity.ok(new ResponseWrapper<>(HttpStatus.OK.value(), "Login successful", result));
     }
 

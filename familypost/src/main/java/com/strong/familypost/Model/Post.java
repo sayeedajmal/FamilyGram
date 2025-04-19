@@ -1,5 +1,6 @@
 package com.strong.familypost.Model;
 
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -8,6 +9,7 @@ import java.util.Set;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.mongodb.lang.NonNull;
 
 import lombok.AllArgsConstructor;
@@ -52,7 +54,9 @@ public class Post {
     /** Set of user IDs who have liked this post */
     private Set<String> likes = new HashSet<>();
 
+    private BigInteger likeCount;
+    
     /** Timestamp when the post was created */
-    @NonNull
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
     private LocalDateTime createdAt = LocalDateTime.now();
 }
