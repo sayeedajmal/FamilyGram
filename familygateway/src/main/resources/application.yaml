@@ -9,8 +9,7 @@ spring:
         - id: family-auth-service
           uri: lb://familyauth
           predicates:
-            - Path=/auth/**
-            - Path=/user/**
+            - Path=/auth/**,/user/**
         - id: family-feed-service
           uri: lb://familyfeed
           predicates:
@@ -18,12 +17,14 @@ spring:
         - id: family-post-service
           uri: lb://familypost
           predicates:
-            - Path=/comments/**
-            - Path=/posts/**
+            - Path=/comments/**,/posts/**
         - id: family-notification-service
           uri: lb://familynotification
           predicates:
-            - Path=/notifications/**
+            - Path=/ws-notifications/**,/graphql,/notifications/**
+          filters:
+            - RewritePath=/graphql, /graphql # Ensures exact path matching
+            - AddRequestHeader=Content-Type, application/json # Ensures proper content type
       discovery:
         locator:
           enabled: true

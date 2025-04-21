@@ -3,12 +3,8 @@ import * as VideoThumbnails from "expo-video-thumbnails";
 import { Platform } from "react-native";
 
 import loginSignup from "./loginSignup";
-//const POST_API_URL = "http://34.55.86.158:8083";
-//const FEED_API_URL = "http://34.55.86.158:8084";
-const POST_API_URL = "http://192.168.31.218:8083";
-const FEED_API_URL = "http://192.168.31.218:8084";
-//const POST_API_URL = "https://familypost.onrender.com";
-//const FEED_API_URL = "https://familyfeed.onrender.com";
+//const API_URL = "http://34.55.86.158:8080";
+const API_URL = "http://192.168.31.218:8080";
 
 class PostService {
 
@@ -67,7 +63,7 @@ class PostService {
 
         formData.append("post", JSON.stringify(post));
 
-        const response = await loginSignup.request(`${POST_API_URL}/posts`, {
+        const response = await loginSignup.request(`${API_URL}/posts`, {
             method: "POST",
             headers: {
                 "Content-Type": "multipart/form-data",
@@ -84,7 +80,7 @@ class PostService {
             throw new Error("User ID is required");
         }
 
-        const response = await loginSignup.request(`${POST_API_URL}/posts?userId=${userId}`, {
+        const response = await loginSignup.request(`${API_URL}/posts?userId=${userId}`, {
             method: "GET",
         });
 
@@ -97,7 +93,7 @@ class PostService {
             throw new Error("Post ID is required");
         }
 
-        const response = await loginSignup.request(`${POST_API_URL}/posts/${postId}`, {
+        const response = await loginSignup.request(`${API_URL}/posts/${postId}`, {
             method: "DELETE",
         });
 
@@ -110,7 +106,7 @@ class PostService {
             throw new Error("UserID is required");
         }
 
-        const response = await loginSignup.request(`${FEED_API_URL}/feeds/random-feed?mineId=${mineId}&&page=${page}`, {
+        const response = await loginSignup.request(`${API_URL}/feeds/random-feed?mineId=${mineId}&&page=${page}`, {
             method: "GET",
         });
 
@@ -122,7 +118,7 @@ class PostService {
             throw new Error("User ID, Post ID are required");
         }
 
-        const response = await loginSignup.request(`${POST_API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
+        const response = await loginSignup.request(`${API_URL}/posts/${postId}/toggle-like?userId=${userId}`, {
             method: "POST",
         });
         return response;
@@ -131,7 +127,7 @@ class PostService {
     async addComment(comment) {
         if (!comment || !comment.text?.trim()) return null;
 
-        const response = await loginSignup.request(`${POST_API_URL}/comments`, {
+        const response = await loginSignup.request(`${API_URL}/comments`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(comment),
@@ -142,7 +138,7 @@ class PostService {
 
     async showCommentByPostId(postId) {
         if (!postId) return;
-        const response = await loginSignup.request(`${POST_API_URL}/comments/post/${postId}`, {
+        const response = await loginSignup.request(`${API_URL}/comments/post/${postId}`, {
             method: "GET",
         });
         return response;
@@ -154,7 +150,7 @@ class PostService {
         const accessToken = await loginSignup.getAccessToken();
 
         try {
-            const response = await fetch(`${FEED_API_URL}/feeds/media/${fieldId}`, {
+            const response = await fetch(`${API_URL}/feeds/media/${fieldId}`, {
                 method: "GET",
                 headers: {
                     "Authorization": `Bearer ${accessToken}`,

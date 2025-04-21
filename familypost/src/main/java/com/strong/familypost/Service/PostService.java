@@ -252,14 +252,11 @@ public class PostService {
                 List<Post> posts = cachedMap.values().stream()
                         .map(obj -> {
                             try {
-                                if (obj instanceof String str) {
-                                    return mapper.readValue(str, Post.class); // parse from JSON string
-                                } else {
-                                    System.out.println("⚠️ Unexpected cached value type: " + obj.getClass().getName());
-                                    return null;
-                                }
+                                String json = obj.toString(); 
+                                return mapper.readValue(json, Post.class);
                             } catch (Exception e) {
-                                throw new RuntimeException("Error collecting post: " + e.getLocalizedMessage());
+                                redisTemplate.delete(cacheKey); 
+                                throw new RuntimeException("Error collecting post: " + e.getLocalizedMessage(), e);
                             }
                         })
                         .filter(Objects::nonNull)
