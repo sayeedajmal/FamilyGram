@@ -207,14 +207,6 @@ const AppNotification = () => {
 
   const markAsRead = async (notifIds) => {
     try {
-      const query = `
-        mutation MarkNotificationAsRead($notifIds: [String!]) {
-          markNotificationAsRead(notifIds: $notifIds) {
-            id
-            read
-          }
-        }
-      `;
       const response = await NotificationSocket.markAsRead(notifIds);
 
       if (response) {

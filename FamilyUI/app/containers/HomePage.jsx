@@ -137,7 +137,7 @@ const HomePage = () => {
     append ? setLoadingMore(true) : setRefreshing(true);
 
     try {
-      const response = await postHandle.getFeed(myProfile?.id, page);
+      const response = await postHandle.getFeed(myProfile?.id, 0);
       setPage((prev) => (prev === 10 ? 0 : prev + 1));
       if (response?.status && response.data?.data) {
         const fetchedPosts = await Promise.all(

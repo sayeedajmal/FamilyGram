@@ -19,6 +19,7 @@
         <module>familynotification</module>
         <module>familygateway</module>
         <module>familydiscovery</module>
+        <module>familychat</module>
         <!-- Add other microservices here -->
     </modules>
 
