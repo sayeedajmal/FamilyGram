@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.strong.familypost.Model.LiteUser;
 import com.strong.familypost.Util.ResponseWrapper;
 
-@FeignClient(name = "familyauth")
+@FeignClient(name = "familyauth", url="${feign.client-url}")
 @Service
 public interface UserServiceClient {
 
