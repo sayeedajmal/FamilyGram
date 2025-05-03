@@ -4,10 +4,11 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.strong</groupId>
-        <artifactId>FamilyGram</artifactId>
-        <version>1.0.0</version>
-    </parent>
+		<groupId>org.springframework.boot</groupId>
+		<artifactId>spring-boot-starter-parent</artifactId>
+		<version>3.4.4</version>
+		<relativePath/> <!-- lookup parent from repository -->
+	</parent>
 
     <groupId>com.strong</groupId>
     <artifactId>familyauth</artifactId>
