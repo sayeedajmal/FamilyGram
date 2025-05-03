@@ -4,6 +4,8 @@ server:
 spring:
   application:
     name: FamilyNotificaton
+  main:
+    allow-circular-references: true
   data:
     mongodb:
       uri: ${DBURL}
