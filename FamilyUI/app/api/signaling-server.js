@@ -1,7 +1,7 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 
-const SIGNAL_API_URL = "http://192.168.31.218:8085";
+const SIGNAL_API_URL = "https://familygateway.onrender.com";
 
 class SignalSocket {
     constructor(userId, onSignalReceived) {

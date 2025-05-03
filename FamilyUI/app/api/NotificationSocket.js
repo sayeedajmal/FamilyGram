@@ -1,10 +1,9 @@
 import { Client } from "@stomp/stompjs";
 import SockJS from "sockjs-client";
 import { Alert } from "react-native";
-import * as Notifications from "expo-notifications";
 import Toast from 'react-native-toast-message';
-const NOTIF_API_URL = "http://192.168.31.218:8085";
-//const NOTIF_API_URL = "http://34.55.86.158:8080";
+//const NOTIF_API_URL = "http://192.168.31.218:8085";
+const NOTIF_API_URL = "https://familynotification.onrender.com";
 class NotificationSocket {
 
     constructor(userId, onNotificationReceived, onFetchNotifications) {
@@ -14,17 +13,6 @@ class NotificationSocket {
         this.client = null;
         this.connected = false;
         this.serverUrl = NOTIF_API_URL;
-    }
-    async triggerSystemNotification(notification) {
-        await Notifications.scheduleNotificationAsync({
-            content: {
-                title: "🔔 New Notification",
-                body: notification.message || "You have a new notification!",
-                sound: true,  // ✅ Uses default system sound
-                priority: "high",
-            },
-            trigger: null,  // Show immediately
-        });
     }
     // Connect to WebSocket
     connect() {

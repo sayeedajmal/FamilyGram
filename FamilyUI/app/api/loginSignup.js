@@ -3,8 +3,8 @@ import * as ImageManipulator from "expo-image-manipulator";
 import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 
-const AUTH_API_URL = "http://192.168.31.218:8080";
-//const AUTH_API_URL = "http://34.55.86.158:8080";
+//const AUTH_API_URL = "http://192.168.31.218:8080";
+const AUTH_API_URL = "https://familyauth.onrender.com";
 
 const Storage = {
     setItem: async (key, value) => {
@@ -109,6 +109,7 @@ class ApiService {
         }
 
         const responseData = await response.json();
+
         return { status: response.ok, message: responseData.message || "Success", data: responseData };
     }
 
@@ -344,6 +345,7 @@ class ApiService {
     }
 
     async fetchUserProfile(mineId) {
+
         const response = await this.request(`${AUTH_API_URL}/user/myProfile?mineId=${encodeURIComponent(mineId)}`, {
             method: "GET",
             headers: { "Content-Type": "application/json" },
@@ -358,6 +360,11 @@ class ApiService {
             if (imageResponse.status) {
                 thumbnailUrl = imageResponse.data;
             }
+
+            this.request(`https://familyfeed.onrender.com`);
+            this.request(`https://familypost.onrender.com`);
+            this.request(`https://familynotification.onrender.com`);
+
             userProfile.thumbnailUrl = thumbnailUrl;
             await Storage.setItem("userProfile", JSON.stringify(userProfile));
             return userProfile;
