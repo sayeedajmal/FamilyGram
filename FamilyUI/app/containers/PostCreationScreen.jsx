@@ -1,8 +1,8 @@
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
-import { Video } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
-import React, { useCallback, useEffect, useState } from "react";
+import { Video } from "expo-av";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -17,9 +17,9 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import loginSignup from "../api/loginSignup";
+import NotificationSocket from "../api/NotificationSocket";
 import postHandle from "../api/postHandle";
 import { Colors } from "../constants/Colors";
-import NotificationSocket from "../api/NotificationSocket";
 
 const PostCreationScreen = () => {
   const [caption, setCaption] = useState("");
@@ -35,6 +35,8 @@ const PostCreationScreen = () => {
   const textColor = themeColors.text;
   const navigation = useNavigation();
 
+  const videoRefs = useRef({});
+
   useFocusEffect(
     useCallback(() => {
       return () => {
@@ -49,23 +51,20 @@ const PostCreationScreen = () => {
   const SUPPORTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
   const SUPPORTED_VIDEO_TYPES = ["video/mp4", "video/mkv", "video/quicktime"];
 
-  // Open Image/Video Picker (Multiple Selection)
   const pickMedia = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ["images"],
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.All,
       allowsMultipleSelection: true,
       quality: 1,
     });
 
     if (!result.canceled) {
-      // Filter only supported image and video types
       const filteredAssets = result.assets.filter(
         (asset) =>
           SUPPORTED_IMAGE_TYPES.includes(asset.mimeType) ||
           SUPPORTED_VIDEO_TYPES.includes(asset.mimeType)
       );
 
-      // Map selected files to desired format
       const selectedFiles = filteredAssets.map((asset) => ({
         uri: asset.uri,
         type:
@@ -76,7 +75,6 @@ const PostCreationScreen = () => {
         name: asset.fileName || `media_${Date.now()}`,
       }));
 
-      // Update state only if there are valid files
       if (selectedFiles.length > 0) {
         setMediaFiles((prevFiles) => [...prevFiles, ...selectedFiles]);
       }
@@ -123,7 +121,6 @@ const PostCreationScreen = () => {
       const postId = data?.id;
       const postThumbId = data?.thumbnailIds?.[0];
 
-      // Trigger Notification for all followers
       await NotificationSocket.sendNotificationsBulk(
         "POST",
         "Posted a new post",
@@ -178,9 +175,13 @@ const PostCreationScreen = () => {
                 <TouchableOpacity key={index}>
                   {file.type.includes("video") ? (
                     <Video
+                      ref={(ref) => (videoRefs.current[index] = ref)}
                       source={{ uri: file.uri }}
+                      rate={1.0}
+                      volume={1.0}
+                      isMuted={false}
+                      resizeMode="cover"
                       shouldPlay
-                      usePoster
                       isLooping
                       style={{
                         width: 300,
@@ -188,8 +189,6 @@ const PostCreationScreen = () => {
                         marginRight: 10,
                         borderRadius: 10,
                       }}
-                      useNativeControls
-                      resizeMode="cover"
                     />
                   ) : (
                     <Image

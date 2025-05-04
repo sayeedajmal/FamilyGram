@@ -582,7 +582,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                                   overflow: "hidden",
                                 }}
                               >
-                                {/* Use VideoView with useVideoPlayer hook */}
                                 <VideoView
                                   videoPlayer={getVideoPlayer(index)}
                                   style={{
@@ -595,7 +594,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
                                   useNativeControls={false}
                                 />
 
-                                {/* Play indicator overlay - only shows when paused */}
                                 {activeIndex !== index && (
                                   <View
                                     style={{

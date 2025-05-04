@@ -113,16 +113,29 @@ public class PostService {
                 savedPost = postRepo.save(savedPost);
             }
 
-            // Step 5: Cache in Redis as HASH
-            String cacheKey = "posts:" + savedPost.getUserId(); // Hash key
-            String postId = savedPost.getId(); // Hash field
+            // Step 5: Cache in Redis (merge logic)
+            String cacheKey = "posts:" + savedPost.getUserId(); // Redis Hash Key
+            String postId = savedPost.getId(); // Hash field (post ID)
 
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-            String jsonPost = mapper.writeValueAsString(savedPost);
+            // Check if Redis already has posts for this user
+            Map<Object, Object> existingPosts = redisTemplate.opsForHash().entries(cacheKey);
 
+            // If Redis is empty, fetch from DB
+            if (existingPosts == null || existingPosts.isEmpty()) {
+                List<Post> dbPosts = postRepo.findByUserId(savedPost.getUserId());
+
+                for (Post dbPost : dbPosts) {
+                    String json = mapper.writeValueAsString(dbPost);
+                    redisTemplate.opsForHash().put(cacheKey, dbPost.getId(), json);
+                }
+            }
+
+            // Add the newly created post to Redis
+            String jsonPost = mapper.writeValueAsString(savedPost);
             redisTemplate.opsForHash().put(cacheKey, postId, jsonPost);
 
             return savedPost;

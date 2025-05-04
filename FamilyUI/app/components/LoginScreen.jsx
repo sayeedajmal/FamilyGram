@@ -112,7 +112,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
             <ActivityIndicator color={bg} />
           ) : (
             <Text className="text-white text-lg font-semibold font-custom">
-              Log in
+              Login
             </Text>
           )}
         </TouchableOpacity>
@@ -134,7 +134,7 @@ export default function LoginScreen({ navigation, setAuthenticated }) {
             Don't have an account?
             <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
               <Text
-                className="font-semibold h-10 m-1 mt-3 font-custom"
+                className="h-10 m-1 mt-3 font-custom"
                 style={{ color: iconColor }}
               >
                 Sign up
