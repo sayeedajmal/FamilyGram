@@ -4,10 +4,9 @@ import { Alert } from "react-native";
 import * as Notifications from "expo-notifications";
 import Toast from 'react-native-toast-message';
 const NOTIF_API_URL = "http://192.168.31.218:8085";
-//const NOTIF_API_URL = "http://34.55.86.158:8085";
-//const NOTIF_API_URL = "https://familygram.onrender.com";
+//const NOTIF_API_URL = "http://34.55.86.158:8080";
 class NotificationSocket {
-    
+
     constructor(userId, onNotificationReceived, onFetchNotifications) {
         this.userId = userId;
         this.onNotificationReceived = onNotificationReceived;
@@ -129,14 +128,14 @@ class NotificationSocket {
                     `,
                 }),
             });
-    
-           return true;
+
+            return true;
         } catch (error) {
             console.error("Error marking notifications as read:", error);
             return false;
         }
     }
-    
+
 
     async sendNotificationsBulk(type, message, senderUsername, receivers, senderId, thumbnailId, postId, postThumbId) {
         try {

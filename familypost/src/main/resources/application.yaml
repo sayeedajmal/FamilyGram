@@ -32,12 +32,16 @@ jwt:
   tokenValidityInMilliSeconds: ${JWT_TOKEN_VALIDITY_IN_MILLISECONDS}
   tokenRefreshInMilliSeconds: ${JWT_TOKEN_REFRESH_IN_MILLISECONDS}
 
-#http://localhost:8082 https://familygram.onrender.com http://familyauth:8082
 feign:
-  client-url: "http://familyauth:8082"
+  client-url: ${AUTH_URL}
 
 server:
   port: 8083
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${MicroZone}
 
 management:
   endpoints:

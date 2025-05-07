@@ -1,8 +1,10 @@
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import ContentLoader, { Circle, Rect } from "react-content-loader/native";
 import {
+  Alert,
   FlatList,
   Image,
   Keyboard,
@@ -14,9 +16,7 @@ import {
   TouchableWithoutFeedback,
   View,
   useColorScheme,
-  Alert,
 } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import loginSignup from "../api/loginSignup";
 import { Colors } from "../constants/Colors";
 

@@ -1,0 +1,43 @@
+spring:
+  application:
+    name: FamilyGateway
+  main:
+    web-application-type: reactive
+  cloud:
+    gateway:
+      routes:
+        - id: family-auth-service
+          uri: lb://familyauth
+          predicates:
+            - Path=/auth/**,/user/**
+        - id: family-feed-service
+          uri: lb://familyfeed
+          predicates:
+            - Path=/feeds/**
+        - id: family-post-service
+          uri: lb://familypost
+          predicates:
+            - Path=/comments/**,/posts/**
+        - id: family-notification-service
+          uri: lb://familynotification
+          predicates:
+            - Path=/ws-notifications/**,/graphql,/notifications/**
+          filters:
+            - RewritePath=/graphql, /graphql # Ensures exact path matching
+            - AddRequestHeader=Content-Type, application/json # Ensures proper content type
+      discovery:
+        locator:
+          enabled: true
+          lower-case-service-id: true
+
+server:
+  port: 8080
+
+eureka:
+  client:
+    register-with-eureka: true
+    fetch-registry: true
+    service-url:
+      defaultZone: ${MICROZONE}
+  instance:
+    prefer-ip-address: true

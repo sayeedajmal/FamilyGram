@@ -477,7 +477,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }}>
       <KeyboardAwareScrollView
-        style={{ backgroundColor: bg }}
+        style={{ backgroundColor: themeColors.tint }}
         keyboardShouldPersistTaps="handled"
       >
         {loading ? (
@@ -506,7 +506,7 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               backgroundColor: bg,
               borderRadius: 12,
               padding: 10,
-              marginBottom: 16,
+              marginBottom: 5,
             }}
           >
             {/* Post Header */}
@@ -514,7 +514,6 @@ const PostModel = ({ post, loading = false, videoRefs, myProf, userProf }) => {
               style={{
                 flexDirection: "row",
                 alignItems: "center",
-                marginBottom: 8,
               }}
             >
               <Image

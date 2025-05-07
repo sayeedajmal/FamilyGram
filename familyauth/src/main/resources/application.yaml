@@ -42,16 +42,10 @@ jwt:
   tokenValidityInMilliSeconds: ${JWT_TOKEN_VALIDITY_IN_MILLISECONDS}
   tokenRefreshInMilliSeconds: ${JWT_TOKEN_REFRESH_IN_MILLISECONDS}
 
-# Auth:
-#   Cors:
-#     Url: ${CORS_URL}
-#     Methods: ${CORS_METHODS}
-
-# logging:
-#   level:
-#     web: OFF
-#     org.springframework.web: ERROR
-#     feign: ERROR
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${MicroZone}
 
 management:
   endpoints:

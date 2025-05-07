@@ -1,31 +1,35 @@
 # Documentation
 
-## AUTH
+This architecture diagram illustrates the FamilyGram microservices system:
 
-    - /auth
-    POST
-        - sendSignupOtp (parm email)
-        - register (Body User)
-        - login (Body user)
+FamilyDiscovery (center top): Eureka Server running on port 8761 that handles service registration and discovery
 
-✅ Why WebSocket alone isn't enough
-WebSocket is awesome for pushing notifications to clients...
-But it doesn't listen to events across services.
+All services register themselves with this central registry
 
-So if:
+FamilyGateway (left): API Gateway running on port 8080 that:
 
-Someone likes a post ➝ Post Service emits event
+Routes external requests to the appropriate microservices
+Registers itself with the Discovery Server
+Acts as the single entry point for client applications
 
-Someone follows a user ➝ User Service emits event
+Microservices (right):
 
-Someone comments ➝ Comment Service emits event
+FamilyAuth (port 8082): Authentication service
+FamilyPost (port 8083): Post management service
+FamilyFeed (port 8084): Feed aggregation service
+FamilyNotification (port 8085): Notification service
 
-➡️ WebSocket won't receive these events on its own.
-That's where Kafka comes in.
+Kafka Broker (center): Message broker running on port 9092 that:
 
-[Frontend]  
- │  
- ▼  
-[UserService] → [Redis] → (Kafka Producer) → [MongoUpdaterService] → [MongoDB] (Kafka Consumer)
+Enables asynchronous communication between services
+Handles event-driven interactions
 
-[PostService] → [Redis] → (Kafka Producer) → [MongoUpdaterService] → [MongoDB] (Kafka Consumer)
+The diagram shows three types of connections:
+
+Dashed lines: Service registration with the Discovery Server
+Solid blue lines: API request routing through the Gateway
+Solid orange lines: Inter-service communication via Kafka
+
+This design follows microservices best practices by separating concerns and keeping the Discovery Server and API Gateway as independent components.
+
+<img src="System Design.png" alt="FamilyGram microservices architecture diagram">

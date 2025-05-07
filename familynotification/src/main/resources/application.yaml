@@ -25,16 +25,10 @@ spring:
     listener:
       ack-mode: manual
 
-# Auth:
-#   Cors:
-#     Url: ${CORS_URL}
-#     Methods: ${CORS_METHODS}
-
-# logging:
-#   level:
-#     web: OFF
-#     org.springframework.web: ERROR
-#     feign: ERROR
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${MicroZone}
 
 management:
   endpoints:

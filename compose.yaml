@@ -1,4 +1,29 @@
 services:
+  familydiscovery:
+    build:
+      context: .
+      dockerfile: familydiscovery/Dockerfile
+    container_name: familydiscovery
+    ports:
+      - "8761:8761"
+    networks:
+      - familygram-network
+    volumes:
+      - familygram-storage:/var/lib/discovery/data
+
+  familygateway:
+    build:
+      context: .
+      dockerfile: familygateway/Dockerfile
+    container_name: familygateway
+    ports:
+      - "8080:8080"
+    env_file: .env
+    networks:
+      - familygram-network
+    volumes:
+      - familygram-storage:/var/lib/gateway/data
+      
   familyauth:
     build:
       context: .
@@ -7,6 +32,10 @@ services:
     ports:
       - "8082:8082"
     env_file: .env
+    depends_on:
+      - broker
+      - familygateway
+      - familydiscovery
     networks:
       - familygram-network
     volumes:
@@ -22,6 +51,8 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - familygateway
+      - familydiscovery
     networks:
       - familygram-network
     volumes:
@@ -37,6 +68,8 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - familygateway
+      - familydiscovery
     networks:
       - familygram-network
     volumes:
@@ -52,6 +85,8 @@ services:
     env_file: .env
     depends_on:
       - broker
+      - familygateway
+      - familydiscovery
     networks:
       - familygram-network
     volumes:

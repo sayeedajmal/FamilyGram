@@ -1,9 +1,11 @@
 package com.strong.familynotification;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration;
+import org.springframework.cloud.client.discovery.EnableDiscoveryClient;
 import org.springframework.context.annotation.Bean;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
@@ -15,6 +17,7 @@ import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory;
 import org.springframework.kafka.core.ConsumerFactory;
 import org.springframework.kafka.listener.ContainerProperties;
 import org.springframework.kafka.listener.DefaultErrorHandler;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.util.backoff.FixedBackOff;
@@ -25,10 +28,12 @@ import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerCo
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.strong.familynotification.Model.SignalingMessage;
 
 @SpringBootApplication(exclude = { DataSourceAutoConfiguration.class })
 @EnableWebSocketMessageBroker
 @EnableScheduling
+@EnableDiscoveryClient
 public class FamilynotificationApplication implements WebSocketMessageBrokerConfigurer {
 
 	@Value("${spring.redis.host}")
@@ -40,15 +45,22 @@ public class FamilynotificationApplication implements WebSocketMessageBrokerConf
 	@Value("${spring.redis.password}")
 	String password;
 
+	@Autowired
+	private SimpMessagingTemplate messagingTemplate;
+
 	public static void main(String[] args) {
 		SpringApplication.run(FamilynotificationApplication.class, args);
 	}
 
 	@Override
-	public void configureMessageBroker(@SuppressWarnings("null") MessageBrokerRegistry registry) {
+	public void configureMessageBroker(MessageBrokerRegistry registry) {
 		registry.enableSimpleBroker("/topic", "/queue", "/user");
 		registry.setApplicationDestinationPrefixes("/app");
 		registry.setUserDestinationPrefix("/user");
+	}
+
+	public void sendSignalingMessageToUser(String receiverId, SignalingMessage message) {
+		messagingTemplate.convertAndSendToUser(receiverId, "/queue/signaling", message);
 	}
 
 	@Bean
@@ -67,8 +79,12 @@ public class FamilynotificationApplication implements WebSocketMessageBrokerConf
 	}
 
 	@Override
-	public void registerStompEndpoints(@SuppressWarnings("null") StompEndpointRegistry registry) {
+	public void registerStompEndpoints(StompEndpointRegistry registry) {
 		registry.addEndpoint("/ws-notifications")
+				.setAllowedOrigins("http://localhost:3000", "http://192.168.31.218:3000")
+				.withSockJS();
+
+		registry.addEndpoint("/ws-signaling")
 				.setAllowedOrigins("http://localhost:3000", "http://192.168.31.218:3000")
 				.withSockJS();
 	}
