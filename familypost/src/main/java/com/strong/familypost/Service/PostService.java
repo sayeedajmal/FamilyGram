@@ -1,6 +1,5 @@
 package com.strong.familypost.Service;
 
-import java.math.BigInteger;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -109,7 +108,6 @@ public class PostService {
                 }
 
                 // Step 4: Save post again with media references
-                savedPost.setLikeCount(BigInteger.valueOf(0));
                 savedPost = postRepo.save(savedPost);
             }
 
@@ -311,24 +309,5 @@ public class PostService {
         } catch (Exception e) {
             throw new RuntimeException("Error fetching and caching posts: " + e.getMessage());
         }
-    }
-
-    public boolean toggleLike(String postId, String userId) throws PostException {
-        String redisLikeKey = "post_like:" + postId;
-
-        // Step 1: Check if user already liked
-        Boolean hasLiked = redisTemplate.opsForSet().isMember(redisLikeKey, userId);
-
-        boolean isLiked;
-        if (Boolean.TRUE.equals(hasLiked)) {
-            // User already liked → remove like
-            redisTemplate.opsForSet().remove(redisLikeKey, userId);
-            isLiked = false;
-        } else {
-            // User hasn't liked → add like
-            redisTemplate.opsForSet().add(redisLikeKey, userId);
-            isLiked = true;
-        }
-        return isLiked;
     }
 }

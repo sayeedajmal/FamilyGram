@@ -1,7 +1,8 @@
 package com.strong.familypost.Service;
 
-import java.math.BigInteger;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.data.mongodb.core.BulkOperations;
@@ -13,8 +14,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import com.strong.familypost.Model.Post;
-import com.strong.familypost.Repository.PostRepo;
+import com.strong.familypost.Model.Like;
 
 import lombok.RequiredArgsConstructor;
 
@@ -24,12 +24,9 @@ public class CornService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final MongoTemplate mongoTemplate;
-    private final PostRepo postRepo;
 
-    @Scheduled(fixedRate = 1 * 60 * 1000) // every 5 mins
+    @Scheduled(fixedRate = 2 * 60 * 1000) // every 2 minutes
     public void syncLikesToDB() {
-        // System.out.println("⏰ Running CRON to sync post likes...");
-
         Set<String> keys = redisTemplate.keys("post_like:*");
         if (keys == null || keys.isEmpty())
             return;
@@ -45,55 +42,39 @@ public class CornService {
                 if (redisUserIds == null || redisUserIds.isEmpty())
                     continue;
 
-                Set<String> redisLikes = redisUserIds.stream()
+                Set<String> userIds = redisUserIds.stream()
                         .map(Object::toString)
                         .collect(Collectors.toSet());
 
-                // 🧠 Get existing likes from MongoDB
-                Optional<Post> optionalPost = postRepo.findById(postId);
-                Set<String> finalLikes = new HashSet<>(redisLikes);
+                // Build query to find Like document by postId
+                Query query = new Query(Criteria.where("postId").is(postId));
 
-                BigInteger likeCount = BigInteger.valueOf(finalLikes.size());
-                if (optionalPost.isPresent()) {
-                    Post updatedPost = optionalPost.get();
-                    updatedPost.setLikes(finalLikes);
-                    updatedPost.setLikeCount(likeCount);
-
-                    String userId = updatedPost.getUserId();
-                    String feedKey = "posts:" + userId;
-
-                    redisTemplate.opsForHash().put(feedKey, postId, updatedPost);
-                }
-                // ✅ Prepare update
-                Query query = new Query(Criteria.where("_id").is(postId));
-                Update update = new Update()
-                        .set("likes", finalLikes)
-                        .set("likeCount", likeCount);
+                // Add the new likes to the existing set
+                Update update = new Update().addToSet("likes").each(userIds.toArray());
 
                 queries.add(query);
                 updates.add(update);
 
             } catch (Exception e) {
-                // System.err.println("❌ Error preparing update for key: " + key);
+                System.err.println("❌ Error preparing update for key: " + key);
                 e.printStackTrace();
             }
         }
 
-        try {
-            BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Post.class);
-            for (int i = 0; i < queries.size(); i++) {
-                bulkOps.updateOne(queries.get(i), updates.get(i));
+        if (!queries.isEmpty()) {
+            try {
+                BulkOperations bulkOps = mongoTemplate.bulkOps(BulkOperations.BulkMode.UNORDERED, Like.class);
+                for (int i = 0; i < queries.size(); i++) {
+                    bulkOps.updateOne(queries.get(i), updates.get(i));
+                }
+                bulkOps.execute();
+
+                System.out.println("✅ Likes synced to DB for " + queries.size() + " posts");
+            } catch (Exception e) {
+                System.err.println("❌ Bulk update failed");
+                e.printStackTrace();
             }
-            bulkOps.execute();
-
-            // System.out.println("✅ Bulk update completed for " + queries.size() + " posts");
-
-            // Cleanup Redis keys
-            redisTemplate.delete(keys);
-
-        } catch (Exception e) {
-            // System.err.println("❌ Bulk update failed");
-            e.printStackTrace();
         }
     }
+
 }

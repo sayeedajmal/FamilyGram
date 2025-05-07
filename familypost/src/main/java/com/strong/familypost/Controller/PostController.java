@@ -24,6 +24,7 @@ import com.mongodb.client.gridfs.model.GridFSFile;
 import com.strong.familypost.Model.Comment;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Service.CommentService;
+import com.strong.familypost.Service.LikeService;
 import com.strong.familypost.Service.PostService;
 import com.strong.familypost.Service.StorageService;
 import com.strong.familypost.Util.PostException;
@@ -61,6 +62,9 @@ public class PostController {
 
     @Autowired
     private StorageService storageService;
+
+    @Autowired
+    private LikeService likeService;
 
     /**
      * Creates a new post with multiple media attachments.
@@ -178,7 +182,7 @@ public class PostController {
             @PathVariable String postId,
             @RequestParam("userId") String userId) {
         try {
-            boolean liked = postService.toggleLike(postId, userId);
+            boolean liked = likeService.toggleLike(postId, userId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Like toggled successfully", liked));
         } catch (PostException e) {
             return ResponseEntity.badRequest().body(new ResponseWrapper<>(400, "Error toggling like", false));
