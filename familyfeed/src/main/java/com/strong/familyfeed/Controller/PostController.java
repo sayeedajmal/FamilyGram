@@ -15,8 +15,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.mongodb.client.gridfs.model.GridFSFile;
+import com.strong.familyfeed.Model.FullPost;
 import com.strong.familyfeed.Model.Post;
-import com.strong.familyfeed.Model.PostWithUser;
 import com.strong.familyfeed.Service.PostService;
 import com.strong.familyfeed.Service.StorageService;
 import com.strong.familyfeed.Util.PostException;
@@ -69,13 +69,13 @@ public class PostController {
     }
 
     @GetMapping("/random-feed")
-    public ResponseEntity<ResponseWrapper<List<PostWithUser>>> getRandomFeedPosts(
+    public ResponseEntity<ResponseWrapper<List<FullPost>>> getRandomFeedPosts(
             @RequestParam String mineId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
             @RequestHeader("Authorization") String token) {
 
-        List<PostWithUser> posts = postService.getPagedFeedPosts(mineId, page, size, token);
+        List<FullPost> posts = postService.getPagedFeedPosts(mineId, page, size, token);
 
         return ResponseEntity.ok(new ResponseWrapper<>(
                 HttpStatus.OK.value(),

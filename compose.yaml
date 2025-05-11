@@ -18,7 +18,7 @@ services:
     container_name: familygateway
     ports:
       - "8080:8080"
-    env_file: .env
+    env_file: .env.development
     networks:
       - familygram-network
     volumes:
@@ -31,7 +31,7 @@ services:
     container_name: familyauth
     ports:
       - "8082:8082"
-    env_file: .env
+    env_file: .env.development
     depends_on:
       - broker
       - familygateway
@@ -48,7 +48,7 @@ services:
     container_name: familyfeed
     ports:
       - "8084:8084"
-    env_file: .env
+    env_file: .env.development
     depends_on:
       - broker
       - familygateway
@@ -65,7 +65,7 @@ services:
     container_name: familypost
     ports:
       - "8083:8083"
-    env_file: .env
+    env_file: .env.development
     depends_on:
       - broker
       - familygateway
@@ -82,7 +82,7 @@ services:
     container_name: familynotification
     ports:
       - "8085:8085"
-    env_file: .env
+    env_file: .env.development
     depends_on:
       - broker
       - familygateway
@@ -91,6 +91,17 @@ services:
       - familygram-network
     volumes:
       - familygram-storage:/var/lib/notification/data
+
+  redisinsight:
+    image: redis/redisinsight:latest
+    container_name: redisinsight
+    restart: always
+    ports:
+      - "5540:5540"
+    networks:
+      - familygram-network
+    volumes:
+      - familygram-storage:/var/lib/redisInsight/data
 
   broker:
     image: apache/kafka:latest

@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
+import com.strong.familyfeed.Model.FullPost;
 import com.strong.familyfeed.Model.LiteUser;
 import com.strong.familyfeed.Model.Post;
 import com.strong.familyfeed.Model.PostWithUser;
@@ -32,11 +33,11 @@ public class PostService {
     private RedisTemplate<String, Object> redisTemplate;
 
     @SuppressWarnings({ "null", "unchecked" })
-    public List<PostWithUser> getRandomFeedPosts(String mineId, int userLimit, String token) {
+    public List<FullPost> getRandomFeedPosts(String mineId, int userLimit, String token) {
         String cacheKey = "user_feed:" + mineId;
         ValueOperations<String, Object> valueOps = redisTemplate.opsForValue();
 
-        List<PostWithUser> cachedFeed = (List<PostWithUser>) valueOps.get(cacheKey);
+        List<FullPost> cachedFeed = (List<FullPost>) valueOps.get(cacheKey);
         if (cachedFeed != null) {
             return cachedFeed;
         }
@@ -49,27 +50,31 @@ public class PostService {
         List<LiteUser> users = response.getBody().getData();
         Pageable pageable = PageRequest.of(0, 5);
 
-        List<PostWithUser> freshFeed = users.stream()
+        List<FullPost> freshFeed = users.stream()
                 .flatMap(user -> {
                     List<Post> posts = postRepo.findTopEngagedPostsByUserId(user.getId(), pageable);
                     return posts.stream()
                             .filter(post -> post != null && post.getUserId() != null)
-                            .map(post -> new PostWithUser(
-                                    user.getUsername(),
-                                    user.getName(),
-                                    user.getThumbnailId(),
-                                    post.getId(),
-                                    post.getUserId(),
-                                    post.getCaption(),
-                                    post.getMediaIds() != null ? post.getMediaIds() : List.of(),
-                                    post.getLocation(),
-                                    post.getLikes() != null ? post.getLikes() : new HashSet<>(),
-                                    post.getCreatedAt()));
+                            .map(post -> {
+                                PostWithUser pwu = new PostWithUser(
+                                        user.getUsername(),
+                                        user.getName(),
+                                        user.getThumbnailId(),
+                                        post.getId(),
+                                        post.getUserId(),
+                                        post.getCaption(),
+                                        post.getMediaIds() != null ? post.getMediaIds() : List.of(),
+                                        post.getLocation(),
+                                        post.getLikes() != null ? post.getLikes() : new HashSet<>(),
+                                        post.getCreatedAt());
+                                Set<String> redisLikes = getLikesForPost(post.getId());
+                                return new FullPost(pwu, redisLikes);
+                            });
                 })
                 .collect(Collectors.collectingAndThen(
                         Collectors.toCollection(LinkedHashSet::new),
                         list -> {
-                            List<PostWithUser> finalList = new ArrayList<>(list);
+                            List<FullPost> finalList = new ArrayList<>(list);
                             Collections.shuffle(finalList);
                             return finalList;
                         }));
@@ -78,12 +83,12 @@ public class PostService {
         return freshFeed;
     }
 
-    public List<PostWithUser> getPagedFeedPosts(String mineId, int page, int size, String token) {
+    public List<FullPost> getPagedFeedPosts(String mineId, int page, int size, String token) {
         String cacheKey = "user_feed:" + mineId;
         ValueOperations<String, Object> valueOps = redisTemplate.opsForValue();
 
         @SuppressWarnings("unchecked")
-        List<PostWithUser> fullFeed = (List<PostWithUser>) valueOps.get(cacheKey);
+        List<FullPost> fullFeed = (List<FullPost>) valueOps.get(cacheKey);
 
         if (fullFeed == null) {
             fullFeed = getRandomFeedPosts(mineId, 10, token);
@@ -96,15 +101,23 @@ public class PostService {
             return List.of();
         }
 
-        // 🔥 Detect if this is the last page
         boolean isLastPage = end >= fullFeed.size();
-
         if (isLastPage) {
-            // 🧠 Background refresh
             refreshFeedAsync(mineId, size, token);
         }
 
         return fullFeed.subList(start, end);
+    }
+
+    private Set<String> getLikesForPost(String postId) {
+        String redisLikeKey = "post_like:" + postId;
+        Set<Object> members = redisTemplate.opsForSet().members(redisLikeKey);
+        if (members == null)
+            return new HashSet<>();
+        return members.stream()
+                .filter(Objects::nonNull)
+                .map(Object::toString)
+                .collect(Collectors.toSet());
     }
 
     @Async

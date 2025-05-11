@@ -1,5 +1,7 @@
 package com.strong.familypost.Service;
 
+import java.util.concurrent.TimeUnit;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -26,8 +28,11 @@ public class LikeService {
         } else {
             // User hasn't liked → add like
             redisTemplate.opsForSet().add(redisLikeKey, userId);
+            // Set TTL for 12 hours
+            redisTemplate.expire(redisLikeKey, 12, TimeUnit.HOURS);
             isLiked = true;
         }
         return isLiked;
     }
+
 }

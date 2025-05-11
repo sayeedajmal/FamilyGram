@@ -3,9 +3,12 @@ package com.strong.familypost.Service;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,9 +24,12 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.strong.familypost.Model.FullPost;
+import com.strong.familypost.Model.Like;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Model.User;
 import com.strong.familypost.Repository.CommentRepo;
+import com.strong.familypost.Repository.LikeRepo;
 import com.strong.familypost.Repository.PostRepo;
 import com.strong.familypost.Util.PostException;
 
@@ -44,6 +50,9 @@ public class PostService {
 
     @Autowired
     private CommentRepo commentRepo;
+
+    @Autowired
+    private LikeRepo likeRepo;
 
     @Autowired
     private StorageService storageService;
@@ -157,15 +166,18 @@ public class PostService {
             throw new PostException("You are not authorized to access this Resource");
         }
 
-        // Delete all comments associated with the post
+        // Delete all comments,Likes associated with the post
         commentRepo.deleteByPostId(postId);
+        likeRepo.deleteByPostId(postId);
 
         // Delete post from database
         postRepo.deleteById(postId);
 
         // Update Redis cache - remove the post if it exists in cache
-        String cacheKey = "posts:" + post.getUserId();
-        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(cacheKey);
+        String postKey = "posts:" + post.getUserId();
+        String commentKey = "comments:" + post.getId();
+        String likeKey = "post_like:" + post.getId();
+        List<?> cachedList = (List<?>) redisTemplate.opsForValue().get(postKey);
 
         if (cachedList != null) {
             List<Post> updatedList = new ArrayList<>();
@@ -178,9 +190,11 @@ public class PostService {
                     }
                 }
             }
-
+            // Delete The Cache of Likes and Comments
+            redisTemplate.delete(likeKey);
+            redisTemplate.delete(commentKey);
             // Update the cache with the filtered list
-            redisTemplate.opsForValue().set(cacheKey, updatedList, Duration.ofMinutes(20));
+            redisTemplate.opsForValue().set(postKey, updatedList, Duration.ofMinutes(20));
         }
     }
 
@@ -192,33 +206,59 @@ public class PostService {
      * @throws PostException if the postId is null or empty, or if no post exists
      *                       with the given id
      */
-    public Post getPostById(String postId, String userId) throws PostException {
+    public FullPost getPostById(String postId, String userId) throws PostException {
         try {
             String redisHashKey = "posts:" + userId;
             ObjectMapper mapper = new ObjectMapper();
             mapper.registerModule(new JavaTimeModule());
             mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
-            // Step 1: Try getting from Redis Hash
+            Post post = null;
+
+            // Try Redis cache
             Object cached = redisTemplate.opsForHash().get(redisHashKey, postId);
             if (cached != null) {
-
                 if (cached instanceof String) {
-                    return mapper.readValue((String) cached, Post.class);
+                    post = mapper.readValue((String) cached, Post.class);
                 } else if (cached instanceof Map) {
-                    return mapper.convertValue(cached, Post.class);
+                    post = mapper.convertValue(cached, Post.class);
                 }
             }
 
-            // Step 2: Fallback to DB
-            Post post = postRepo.findById(postId)
-                    .orElseThrow(() -> new PostException("No Post with postId: " + postId));
+            // If not found in cache, fetch from DB and update cache
+            if (post == null) {
+                post = postRepo.findById(postId)
+                        .orElseThrow(() -> new PostException("No Post with postId: " + postId));
 
-            String json = mapper.writeValueAsString(post);
+                String json = mapper.writeValueAsString(post);
+                redisTemplate.opsForHash().put(redisHashKey, postId, json);
+                redisTemplate.expire(redisHashKey, Duration.ofHours(12));
+            }
 
-            redisTemplate.opsForHash().put(redisHashKey, postId, json);
+            // ✅ Get likes from Redis
+            Set<Object> likeSet = redisTemplate.opsForSet().members("post_like:" + postId);
+            Set<String> likes;
 
-            return post;
+            if (likeSet == null || likeSet.isEmpty()) {
+                // Redis doesn't have it — fetch from MongoDB
+                Like like = likeRepo.findByPostId(postId);
+
+                if (like != null && like.getLikes() != null && !like.getLikes().isEmpty()) {
+                    // Add all userIds back to Redis set
+                    redisTemplate.opsForSet().add("post_like:" + postId, like.getLikes().toArray());
+                    redisTemplate.expire("post_like:" + postId, 12, TimeUnit.HOURS);
+
+                    // Use those userIds
+                    likes = new HashSet<>(like.getLikes());
+                } else {
+                    likes = new HashSet<>();
+                }
+            } else {
+                likes = likeSet.stream().map(Object::toString).collect(Collectors.toSet());
+            }
+
+            // ✅ Return enriched response
+            return new FullPost(post, likes);
 
         } catch (Exception e) {
             e.printStackTrace();
@@ -241,7 +281,6 @@ public class PostService {
         try {
             // 1️⃣ Try to fetch from Redis HASH
             Map<Object, Object> cachedMap = redisTemplate.opsForHash().entries(cacheKey);
-
             if (cachedMap != null && !cachedMap.isEmpty()) {
                 ObjectMapper mapper = new ObjectMapper();
                 mapper.registerModule(new JavaTimeModule());
@@ -250,10 +289,10 @@ public class PostService {
                 List<Post> posts = cachedMap.values().stream()
                         .map(obj -> {
                             try {
-                                String json = obj.toString(); 
+                                String json = obj.toString();
                                 return mapper.readValue(json, Post.class);
                             } catch (Exception e) {
-                                redisTemplate.delete(cacheKey); 
+                                redisTemplate.delete(cacheKey);
                                 throw new RuntimeException("Error collecting post: " + e.getLocalizedMessage(), e);
                             }
                         })
@@ -302,7 +341,7 @@ public class PostService {
             if (!postMap.isEmpty()) {
                 redisTemplate.opsForHash().putAll(cacheKey, postMap);
                 // Optional: Set TTL (e.g., 10 minutes)
-                redisTemplate.expire(cacheKey, Duration.ofMinutes(10));
+                redisTemplate.expire(cacheKey, Duration.ofHours(12));
             }
 
             return postsFromDb;

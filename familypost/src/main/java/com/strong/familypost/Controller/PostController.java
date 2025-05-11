@@ -22,6 +22,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.gridfs.model.GridFSFile;
 import com.strong.familypost.Model.Comment;
+import com.strong.familypost.Model.FullPost;
 import com.strong.familypost.Model.Post;
 import com.strong.familypost.Service.CommentService;
 import com.strong.familypost.Service.LikeService;
@@ -141,10 +142,10 @@ public class PostController {
      */
     @GetMapping("/{postId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<ResponseWrapper<Post>> getPostById(
+    public ResponseEntity<ResponseWrapper<FullPost>> getPostById(
             @PathVariable String postId, @RequestParam String userId) {
         try {
-            Post post = postService.getPostById(postId, userId);
+            FullPost post = postService.getPostById(postId, userId);
             return ResponseEntity.ok(new ResponseWrapper<>(200, "Post retrieved successfully", post));
         } catch (PostException e) {
             return ResponseEntity.status(404).body(new ResponseWrapper<>(404, "No Post", null));

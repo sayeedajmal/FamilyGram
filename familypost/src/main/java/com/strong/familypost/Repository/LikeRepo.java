@@ -7,5 +7,7 @@ import com.strong.familypost.Model.Like;
 public interface LikeRepo extends MongoRepository<Like, String> {
 
    Like findByPostId(String postId);
+
+   void deleteByPostId(String postId);
     
 }
